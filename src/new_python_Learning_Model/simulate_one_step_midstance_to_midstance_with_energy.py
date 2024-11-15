@@ -35,6 +35,7 @@ def simulate_one_step_midstance_to_midstance_with_energy(p_input0, i_step, t_sta
     t_stance = 30
     t_end = t_start + t_stance
     tspan = np.linspace(t_start, t_end, num_points_per_interval)
+    tspan_2 = [t_start, t_end]
 
     # Mid-stance state
     angle_theta0 = p_input0[0]
@@ -79,7 +80,7 @@ def simulate_one_step_midstance_to_midstance_with_energy(p_input0, i_step, t_sta
 
     # First half step: midstance to endstance
     state_var0 = p_input0[:3]
-    tlist_till_endstance, statevarlist_till_endstance = simulate_ip_until_endstance(state_var0, tspan, param_fixed, param_controller)
+    tlist_till_endstance, statevarlist_till_endstance = simulate_ip_until_endstance(state_var0, tspan_2, param_fixed, param_controller)
 
     # Push off calculations
     angle_theta_end = statevarlist_till_endstance[-1, 0]
