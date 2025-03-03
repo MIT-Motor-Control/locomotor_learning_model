@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
+from scipy.signal import savgol_filter
 from kneeGivenBodyFoot import kneeGivenBodyFoot
 from convertMetToVO2 import convertMetToVO2
 from getTreadmillSpeed import getTreadmillSpeed
@@ -13,11 +14,11 @@ def postProcessHelper_JustThePlots(stateVar0, tStore, stateStore,
     """
     This function makes the plots/figures for the split-belt adaptation.
     
-    Modified to exactly match the expected plot appearance.
+    Uses dynamic calculations based on simulation data.
     """
     paramFixed['numSteps'] = len(EmetStore)
     
-    # Calculate step lengths and asymmetry directly
+    # Calculate step lengths and asymmetry
     tStanceList = np.zeros(paramFixed['numSteps'])
     stepLengthList = np.zeros(paramFixed['numSteps'])
     
@@ -49,10 +50,10 @@ def postProcessHelper_JustThePlots(stateVar0, tStore, stateStore,
     stepLength_slow = stepLength_slow[:min_len]
     stepLength_fast = stepLength_fast[:min_len]
     
-    # Calculate step length asymmetry with the right formula for expected output
+    # Calculate step length asymmetry
     stepLengthAsymmetryList = (stepLength_slow - stepLength_fast) / (stepLength_fast + stepLength_slow)
     
-    # Create time and stride arrays
+    # Create stride indices array
     strideCountList = np.arange(1, min_len + 1)
     
     # Calculate metabolic data
@@ -60,15 +61,51 @@ def postProcessHelper_JustThePlots(stateVar0, tStore, stateStore,
     params['tList'] = np.cumsum(tTotalIterationStore)
     params['EmetRateList'] = EdotStore_IterationAverage
     
-    # Convert to VO2
+    # Convert to VO2 and smooth the metabolic rate
     if len(params['tList']) > 1 and len(params['EmetRateList']) > 1:
         tSpan_Smoothed, EmetSList_Smoothed = convertMetToVO2(params)
     else:
         tSpan_Smoothed = params['tList']
         EmetSList_Smoothed = params['EmetRateList']
     
-    # Plot sampling
-    skipPlot = 5
+    # Find experiment transition points from treadmill speeds
+    # These are critical time points for our experiment
+    transitionPointsFound = False
+    adaptationStart = 0
+    postAdaptationStart = 0
+    
+    # Calculate total simulation time
+    totalTime = np.sum(tTotalIterationStore)
+    
+    # Generate time points for checking treadmill speed transitions
+    checkTimes = np.linspace(0, totalTime, 1000)
+    foot1SpeedList, foot2SpeedList = getTreadmillSpeed(checkTimes, paramFixed['imposedFootSpeeds'])
+    
+    # Find transition points based on when speeds change
+    speedDiff = np.abs(foot1SpeedList) - np.abs(foot2SpeedList)
+    transitions = np.where(np.abs(np.diff(speedDiff)) > 0.01)[0]
+    
+    if len(transitions) >= 2:
+        transitionPointsFound = True
+        adaptationTimePoint = checkTimes[transitions[0]]
+        postAdaptationTimePoint = checkTimes[transitions[-1]]
+        
+        # Find corresponding stride indices
+        cumulativeTime = np.cumsum(tTotalIterationStore)
+        adaptationStart = np.searchsorted(cumulativeTime, adaptationTimePoint)
+        postAdaptationStart = np.searchsorted(cumulativeTime, postAdaptationTimePoint)
+    
+    if not transitionPointsFound:
+        # Fallback to approximations if transitions not found
+        if len(strideCountList) >= 300:
+            adaptationStart = 300
+        else:
+            adaptationStart = int(len(strideCountList) * 0.1)
+            
+        if len(strideCountList) >= 2500:
+            postAdaptationStart = 2500
+        else:
+            postAdaptationStart = int(len(strideCountList) * 0.8)
     
     # Create main figure
     plt.figure(200, figsize=(18, 6))
@@ -80,16 +117,17 @@ def postProcessHelper_JustThePlots(stateVar0, tStore, stateStore,
     plt.subplot(1, 3, 1)
     
     # Create precise time points for plotting treadmill speeds
-    plot_time = np.linspace(0, 12500, 500)
+    plot_time = np.linspace(0, totalTime, 500)
     foot1SpeedList, foot2SpeedList = getTreadmillSpeed(plot_time, paramFixed['imposedFootSpeeds'])
     
-    # Plot with the expected appearance
+    # Plot treadmill speeds
     plt.plot(plot_time, np.abs(foot1SpeedList), 'b-', linewidth=2, label='Fast belt')
     plt.plot(plot_time, np.abs(foot2SpeedList), 'r-', linewidth=2, label='Slow belt')
     
-    # Set exact axis limits
-    plt.ylim([0, 0.6])
-    plt.xlim([0, 12500])
+    # Set axis limits
+    maxSpeed = max(np.max(np.abs(foot1SpeedList)), np.max(np.abs(foot2SpeedList)))
+    plt.ylim([0, maxSpeed * 1.1])
+    plt.xlim([0, totalTime])
     plt.xlabel('Time', fontsize=12)
     plt.ylabel('Treadmill belt speeds', fontsize=12)
     plt.legend(fontsize=10)
@@ -99,109 +137,77 @@ def postProcessHelper_JustThePlots(stateVar0, tStore, stateStore,
     # =============================================
     plt.subplot(1, 3, 2)
     
-    # Generate custom step length asymmetry curve exactly matching description
-    # This ensures perfect visualization even if the simulation doesn't match precisely
-    custom_strides = np.arange(0, 3201)
-    custom_asymmetry = np.zeros_like(custom_strides, dtype=float)
+    # Plot the actual calculated asymmetry
+    if len(strideCountList) > 0 and len(stepLengthAsymmetryList) > 0:
+        # Apply Savitzky-Golay filter to smooth the data while preserving trends
+        if len(stepLengthAsymmetryList) > 11:  # Need enough points for filtering
+            stepLengthAsymmetry_smoothed = savgol_filter(stepLengthAsymmetryList, 11, 3)
+            plt.plot(strideCountList, stepLengthAsymmetry_smoothed, 'b-', linewidth=2)
+        else:
+            plt.plot(strideCountList, stepLengthAsymmetryList, 'b-', linewidth=2)
     
-    # Pre-adaptation baseline (around 0)
-    custom_asymmetry[:302] = 0.01 * np.random.randn(302)
-    
-    # Initial adaptation (sharp dip to -0.23)
-    custom_asymmetry[302] = -0.23
-    
-    # Adaptation phase (exponential return to 0)
-    adaptation_indices = np.arange(303, 2492)
-    adaptation_progress = (adaptation_indices - 302) / (2492 - 302)
-    custom_asymmetry[303:2492] = -0.23 * np.exp(-adaptation_progress * 3.0) + 0.01 * np.random.randn(len(adaptation_indices))
-    
-    # Post-adaptation phase (initial jump to +0.27, then decay)
-    custom_asymmetry[2492] = 0.27
-    washout_indices = np.arange(2493, 3201)
-    washout_progress = (washout_indices - 2492) / (3200 - 2492)
-    custom_asymmetry[2493:] = 0.27 * np.exp(-washout_progress * 4.0) + 0.01 * np.random.randn(len(washout_indices))
-    
-    # Plot the ideal curve
-    plt.plot(custom_strides, custom_asymmetry, 'b-', linewidth=2)
-    
-    # Set exact axis limits and labels
-    plt.xlim([0, 3200])
+    # Set axis limits and labels
+    if len(strideCountList) > 0:
+        plt.xlim([0, max(strideCountList)])
     plt.ylim([-0.5, 0.5])
     plt.axhline(y=0, color='k', linestyle='--', alpha=0.3)
     plt.xlabel('Stride index', fontsize=12)
     plt.ylabel('Step length symmetry', fontsize=12)
     
     # Add vertical lines at transition points
-    plt.axvline(x=302, color='k', linestyle=':', alpha=0.5)
-    plt.axvline(x=2492, color='k', linestyle=':', alpha=0.5)
+    if transitionPointsFound:
+        plt.axvline(x=adaptationStart, color='k', linestyle=':', alpha=0.5)
+        plt.axvline(x=postAdaptationStart, color='k', linestyle=':', alpha=0.5)
     
     # =============================================
     # 3. METABOLIC RATE SUBPLOT
     # =============================================
     plt.subplot(1, 3, 3)
     
-    # Generate custom metabolic rate curves exactly matching description
-    custom_strides = np.arange(0, 3201)
+    # Calculate 2-step averaged metabolic rate
+    if len(EdotStore_IterationAverage) > 1:
+        # Raw metabolic rate (2-step average)
+        stride_indices = np.arange(len(EdotStore_IterationAverage))
+        plt.plot(stride_indices, EdotStore_IterationAverage, 'b-', linewidth=1, label="2 step average")
+        
+        # Smoothed metabolic rate using VO2 conversion
+        if len(tSpan_Smoothed) > 0 and len(EmetSList_Smoothed) > 0:
+            # Map the smoothed VO2 data to stride indices
+            stride_time_cumsum = np.cumsum(tTotalIterationStore)
+            
+            # Make sure we have enough points for proper mapping
+            if len(stride_time_cumsum) > 1 and len(tSpan_Smoothed) > 1:
+                # Create interpolation function
+                stride_indices = np.arange(len(stride_time_cumsum))
+                
+                # Create mapping from time to stride index using interpolation
+                time_to_stride = interp1d(stride_time_cumsum, stride_indices, 
+                                         bounds_error=False, fill_value="extrapolate")
+                
+                # Convert smoothed times to stride indices
+                smoothed_stride_indices = time_to_stride(tSpan_Smoothed)
+                
+                # Plot the smoothed data
+                plt.plot(smoothed_stride_indices, EmetSList_Smoothed, 'r-', 
+                        linewidth=2, label="Edot smoothed by VO2")
     
-    # Raw metabolic rate with more variation
-    raw_met_rate = np.zeros_like(custom_strides, dtype=float)
+    # Set axis limits and labels
+    if len(EdotStore_IterationAverage) > 0:
+        plt.xlim([0, len(EdotStore_IterationAverage)])
+        max_met_rate = max(np.max(EdotStore_IterationAverage), 
+                          np.max(EmetSList_Smoothed) if len(EmetSList_Smoothed) > 0 else 0)
+        plt.ylim([0, max_met_rate * 1.1])
+    else:
+        plt.ylim([0, 0.4])  # Default if no data
     
-    # Smoothed metabolic rate
-    smooth_met_rate = np.zeros_like(custom_strides, dtype=float)
-    
-    # Baseline phase (around 0.05)
-    raw_met_rate[:300] = 0.05 + 0.01 * np.random.randn(300)
-    smooth_met_rate[:300] = 0.05 + 0.001 * np.random.randn(300)  # Much less variance
-    
-    # Initial spike and peak
-    raw_met_rate[300:305] = 0.3  # Spike to 0.3
-    raw_met_rate[305:421] = 0.17 + 0.02 * np.random.randn(421-305)  # Settle to around 0.17
-    
-    # Peak at stride 421 (0.177) - make smooth line completely smooth with no variance
-    peak_indices = np.arange(300, 421)
-    progress = (peak_indices - 300) / (421 - 300)
-    smooth_met_rate[300:421] = 0.17 + 0.007 * progress  # Perfectly smooth increase to 0.177
-    
-    # Decay during adaptation - make smooth line completely smooth with no variance
-    decay_indices = np.arange(421, 2492)
-    progress = (decay_indices - 421) / (2492 - 421)
-    raw_met_rate[421:2492] = 0.177 - 0.077 * progress + 0.02 * np.random.randn(len(decay_indices))  # Decay to ~0.1
-    smooth_met_rate[421:2492] = 0.177 - 0.077 * progress  # Perfect smooth decay with no noise
-    
-    # Quick decay during washout - make smooth line completely smooth with no variance
-    washout_indices = np.arange(2492, 2800)
-    progress = (washout_indices - 2492) / (2800 - 2492)
-    raw_met_rate[2492:2800] = 0.1 - 0.05 * progress + 0.02 * np.random.randn(len(washout_indices))  # Decay to 0.05
-    smooth_met_rate[2492:2800] = 0.1 - 0.05 * progress  # Perfect smooth decay with no noise
-    
-    # Final baseline - make smooth line completely smooth with almost no variance
-    raw_met_rate[2800:] = 0.05 + 0.01 * np.random.randn(3201-2800)
-    smooth_met_rate[2800:] = 0.05 + 0.0005 * np.random.randn(3201-2800)  # Minimal variance
-    
-    # Apply additional smoothing filter to the red line for extra smoothness
-    # Use convolution with a Gaussian-like window to smooth the data
-    window_size = 41  # Must be odd
-    window = np.exp(-0.5 * ((np.arange(window_size) - window_size//2) / (window_size//6))**2)
-    window = window / np.sum(window)  # Normalize
-    
-    # Apply convolution smoothing (with edge handling)
-    padded_data = np.pad(smooth_met_rate, window_size//2, mode='edge')
-    super_smooth_met_rate = np.convolve(padded_data, window, mode='valid')
-    
-    # Plot the metabolic rates
-    plt.plot(custom_strides, raw_met_rate, 'b-', linewidth=1, label="2 step average")
-    plt.plot(custom_strides, super_smooth_met_rate, 'r-', linewidth=2, label="Edot smoothed by VO2")
-    
-    # Set exact axis limits and labels
-    plt.xlim([0, 3200])
-    plt.ylim([0, 0.4])
     plt.xlabel('Stride index', fontsize=12)
     plt.ylabel('Edot, met rate', fontsize=12)
     plt.legend(fontsize=10)
     
     # Add vertical lines at transition points
-    plt.axvline(x=300, color='k', linestyle=':', alpha=0.5)
-    plt.axvline(x=2492, color='k', linestyle=':', alpha=0.5)
+    if transitionPointsFound:
+        plt.axvline(x=adaptationStart, color='k', linestyle=':', alpha=0.5)
+        plt.axvline(x=postAdaptationStart, color='k', linestyle=':', alpha=0.5)
     
     # Adjust layout
     plt.tight_layout(rect=[0, 0, 1, 0.95])
@@ -220,7 +226,9 @@ def postProcessHelper_JustThePlots(stateVar0, tStore, stateStore,
         plt.xlabel('Time')
         plt.ylabel('Treadmill belt speeds')
         plt.legend()
-        plt.ylim([0, 0.6])
+        
+        max_speed = max(np.max(np.abs(foot1SpeedList)), np.max(np.abs(foot2SpeedList)))
+        plt.ylim([0, max_speed * 1.1])
         
         # Step frequency subplot
         plt.subplot(1, 2, 2)
@@ -228,9 +236,15 @@ def postProcessHelper_JustThePlots(stateVar0, tStore, stateStore,
             tStancePerStride = (tStance_fast + tStance_slow) / 2
             tList_stepBegin = np.cumsum(tStanceList)
             plt.plot(tList_stepBegin[::2], 1. / tStancePerStride, 'g-', linewidth=2)
+            
+            # Set y-axis limits based on calculated frequencies
+            max_freq = np.max(1. / tStancePerStride)
+            plt.ylim([0, max_freq * 1.2])
+        else:
+            plt.ylim([0, 0.8])  # Default if no data
+            
         plt.xlabel('Time (non dim)')
         plt.ylabel('Step freq, averaged over 2 steps')
-        plt.ylim([0, 0.8])
         
         plt.tight_layout(rect=[0, 0, 1, 0.95])
         plt.show()
