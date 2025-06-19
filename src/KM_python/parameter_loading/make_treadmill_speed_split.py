@@ -1,76 +1,113 @@
-"""Simple split-belt treadmill speed profile."""
-from __future__ import annotations
-
 import numpy as np
-
-
-def make_treadmill_speed_split(param_fixed: dict) -> dict:
-    """Return imposed belt speeds for a classic split-belt protocol."""
+import matplotlib.pyplot as plt
+ 
+def make_treadmill_speed_split(paramFixed):
+    # ------------------------------------------------------------------
+    # exactly as in MATLAB:
     L = 0.95
     g = 9.81
-    time_scaling = np.sqrt(L / g)
+    timeScaling = np.sqrt(L / g)
 
-    delta = 0.0328
-    v_normal = -0.3276
-    v_fast = v_normal - 5 * delta
-    v_slow = v_normal + 5 * delta
+    # +5 delta
+    delta = 0.0328  # half of normal delta
+    vNormal = -0.3276
+    vFast   = vNormal - 5 * delta
+    vSlow   = vNormal + 5 * delta
 
-    t_duration_transition = param_fixed.get('transitionTime', 15) / time_scaling
+    # ------------------------------------------------------------------
+    # branch on protocol
+    speedProtocol = paramFixed['speedProtocol']
+    if speedProtocol == 'single speed':
+        # transitioning from one speed to next takes
+        tDurationTransition = paramFixed['transitionTime'] / timeScaling
 
-    speed_protocol = param_fixed.get('speedProtocol', 'classic split belt')
-    if speed_protocol != 'classic split belt':
-        raise NotImplementedError("Only 'classic split belt' protocol implemented")
+        # phase durations (non-dimensionalized)
+        tDuration1 = 9 * 60 / timeScaling
+        tDuration2 = 1 * 60 / timeScaling
+        tDuration3 = 1 * 60 / timeScaling
+        tDuration4 = 1 * 60 / timeScaling
 
-    t_duration1 = 1 * 60 / time_scaling
-    t_duration2 = 5 * 60 / time_scaling
-    t_duration3 = 45 * 60 / time_scaling
-    t_duration4 = 5 * 60 / time_scaling
+        # tied‐belt speeds
+        f1_p1 = f2_p1 = vNormal
+        f1_p2 = f2_p2 = vNormal
+        f1_p3 = f2_p3 = vNormal
+        f1_p4 = f2_p4 = vNormal
 
-    foot_speed1_store = np.array([
-        v_normal,
-        v_normal,
-        v_normal,
-        v_fast,
-        v_normal,
-    ])
-    foot_speed2_store = np.array([
-        v_normal,
-        v_normal,
-        v_normal,
-        v_slow,
-        v_normal,
-    ])
+    elif speedProtocol == 'classic split belt':
+        tDurationTransition = paramFixed['transitionTime'] / timeScaling
 
-    t_store = np.array([0, t_duration1, t_duration2, t_duration3, t_duration4])
-    t_store = np.cumsum(t_store)
+        tDuration1 = 1 * 60 / timeScaling
+        tDuration2 = 5 * 60 / timeScaling
+        tDuration3 = 45 * 60 / timeScaling
+        tDuration4 = 5 * 60 / timeScaling
 
-    t_list = [0.0]
-    fs1 = [foot_speed1_store[0]]
-    fs2 = [foot_speed2_store[0]]
+        f1_p1 = f2_p1 = vNormal
+        f1_p2 = f2_p2 = vNormal
+        f1_p3, f2_p3 = vFast, vSlow
+        f1_p4 = f2_p4 = vNormal
 
-    for i in range(1, len(t_store)):
-        if i < len(t_store) - 1:
-            t_list.extend([t_store[i], t_store[i] + t_duration_transition])
-            fs1.extend([foot_speed1_store[i], foot_speed1_store[i + 1]])
-            fs2.extend([foot_speed2_store[i], foot_speed2_store[i + 1]])
+    else:
+        raise ValueError(f"Unknown speedProtocol: {speedProtocol}")
+
+    # build the “phase” arrays exactly as MATLAB’s tStore and speed stores
+    tStore = np.cumsum([0, tDuration1, tDuration2, tDuration3, tDuration4])
+    footSpeed1Store = np.array([f1_p1, f1_p1, f1_p2, f1_p3, f1_p4])
+    footSpeed2Store = np.array([f2_p1, f2_p1, f2_p2, f2_p3, f2_p4])
+
+    # ------------------------------------------------------------------
+    # insert transition segments
+    tStore_new       = [tStore[0]]
+    foot1_new        = [footSpeed1Store[0]]
+    foot2_new        = [footSpeed2Store[0]]
+
+    for i in range(1, len(tStore)):
+        if i < len(tStore) - 1:
+            # start of phase i
+            tStore_new.append(tStore[i])
+            foot1_new.append(footSpeed1Store[i])
+            foot2_new.append(footSpeed2Store[i])
+            # end of transition into phase i+1
+            tStore_new.append(tStore[i] + tDurationTransition)
+            foot1_new.append(footSpeed1Store[i+1])
+            foot2_new.append(footSpeed2Store[i+1])
         else:
-            t_list.append(t_store[i])
-            fs1.append(foot_speed1_store[i])
-            fs2.append(foot_speed2_store[i])
+            # last phase just append once
+            tStore_new.append(tStore[i])
+            foot1_new.append(footSpeed1Store[i])
+            foot2_new.append(footSpeed2Store[i])
 
-    t_arr = np.array(t_list)
-    fs1_arr = np.array(fs1)
-    fs2_arr = np.array(fs2)
+    # convert lists back to arrays
+    tList            = np.array(tStore_new)
+    footSpeed1List   = np.array(foot1_new)
+    footSpeed2List   = np.array(foot2_new)
 
-    a1_list = np.diff(fs1_arr) / np.diff(t_arr)
-    a2_list = np.diff(fs2_arr) / np.diff(t_arr)
-    a1_arr = np.concatenate([a1_list, [0]])
-    a2_arr = np.concatenate([a2_list, [0]])
+    # ------------------------------------------------------------------
+    # compute accelerations
+    a1List = np.diff(footSpeed1List) / np.diff(tList)
+    a2List = np.diff(footSpeed2List) / np.diff(tList)
+    # pad with zero at end to match lengths
+    a1List = np.append(a1List, 0.0)
+    a2List = np.append(a2List, 0.0)
 
-    return {
-        'tList': t_arr,
-        'footSpeed1List': fs1_arr,
-        'footSpeed2List': fs2_arr,
-        'footAcc1List': a1_arr,
-        'footAcc2List': a2_arr,
+    # optional: plot like MATLAB
+    plt.figure(2555)
+    plt.plot(tList, np.abs(footSpeed1List), linewidth=2, label='(abs) fast belt')
+    plt.plot(tList, np.abs(footSpeed2List), linewidth=2, label='(abs) slow belt')
+    plt.xlabel('t')
+    plt.ylabel('treadmill speeds (non-dimensional)')
+    plt.ylim([0, abs(vFast) * 1.25])
+    plt.title('Split belt speed change protocol')
+    plt.legend()
+    plt.show()
+
+    # ------------------------------------------------------------------
+    # pack into the same‐named structure/dict
+    beltSpeedsImposed = {
+        'tList':            tList,
+        'footSpeed1List':   footSpeed1List,
+        'footSpeed2List':   footSpeed2List,
+        'footAcc1List':     a1List,
+        'footAcc2List':     a2List
     }
+
+    return beltSpeedsImposed

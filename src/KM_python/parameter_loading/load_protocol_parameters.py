@@ -14,6 +14,7 @@ def load_protocol_parameters(param_fixed: dict) -> dict:
 
     param_fixed['imposedFootSpeeds'] = make_treadmill_speed_split(param_fixed)
 
+    # draw now
     param_fixed['angleSlope'] = 0
 
     nominal_step_time = 1.7
