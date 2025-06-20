@@ -18,12 +18,17 @@ def error_from_memory_compute(
     """
 
     p_input_memory_now = (
-        param_fixed.storedmemory.nominal_control
+        param_fixed['storedmemory']['nominalControl']
         + slope_j_controller_vs_context
-        @ (context_gait_now - param_fixed.storedmemory.nominal_context)
+        @ (context_gait_now - param_fixed['storedmemory']['nominalContext'])
     )
 
     diff = p_input_now_considered_good - p_input_memory_now
-    f = float(diff.T @ diff)
+    
+    # Ensure diff is 1D for proper dot product
+    diff_flat = np.asarray(diff).flatten()
+    
+    # Compute scalar dot product (sum of squared differences)
+    f = float(np.sum(diff_flat * diff_flat))
 
     return f

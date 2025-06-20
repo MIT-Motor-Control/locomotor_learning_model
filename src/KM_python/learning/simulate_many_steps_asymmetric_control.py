@@ -36,7 +36,7 @@ def simulate_many_steps_asymmetric_control(
         Initial time for the simulation.
     """
 
-    num_steps = int(param_fixed.num_steps)
+    num_steps = int(param_fixed['num_steps'])
 
     # Storage for time histories and state trajectories
     t_store: List[np.ndarray] = [np.empty(0) for _ in range(num_steps + 1)]
@@ -52,30 +52,30 @@ def simulate_many_steps_asymmetric_control(
     for i_step in range(1, num_steps + 1):
         # Odd or even control parameters
         if i_step % 2 == 0:
-            param_controller.theta_end_nominal = param_controller.Even.theta_end_nominal
-            param_controller.ydot_at_midstance_nominal_beltframe = (
-                param_controller.Even.ydot_at_midstance_nominal_beltframe
+            param_controller['theta_end_nominal'] = param_controller['Even']['theta_end_nominal']
+            param_controller['ydot_at_midstance_nominal_beltframe'] = (
+                param_controller['Even']['ydot_at_midstance_nominal_beltframe']
             )
-            param_controller.pushoff_impulse_magnitude_nominal = (
-                param_controller.Even.pushoff_impulse_magnitude_nominal
+            param_controller['pushoff_impulse_magnitude_nominal'] = (
+                param_controller['Even']['pushoff_impulse_magnitude_nominal']
             )
-            param_controller.y_at_midstance_nominal_slopeframe = (
-                param_controller.Even.y_at_midstance_nominal_slopeframe
+            param_controller['y_at_midstance_nominal_slopeframe'] = (
+                param_controller['Even']['y_at_midstance_nominal_slopeframe']
             )
-            param_controller.sumy_at_midstance_nominal_slopeframe = (
-                param_controller.Even.sumy_at_midstance_nominal_slopeframe
+            param_controller['sumy_at_midstance_nominal_slopeframe'] = (
+                param_controller['Even']['sumy_at_midstance_nominal_slopeframe']
             )
         else:
-            param_controller.theta_end_nominal = param_controller.Odd.theta_end_nominal
-            param_controller.ydot_at_midstance_nominal_beltframe = (
-                param_controller.Odd.ydot_at_midstance_nominal_beltframe
+            param_controller['theta_end_nominal'] = param_controller['Odd']['theta_end_nominal']
+            param_controller['ydot_at_midstance_nominal_beltframe'] = (
+                param_controller['Odd']['ydot_at_midstance_nominal_beltframe']
             )
-            param_controller.pushoff_impulse_magnitude_nominal = (
-                param_controller.Odd.pushoff_impulse_magnitude_nominal
+            param_controller['pushoff_impulse_magnitude_nominal'] = (
+                param_controller['Odd']['pushoff_impulse_magnitude_nominal']
             )
             # Fixed to zero by fiat
-            param_controller.y_at_midstance_nominal_slopeframe = 0.0
-            param_controller.sumy_at_midstance_nominal_slopeframe = 0.0
+            param_controller['y_at_midstance_nominal_slopeframe'] = 0.0
+            param_controller['sumy_at_midstance_nominal_slopeframe'] = 0.0
 
         (
             state_var0,

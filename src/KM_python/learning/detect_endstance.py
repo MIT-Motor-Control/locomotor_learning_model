@@ -14,5 +14,5 @@ def detect_endstance(
     """
 
     angle_theta = state_var[0]
-    value = angle_theta - param_controller.theta_end_thisStep
+    value = angle_theta - param_controller['theta_end_thisStep']
     return float(value)

@@ -26,8 +26,16 @@ def compute_model_dynamics_model_rls_no_singular(
 
     mu_measurement = 0.0  # Dummy variable, not used
 
-    input_now_store = np.vstack((state_var_now_store, p_input_controller_now_store))
-    output_next_store = state_var_next_store
+    # Ensure both arrays have the same number of columns by taking the minimum
+    min_cols = min(state_var_now_store.shape[1], p_input_controller_now_store.shape[1], 
+                   state_var_next_store.shape[1])
+    
+    state_var_trimmed = state_var_now_store[:, :min_cols]
+    p_input_trimmed = p_input_controller_now_store[:, :min_cols]
+    state_next_trimmed = state_var_next_store[:, :min_cols]
+    
+    input_now_store = np.vstack((state_var_trimmed, p_input_trimmed))
+    output_next_store = state_next_trimmed
 
     # Remove the first row of zeros to avoid singularity
     input_now_store = input_now_store[1:, :]

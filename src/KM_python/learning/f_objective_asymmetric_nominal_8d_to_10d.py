@@ -14,9 +14,12 @@ def f_objective_asymmetric_nominal_8d_to_10d(
     t_start: float,
 ) -> Tuple[float, np.ndarray, float, float, float]:
     """Wrapper matching the MATLAB function of the same name."""
+    # Ensure input is 1D (flatten if needed)
+    p_input_flat = np.asarray(p_input_controller_nominal).flatten()
+    
     temp = np.zeros(10)
-    temp[0:3] = p_input_controller_nominal[0:3]
-    temp[5:10] = p_input_controller_nominal[3:8]
+    temp[0:3] = p_input_flat[0:3]
+    temp[5:10] = p_input_flat[3:8]
     p_input_controller_nominal_full = temp
     return f_objective_asymmetric_nominal(
         p_input_controller_nominal_full,

@@ -89,16 +89,16 @@ def make_treadmill_speed_split(paramFixed):
     a1List = np.append(a1List, 0.0)
     a2List = np.append(a2List, 0.0)
 
-    # optional: plot like MATLAB
-    plt.figure(2555)
-    plt.plot(tList, np.abs(footSpeed1List), linewidth=2, label='(abs) fast belt')
-    plt.plot(tList, np.abs(footSpeed2List), linewidth=2, label='(abs) slow belt')
-    plt.xlabel('t')
-    plt.ylabel('treadmill speeds (non-dimensional)')
-    plt.ylim([0, abs(vFast) * 1.25])
-    plt.title('Split belt speed change protocol')
-    plt.legend()
-    plt.show()
+    # optional: plot like MATLAB (disabled to prevent blocking)
+    # plt.figure(2555)
+    # plt.plot(tList, np.abs(footSpeed1List), linewidth=2, label='(abs) fast belt')
+    # plt.plot(tList, np.abs(footSpeed2List), linewidth=2, label='(abs) slow belt')
+    # plt.xlabel('t')
+    # plt.ylabel('treadmill speeds (non-dimensional)')
+    # plt.ylim([0, abs(vFast) * 1.25])
+    # plt.title('Split belt speed change protocol')
+    # plt.legend()
+    # plt.show()
 
     # ------------------------------------------------------------------
     # pack into the same‐named structure/dict

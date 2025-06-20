@@ -12,10 +12,10 @@ def get_treadmill_speed(t: float, belt_speeds_imposed) -> Tuple[float, float]:
         t_list = belt_speeds_imposed.tList
         foot_speed1_list = belt_speeds_imposed.footSpeed1List
         foot_speed2_list = belt_speeds_imposed.footSpeed2List
-    except AttributeError:  # mapping with snake_case keys
-        t_list = belt_speeds_imposed["t_list"]
-        foot_speed1_list = belt_speeds_imposed["foot_speed1_list"]
-        foot_speed2_list = belt_speeds_imposed["foot_speed2_list"]
+    except AttributeError:  # mapping with dictionary keys (as produced by make_treadmill_speed_split)
+        t_list = belt_speeds_imposed["tList"]
+        foot_speed1_list = belt_speeds_imposed["footSpeed1List"]
+        foot_speed2_list = belt_speeds_imposed["footSpeed2List"]
 
     foot_speed1 = np.interp(t, t_list, foot_speed1_list)
     foot_speed2 = np.interp(t, t_list, foot_speed2_list)

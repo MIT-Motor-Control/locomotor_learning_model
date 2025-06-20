@@ -20,14 +20,14 @@ def swing_cost_doke(
     v_final_relative = v_final - v_body
 
     delta_v = v_final_relative - v_initial_relative
-    force = param_fixed.mFoot * delta_v / t_duration_of_change
+    force = param_fixed['mFoot'] * delta_v / t_duration_of_change
     force_rate = force / t_duration_of_change
 
     epsilon = 0.01
 
     c = (
-        param_fixed.swingCost.Coeff
-        * np.sqrt(force_rate**2 + epsilon**2) ** param_fixed.swingCost.alpha
+        param_fixed['swingCost']['Coeff']
+        * np.sqrt(force_rate**2 + epsilon**2) ** param_fixed['swingCost']['alpha']
     )
 
     return float(c)

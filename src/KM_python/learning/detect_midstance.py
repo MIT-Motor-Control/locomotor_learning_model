@@ -15,7 +15,7 @@ def detect_midstance(
 
     angle_theta = state_var[0]
 
-    y_now = param_fixed.leglength * np.sin(angle_theta + param_fixed.angleSlope)
+    y_now = param_fixed['leglength'] * np.sin(angle_theta + param_fixed['angleSlope'])
     value = y_now
 
     return float(value)

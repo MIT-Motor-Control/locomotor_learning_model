@@ -23,7 +23,7 @@ def load_protocol_parameters(param_fixed: dict) -> dict:
     param_fixed['numStepsToLearn'] = round(param_fixed['numStepsToLearn'] / 100) * 100
 
     learner = param_fixed.get('Learner', {})
-    param_fixed['numIterations'] = int(np.floor(param_fixed['numStepsToLearn'] / learner.get('numStepsPerIteration', 1)))
+    param_fixed['num_iterations'] = int(np.floor(param_fixed['numStepsToLearn'] / learner.get('numStepsPerIteration', 1)))
 
     if learner.get('numStepsPerIteration', 1) % 2 != 0:
         learner['numStepsPerIteration'] = learner.get('numStepsPerIteration', 1) + 1
