@@ -1,109 +1,153 @@
 # locomotor_learning_model
 
-------- Supplementary code to the manuscript ---------------------------------
+Code accompanying the manuscript "Fall risk-aware adaptation explains suboptimal locomotor performance."
 
-Title: "Exploration-based learning of a stabilizing controller predicts locomotor adaptation"
-Authors: Nidhi Seethapathi, Barrett L Clark, and Manoj Srinivasan
+This repository now contains two synchronized implementations of the model:
 
-This code version is offered for review purposes. Upon acceptance/publication 
-of the manuscript, the entire code will be made available without any 
-restrictions in a public repository (e.g., github).
+- `matlab/`: the original MATLAB workflow used during model development.
+- `src/locomotor_learning_model/`: a packaged Python implementation with matching default behavior.
 
-------- How to run the program -----------------------------------------------
+The associated bioRxiv preprint is available here:
+[Fall risk-aware adaptation explains suboptimal locomotor performance](https://www.biorxiv.org/content/10.64898/2026.03.02.709033v1.abstract)
 
-The following assumes that you have downloaded the zip file onto your 
-computer, and have un-zipped the .zip file to create a folder. The unzipped 
-folder will be programsForManuscriptSeethapathiEtAl22 by default.
+## Repository layout
 
-If you have MATLAB already installed on your computer, please directly run the 
-following program within MATLAB: 
-	rootSimulateLearningWhileWalking.m
-This program calls other functions as necessary to perform the simulation, and 
-will generate the key figures. 
+```text
+locomotor_learning_model/
+├── matlab/
+│   ├── run_simulation.m
+│   ├── src/
+│   └── validation/
+├── notebooks/
+├── scripts/
+├── src/locomotor_learning_model/
+├── tests/
+├── pyproject.toml
+└── README.md
+```
 
-To run the program in MATLAB, navigate to the 
-folder containing the code, and type rootSimulateLearningWhileWalking into the
-command prompt and press 'enter' or 'return':
->> rootSimulateLearningWhileWalking <enter/return>
+Key locations:
 
-If don't have MATLAB on your computer or if the above step does not work, 
-see the next section and come back to this section.
+- `matlab/run_simulation.m`: MATLAB entry point.
+- `matlab/validation/export_reference_run.m`: exports a deterministic MATLAB reference run for parity checks.
+- `scripts/run_python_simulation.py`: Python entry point without installation.
+- `scripts/validate_matlab_python_parity.py`: compares Python against a MATLAB reference export.
+- `src/locomotor_learning_model/parameter_loading/load_protocol_parameters.py`: default protocol configuration.
+- `src/locomotor_learning_model/workflow.py`: high-level Python workflow.
 
-------- Programming enviroment and computer requirements ---------------------
+## Requirements
 
-The program is written from scratch in the MATLAB programming environment.
+### Python
 
-The program is open source in the sense you can view the entire code here.
+- Python 3.10 or newer
+- `numpy`
+- `scipy`
+- `matplotlib`
 
-The code is self-contained and does not use any special functions. The only 
-toolbox that may possibly need to be installed is the MATLAB Optimization 
-toolbox, but this may not be necessary depending on your MATLAB installation.
+Install the Python package in editable mode:
 
-The programs were tested in MATLAB Version: 9.12.0.1927505 (R2022a). However, 
-the programs will run in any older version of MATLAB, as the programs do not 
-require any special functionality available only in the newer versions. 
+```bash
+python3 -m pip install -e .
+```
 
-MATLAB is available from Mathworks: 
-https://www.mathworks.com
+### MATLAB
 
-One may use the program either on a personal computer (eg., Desktop or 
-Laptop) or entirely on the cloud through a browser via MATLAB online:
-https://www.mathworks.com/products/matlab-online.html#license-types
+- MATLAB with standard ODE functionality (`ode45`)
+- The default simulation does not require a custom toolbox configuration
 
-Octave is a free clone of MATLAB and is available here under the 
-GNU General Public License (GPL).
-https://octave.org
-MATLAB programs that don't use special toolboxes, as here, can be run
-on Octave essentially verbatim. You should be able to run our programs
-on Octave.
+The MATLAB code was refactored into `matlab/` so it can be run directly without browsing through the original flat code drop.
 
-------- Other general notes --------------------------------------------------
+## Quick start
 
+### Run the Python implementation
 
-1) The simulation parameters and conditions are encoded within the various 
-loadParameters*** files. 
+Recommended:
 
-2) See the Methods section and Supplementary Appendix of the manuscript for 
-the mathematical equations underlying the simulation.
+```bash
+python3 -m pip install -e .
+locomotor-learning-model --no-plots
+```
 
-3) Because the simulation is stochastic, running the program two times will
-give slightly different curves, while having broad statistical similarity.
+Or, without installation:
 
-4) If your program hangs for whatever reason, please exit the program via 
-crtl-c or exit MATLAB through a force quit, and then re-start the program.
-The qualitative results are invariant to substantial changes to the learning 
-parameters. But if the parameters are outside of the stability region (as
-discussed in the manuscript), the biped or the learner may go unstable, 
-resulting in numerical challenges that may result in the program hanging, as in
-case-H below.
+```bash
+python3 scripts/run_python_simulation.py --no-plots
+```
 
-5) The following are some things to try to examine different aspects of the
-results, as a quick demonstration. This list is by no means comprehensive, as 
-the code allows infinite numerical experiments; these are suggested for 
-qualitative understanding of the results and the structure of the code.
+Useful options:
 
-- A) Run the program provided as is. This is the default version of the code. 
-It will run a classic split-belt adaptation protocol: tied belt, split belt, and 
-tied belt again.
+- `--iterations 100`: override the default number of learning iterations.
+- `--output-dir outputs/python`: save figures as PNG files.
+- `--split-or-tied tied --speed-protocol 'single speed change'`: switch to a tied-belt protocol.
+- `--seed 42`: make the run reproducible.
 
-- B) Turn off learning and memory by setting the following parameters to 
-zero. To do this, go to loadLearnerParameters.m and set the following 
-parameters to zero: paramFixed.Learner.LearningRate and 
-paramFixed.Learner.LearningRateTowardMemory. You will find that there is no
-gradual slow-timescale adaptation: the step length asymmetry looks piecewise
-constant. No learning, just feedback control response.
+### Run the MATLAB implementation
 
-- C) Go back to the default version of the code. Now just set 
-paramFixed.Learner.LearningRateTowardMemory = 0 in loadLearnerParameters.m 
-No memory use, so deadaptation is not particularly faster than adaptation.
+From within MATLAB:
 
-- E) Go back to the default version of the code, which has non-zero 
-paramFixed.Learner.LearningRateTowardMemory, e.g., 0.02, You will see that 
-deadaptation transient is faster than adaptation transient.
-In the future, we will release a version of the code that has options to 
-directly demonstrate these and many other parameter settings as opposed to
-having to manually change the parameters.
+```matlab
+cd matlab
+run_simulation
+```
 
-- F) Go back to the default version of the code. To see degraded learning or 
-biped/learning instability, increase sensory noise in the 
-loadSensoryNoiseParameters.m program, or increase/decrease the learning rates in loadLearnerParameters.m. See remark 6 above about instabilities.
+This wrapper adds `matlab/src` to the path and launches the original manuscript pipeline.
+
+## MATLAB/Python parity
+
+The Python code was checked against the local MATLAB implementation using a deterministic, no-noise reference run. The core controller trajectory matches to machine precision for that reference case.
+
+To reproduce that check:
+
+1. Export a deterministic MATLAB reference:
+
+```matlab
+cd matlab/validation
+export_reference_run('/tmp/locomotor_learning_model_reference.mat', 10)
+```
+
+2. Compare it against Python:
+
+```bash
+python3 scripts/validate_matlab_python_parity.py /tmp/locomotor_learning_model_reference.mat
+```
+
+Additional Python-side validation scripts:
+
+```bash
+python3 tests/test_matlab_python_equivalence.py
+python3 tests/test_detailed_function_comparison.py
+```
+
+## Configuring the simulations
+
+The default manuscript protocol is the classic split-belt experiment.
+
+Main parameter files:
+
+- Python protocol and duration: `src/locomotor_learning_model/parameter_loading/load_protocol_parameters.py`
+- Python learner settings: `src/locomotor_learning_model/parameter_loading/load_learner_parameters.py`
+- MATLAB protocol and duration: `matlab/src/loadProtocolParameters.m`
+- MATLAB learner settings: `matlab/src/loadLearnerParameters.m`
+
+The Python implementation now includes the tied-belt protocol utilities that existed in MATLAB but were not previously exposed in the refactored Python tree.
+
+## Notes
+
+- `notebooks/rootSimulateLearningWhileWalking.ipynb` is kept as an exploratory notebook version of the Python workflow.
+- The MATLAB source filenames remain close to the original manuscript code for traceability.
+- The Python package adds a cleaner public interface on top of the original function-level translation.
+
+## Citation
+
+If you use this repository, please cite:
+
+```bibtex
+@article{kang2026fall,
+  title={Fall risk-aware adaptation explains suboptimal locomotor performance},
+  author={Kang, Inseung and Mitra, Kanishka and Seethapathi, Nidhi},
+  journal={bioRxiv},
+  pages={2026--03},
+  year={2026},
+  publisher={Cold Spring Harbor Laboratory}
+}
+```
