@@ -139,10 +139,6 @@ python tests/test_detailed_function_comparison.py
 - MATLAB protocol settings: `matlab/src/loadProtocolParameters.m`
 - MATLAB learner settings: `matlab/src/loadLearnerParameters.m`
 
-## License
-
-This repository is released under the MIT License. See `LICENSE` for details.
-
 ## Questions
 
 For any questions, contact Kanishka Mitra at mitra819@mit.edu.
