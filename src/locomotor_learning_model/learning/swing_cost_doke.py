@@ -10,10 +10,9 @@ def swing_cost_doke(
     v_body: float,
     param_fixed,
 ) -> float:
-    """Approximate leg swing cost following Doke & Kuo 2005.
+    """Approximate leg swing cost following Doke and Kuo 2005.
 
-    This is a direct translation of ``swingCostDoke.m`` which assumes the cost
-    is related to the force rate needed to change leg swing velocity.
+    The cost scales with the force rate needed to change swing-leg velocity.
     """
 
     v_initial_relative = v_initial - v_body

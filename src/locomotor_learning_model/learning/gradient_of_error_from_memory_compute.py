@@ -11,11 +11,7 @@ def gradient_of_error_from_memory_compute(
     param_fixed,
     context_gait_now: np.ndarray,
 ) -> np.ndarray:
-    """Compute the gradient of the memory prediction error.
-
-    This mirrors the finite-difference calculation in the MATLAB routine
-    ``gradientOfErrorFromMemoryCompute.m``.
-    """
+    """Compute the finite-difference gradient of memory prediction error."""
 
     f0 = error_from_memory_compute(
         slope_j_controller_vs_context,

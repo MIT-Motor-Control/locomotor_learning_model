@@ -6,15 +6,14 @@ import numpy as np
 from scipy.linalg import qr, solve_triangular
 
 
-def _matlab_backslash(input_now_store: np.ndarray, output_next_store: np.ndarray) -> np.ndarray:
-    """Solve ``X \\ Y`` using a MATLAB-like basic least-squares solution.
+def _pivoted_basic_lstsq(
+    input_now_store: np.ndarray,
+    output_next_store: np.ndarray,
+) -> np.ndarray:
+    """Solve a least-squares system with a pivoted basic solution.
 
-    MATLAB's backslash operator chooses a pivoted QR solution for these
-    rank-deficient regressions, whereas NumPy's least-squares routine returns a
-    different minimum-norm solution. The distinction matters here because the
-    learned internal model becomes rank deficient once the rolling estimator is
-    enabled, and those small coefficient differences accumulate over many
-    iterations.
+    The rolling estimator can become rank deficient, so pivoted QR is used to
+    select a consistent subset of independent columns before solving.
     """
 
     q_factor, r_factor, pivot = qr(input_now_store, mode="economic", pivoting=True)
@@ -43,11 +42,10 @@ def rlsupdate(
     mu_measurement: float,
     num_steps_to_use: int,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Perform the simple least-squares model update.
+    """Update a rolling linear model from recent input/output histories.
 
-    This is a direct line-by-line translation of the MATLAB function
-    ``RLSupdate.m``.  The optional parameters ``beta`` and ``mu_measurement``
-    are included for API compatibility but are not used.
+    The optional parameters ``beta`` and ``mu_measurement`` are accepted for
+    compatibility with callers that pass estimator configuration values.
     """
 
     # Pick only the most recent ``num_steps_to_use`` strides. Each column is a
@@ -72,8 +70,8 @@ def rlsupdate(
         [input_now_store, np.ones((input_now_store.shape[0], 1))]
     )
 
-    # Solve the least-squares problem in the same style as MATLAB's ``\``.
-    anew = _matlab_backslash(input_now_store, output_next_store)
+    # Use pivoted QR so rank-deficient windows choose a consistent solution.
+    anew = _pivoted_basic_lstsq(input_now_store, output_next_store)
 
     # Compute errors using the old model.
     aold_t = aold.T

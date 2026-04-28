@@ -5,10 +5,7 @@ import numpy as np
 
 
 def load_learnable_parameters_initial(param_fixed: dict) -> np.ndarray:
-    """Return baseline learnable controller parameters.
-
-    Mirrors ``loadLearnableParametersInitial.m`` from MATLAB.
-    """
+    """Return baseline learnable controller parameters."""
     if param_fixed.get('swingCost', {}).get('Coeff') == 0.9:
         p_input_controller_asymmetric_nominal = np.array([
             0.328221262798818,

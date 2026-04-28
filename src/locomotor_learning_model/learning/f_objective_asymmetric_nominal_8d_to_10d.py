@@ -13,7 +13,7 @@ def f_objective_asymmetric_nominal_8d_to_10d(
     param_fixed,
     t_start: float,
 ) -> Tuple[float, np.ndarray, float, float, float]:
-    """Wrapper matching the MATLAB function of the same name."""
+    """Expand an 8D learned controller vector into the 10D controller state."""
     # Ensure input is 1D (flatten if needed)
     p_input_flat = np.asarray(p_input_controller_nominal).flatten()
     

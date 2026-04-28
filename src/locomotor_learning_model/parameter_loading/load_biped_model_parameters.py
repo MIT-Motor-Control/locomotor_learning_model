@@ -2,10 +2,7 @@ from __future__ import annotations
 
 
 def load_biped_model_parameters(param_fixed: dict | None = None) -> dict:
-    """Return dictionary of fixed biped parameters.
-
-    This mirrors ``loadBipedModelParameters.m`` from the MATLAB code.
-    """
+    """Return fixed biped model parameters."""
     if param_fixed is None:
         param_fixed = {}
 

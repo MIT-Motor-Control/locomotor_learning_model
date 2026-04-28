@@ -9,12 +9,11 @@ def error_from_memory_compute(
     param_fixed,
     context_gait_now: np.ndarray,
 ) -> float:
-    """Compute the prediction error between memory and controller.
+    """Compute squared prediction error between memory and controller state.
 
-    This is a line-by-line translation of the MATLAB function
-    ``errorFromMemoryCompute.m``.  The routine evaluates the discrepancy between
-    the controller parameters that were deemed good and the controller values
-    predicted by the stored memory at the current context.
+    The memory model predicts controller parameters from the current gait
+    context. This returns the squared distance between that prediction and the
+    controller parameters currently considered successful.
     """
 
     p_input_memory_now = (

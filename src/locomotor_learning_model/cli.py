@@ -39,7 +39,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Optional protocol name. Defaults to the manuscript's classic split-belt "
-            "protocol for split runs and MATLAB's four speed changes protocol for tied runs."
+            "protocol for split runs and the four speed changes protocol for tied runs."
         ),
     )
     parser.add_argument(

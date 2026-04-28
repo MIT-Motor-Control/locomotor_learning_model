@@ -1,8 +1,4 @@
-"""Post-processing after learning simulation.
-
-This module provides functionality to post-process the results of the learning
-simulation, following the MATLAB `postProcessAfterLearning.m` function.
-"""
+"""Post-processing after the learning simulation."""
 from __future__ import annotations
 
 import numpy as np
@@ -18,7 +14,7 @@ def post_process_after_learning(
     param_fixed,
     do_animate: bool = False,
 ) -> Tuple[np.ndarray, List, List, np.ndarray, np.ndarray]:
-    """Post-process the learning results.
+    """Post-process learned controller history into trajectories and energies.
     
     This function takes the stored controller parameters from the learning
     process and runs the full simulation to generate detailed trajectories

@@ -1,4 +1,4 @@
-"""Tied-belt treadmill speed protocols mirrored from MATLAB."""
+"""Tied-belt treadmill speed protocol definitions."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import numpy as np
 
 
 def _phase_arrays(durations: list[float], speeds: list[float]) -> tuple[np.ndarray, np.ndarray]:
-    """Construct MATLAB-style cumulative time and speed arrays."""
+    """Construct cumulative phase times and corresponding speeds."""
     t_store = np.cumsum(np.array([0.0, *durations], dtype=float))
     speed_store = np.array([speeds[0], *speeds], dtype=float)
     return t_store, speed_store
@@ -18,7 +18,7 @@ def _with_transitions(
     foot_speed2_store: np.ndarray,
     transition_duration: float,
 ) -> dict[str, np.ndarray]:
-    """Insert treadmill transitions exactly as the MATLAB implementation does."""
+    """Insert finite-duration transitions between speed phases."""
     t_store_new = [float(t_store[0])]
     foot_speed1_new = [float(foot_speed1_store[0])]
     foot_speed2_new = [float(foot_speed2_store[0])]
@@ -52,7 +52,7 @@ def _with_transitions(
 
 
 def make_treadmill_speed_tied(param_fixed: dict) -> dict[str, np.ndarray]:
-    """Build a tied-belt treadmill protocol using the MATLAB timing table."""
+    """Build a tied-belt treadmill protocol from the requested timing table."""
     leg_length = 0.95
     grav = 9.81
     time_scaling = np.sqrt(leg_length / grav)

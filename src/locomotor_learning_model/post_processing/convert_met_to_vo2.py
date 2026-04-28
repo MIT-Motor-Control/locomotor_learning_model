@@ -7,7 +7,7 @@ from scipy.integrate import solve_ivp
 
 
 def convert_met_to_vo2(params: dict) -> tuple[np.ndarray, np.ndarray]:
-    """Mirror MATLAB's first-order VO2 smoothing model."""
+    """Apply first-order smoothing to stride-wise metabolic rate."""
     time_constant = 44.0
     grav = 9.81
     leg_length = 0.95

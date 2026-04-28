@@ -29,7 +29,8 @@ def get_treadmill_speed(
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Return the belt speeds corresponding to time ``t``.
 
-    Mirrors ``getTreadmillSpeed.m`` from MATLAB.
+    Scalar and vector time inputs are supported. Values outside the supplied
+    protocol range are linearly extrapolated from the nearest two samples.
     """
     t_arr = np.atleast_1d(np.asarray(t, dtype=float))
     foot_speed1 = _interp_extrap(

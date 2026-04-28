@@ -13,11 +13,7 @@ def compute_energy_dynamics_model_rls_no_singular(
     p_input_controller_now_store: np.ndarray,
     num_steps_to_use: int,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Update the linear energy dynamics model using least squares.
-
-    This is a line-by-line Python translation of the MATLAB function
-    ``computeEnergyDynamicsModelRLS_NoSingular.m``.
-    """
+    """Update the linear energy dynamics model using recent stride data."""
 
     beta = 0.5  # Unused but kept for API compatibility
 

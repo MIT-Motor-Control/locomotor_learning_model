@@ -6,7 +6,7 @@ import numpy as np
 
 
 def load_how_long_parameters(param_fixed: dict) -> dict:
-    """Override the default simulation duration, mirroring MATLAB."""
+    """Override the default simulation duration."""
     param_fixed["numStepsToLearn"] = 2000
 
     learner = param_fixed["Learner"]

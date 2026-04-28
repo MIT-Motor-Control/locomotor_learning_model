@@ -1,4 +1,4 @@
-"""Plotting and summary helpers mirroring MATLAB post-processing."""
+"""Plotting and summary helpers for simulation outputs."""
 from __future__ import annotations
 
 import numpy as np

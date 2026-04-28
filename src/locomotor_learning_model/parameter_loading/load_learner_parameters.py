@@ -3,10 +3,7 @@ from __future__ import annotations
 
 
 def load_learner_parameters(param_fixed: dict | None = None) -> dict:
-    """Return dictionary with learner settings.
-
-    Mirrors ``loadLearnerParameters.m`` from the MATLAB code.
-    """
+    """Return learner settings for the adaptation simulation."""
     if param_fixed is None:
         param_fixed = {}
 

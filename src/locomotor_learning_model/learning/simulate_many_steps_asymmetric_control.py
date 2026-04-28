@@ -21,7 +21,7 @@ def simulate_many_steps_asymmetric_control(
     np.ndarray,
     np.ndarray,
 ]:
-    """Port of ``simulateManySteps_AsymmetricControl.m``.
+    """Simulate repeated asymmetric walking steps from an initial state.
 
     Parameters
     ----------

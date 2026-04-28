@@ -4,7 +4,7 @@ import numpy as np
 def make_treadmill_speed_split(paramFixed):
     """Build the split-belt treadmill profile used in the manuscript."""
     # ------------------------------------------------------------------
-    # exactly as in MATLAB:
+    # Model constants used to nondimensionalize treadmill timings.
     L = 0.95
     g = 9.81
     timeScaling = np.sqrt(L / g)
@@ -50,7 +50,7 @@ def make_treadmill_speed_split(paramFixed):
     else:
         raise ValueError(f"Unknown speedProtocol: {speedProtocol}")
 
-    # build the “phase” arrays exactly as MATLAB’s tStore and speed stores
+    # Build phase breakpoints and belt-speed stores.
     tStore = np.cumsum([0, tDuration1, tDuration2, tDuration3, tDuration4])
     footSpeed1Store = np.array([f1_p1, f1_p1, f1_p2, f1_p3, f1_p4])
     footSpeed2Store = np.array([f2_p1, f2_p1, f2_p2, f2_p3, f2_p4])
@@ -90,7 +90,7 @@ def make_treadmill_speed_split(paramFixed):
     a1List = np.append(a1List, 0.0)
     a2List = np.append(a2List, 0.0)
 
-    # optional: plot like MATLAB (disabled to prevent blocking)
+    # Optional diagnostic plot disabled to avoid blocking scripted runs.
     # plt.figure(2555)
     # plt.plot(tList, np.abs(footSpeed1List), linewidth=2, label='(abs) fast belt')
     # plt.plot(tList, np.abs(footSpeed2List), linewidth=2, label='(abs) slow belt')
@@ -102,7 +102,7 @@ def make_treadmill_speed_split(paramFixed):
     # plt.show()
 
     # ------------------------------------------------------------------
-    # pack into the same‐named structure/dict
+    # Pack the protocol arrays into a dictionary for downstream simulation.
     beltSpeedsImposed = {
         'tList':            tList,
         'footSpeed1List':   footSpeed1List,

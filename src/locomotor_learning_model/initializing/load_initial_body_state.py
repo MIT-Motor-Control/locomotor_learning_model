@@ -6,10 +6,7 @@ from typing import Sequence
 
 
 def load_initial_body_state(p_input_controller_asymmetric_nominal: Sequence[float]) -> np.ndarray:
-    """Return the initial mid-stance state of the model.
-
-    Mirrors ``loadInitialBodyState.m`` from MATLAB.
-    """
+    """Return the initial mid-stance body state of the model."""
     v_swing_initial = 0.35
     state_var0_model = np.array([
         0.0,  # angleTheta0 - stance leg angle

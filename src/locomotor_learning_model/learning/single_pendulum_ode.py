@@ -9,10 +9,7 @@ def single_pendulum_ode(
     param_fixed,
     param_controller,
 ) -> np.ndarray:
-    """Dynamics for a simple inverted pendulum.
-
-    This is a direct line‑by‑line translation of ``singlePendulumODE.m``.
-    """
+    """Evaluate simple inverted-pendulum stance dynamics."""
 
     angle_theta = state_var[0]
     dangle_theta = state_var[1]

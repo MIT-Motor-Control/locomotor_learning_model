@@ -3,10 +3,7 @@ from __future__ import annotations
 
 
 def load_controller_gain_parameters(param_fixed: dict) -> dict:
-    """Return feedback controller gains.
-
-    Mirrors ``loadControllerGainParameters.m`` from the MATLAB code.
-    """
+    """Return feedback controller gains."""
     param_controller = {}
 
     swing_coeff = param_fixed.get('swingCost', {}).get('Coeff')

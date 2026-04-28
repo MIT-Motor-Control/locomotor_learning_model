@@ -3,10 +3,7 @@ from __future__ import annotations
 
 
 def load_sensory_noise_parameters(param_fixed: dict | None = None) -> dict:
-    """Return dictionary with sensory noise settings.
-
-    Mirrors ``loadSensoryNoiseParameters.m`` from the MATLAB code.
-    """
+    """Return sensory noise settings."""
     if param_fixed is None:
         param_fixed = {}
 

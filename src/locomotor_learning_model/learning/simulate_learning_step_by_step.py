@@ -37,12 +37,11 @@ def simulate_learning_step_by_step(
     context_now: np.ndarray,
     param_controller_gains,
 ) -> np.ndarray:
-    """Python version of ``simulateLearningStepByStep.m``.
+    """Run stride-by-stride adaptation of the locomotor controller.
 
-    This routine mirrors the MATLAB implementation line by line.  It performs a
-    noisy gradient descent update of the controller parameters while updating the
-    internal dynamics and energy models.  Memory formation is also handled
-    analogously to the MATLAB code.
+    Each iteration applies exploratory noise, updates controller parameters from
+    the estimated energy gradient, refreshes internal dynamics and energy
+    models, and adjusts context-dependent memory.
     """
 
     print(

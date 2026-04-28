@@ -11,15 +11,13 @@ def compute_steady_energy_gradient_v2_no_singular(
     num_state_dimensions: int,
     include_internal_model: bool,
 ) -> np.ndarray:
-    """Compute the steady energy gradient without singularities.
+    """Compute steady-state energy sensitivity to controller parameters.
 
-    This is a direct line-by-line translation of the MATLAB function
-    ``computeSteadyEnergyGradientV2_NoSingular.m``.  It returns the gradient of
-    the steady-state energy with respect to the learnable control parameters.
-    ``p_input_now`` is unused but retained for API compatibility.
+    ``p_input_now`` is accepted for compatibility with callers that pass the
+    current controller vector.
     """
 
-    # because we removed one state to avoid singular matrices
+    # Drop the fixed state component before solving the linearized dynamics.
     num_state_dimensions = num_state_dimensions - 1
 
     inow = np.eye(num_state_dimensions)
