@@ -2,7 +2,7 @@
 
 Code for **Safety prioritization shapes locomotor adaptation and performance**, by Inseung Kang, Kanishka Mitra and Nidhi Seethapathi.
 
-[Read the bioRxiv preprint](https://www.biorxiv.org/content/10.64898/2026.03.02.709033v1) · [Data on Zenodo](https://doi.org/10.5281/zenodo.19547419)
+[Read the bioRxiv preprint](https://www.biorxiv.org/content/10.64898/2026.03.02.709033v1) · [Data on Zenodo](https://doi.org/10.5281/zenodo.23402153)
 
 Use this repository to run the locomotor learning model, resume a saved learner, or reproduce the available manuscript figures from saved data.
 
@@ -58,7 +58,15 @@ The [model guide](docs/model.md) covers pausing, extending runs, tied-belt proto
 
 ## Reproduce the paper figures
 
-Use the DATA archive accompanying the same code release on [Zenodo](https://doi.org/10.5281/zenodo.19547419). Download `locomotor_learning_model-DATA.zip`, extract it, and put the extracted folder inside this repository's `data/` folder. The matching DATA release includes the experimental measurements, example checkpoints, and a nested `publication-data.zip` containing fitted models and saved simulation trials. Keep that inner ZIP compressed; preparation handles it automatically. GitHub contains the code, documentation and tests; the release data are distributed in the DATA ZIP.
+Download and install the matching DATA release from [Zenodo](https://doi.org/10.5281/zenodo.23402153) with one command:
+
+```sh
+python scripts/download_data.py
+```
+
+The command downloads 54 smaller pieces, verifies their checksums, rebuilds the original DATA ZIP and extracts it into `data/locomotor_learning_model-DATA/`. The download is 13.34 GB; allow about **42 GB of free space** during installation. If interrupted, run the same command again: verified pieces are reused and the interrupted piece restarts. Temporary downloads are removed after successful installation. An existing DATA folder is never overwritten.
+
+The DATA release includes the experimental measurements, example checkpoints, and a nested `publication-data.zip` containing fitted models and saved simulation trials. Keep that inner ZIP compressed; preparation handles it automatically. GitHub contains the code, documentation and tests. The data download uses only Python's standard library.
 
 Your folders should look like this:
 
@@ -76,7 +84,7 @@ data/
 
 An older experimental-only DATA download supports the available experimental panels in Figures 1 and S3 but lacks model fits and simulation sweeps. Use the matching DATA release for the model analyses. [Data setup](data/README.md) explains both cases.
 
-Use the DATA archive labeled **code release 0.3.0** or later. It includes the additional inputs for Figures 1C/D, 2B, S1 and S3B.
+The downloader is pinned to the matching **code release 0.3.0** dataset. It includes the additional inputs for Figures 1C/D, 2B, S1 and S3B. [Data setup](data/README.md) also covers pieces downloaded manually and alternative destinations.
 
 ```sh
 loco-publication prepare
@@ -127,6 +135,7 @@ locomotor_learning_model/
 │   ├── model.md                      Simulation guide
 │   └── reproducibility.md            Figure workflow and source-data guide
 ├── scripts/
+│   ├── download_data.py              Download, verify and install the split DATA release
 │   ├── validate_matlab_python_parity.py  Compare the two baseline implementations
 │   ├── build_source_workbook.py       Export the editor source workbook
 │   └── check_source_workbook.py       Check workbook values against source CSVs
