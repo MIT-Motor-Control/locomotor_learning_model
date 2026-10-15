@@ -1,20 +1,21 @@
 from __future__ import annotations
 
-from typing import List, Tuple
 import numpy as np
 
 from locomotor_learning_model.learning.simulate_one_step_midstance_to_midstance_with_energy import (
     simulate_one_step_midstance_to_midstance_with_energy,
 )
+
+
 def simulate_many_steps_asymmetric_control(
     state_var0: np.ndarray,
     param_controller,
     param_fixed,
     t_start: float,
-) -> Tuple[
+) -> tuple[
     np.ndarray,
-    List[np.ndarray],
-    List[np.ndarray],
+    list[np.ndarray],
+    list[np.ndarray],
     np.ndarray,
     np.ndarray,
     np.ndarray,
@@ -39,8 +40,8 @@ def simulate_many_steps_asymmetric_control(
     num_steps = int(param_fixed['num_steps'])
 
     # Storage for time histories and state trajectories
-    t_store: List[np.ndarray] = [np.empty(0) for _ in range(num_steps + 1)]
-    state_store: List[np.ndarray] = [np.empty((0, 3)) for _ in range(num_steps + 1)]
+    t_store: list[np.ndarray] = [np.empty(0) for _ in range(num_steps + 1)]
+    state_store: list[np.ndarray] = [np.empty((0, 3)) for _ in range(num_steps + 1)]
 
     emet_total_store = np.zeros(num_steps)
     emet_per_time_store = np.zeros(num_steps)

@@ -1,0 +1,17 @@
+# Tested with Python 3.12.6 and Conda Python 3.12.13 on macOS arm64.
+# MATLAB is configured separately.
+numpy==1.26.4
+scipy==1.17.1
+matplotlib==3.8.2
+pandas==3.0.1
+contourpy==1.3.3
+cycler==0.12.1
+fonttools==4.61.0
+kiwisolver==1.4.9
+packaging==25.0
+pillow==12.0.0
+pyparsing==3.2.5
+python-dateutil==2.9.0.post0
+six==1.17.0
+openpyxl==3.1.5
+et-xmlfile==2.0.0

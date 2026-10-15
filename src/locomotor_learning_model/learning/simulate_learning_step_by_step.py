@@ -1,17 +1,20 @@
 from __future__ import annotations
 
-from typing import Any, List
+from collections.abc import Callable
+from copy import deepcopy
+from typing import Any
 
 import numpy as np
+
 
 def safe_float(value):
     """Safely convert array or scalar to float."""
     if np.isscalar(value):
         return float(value)
-    
+
     # Convert to numpy array and flatten
     arr = np.asarray(value).flatten()
-    
+
     if arr.size == 1:
         return float(arr[0])
     elif arr.size == 0:
@@ -21,13 +24,23 @@ def safe_float(value):
         return float(np.sum(arr))
 
 
-from locomotor_learning_model.learning.get_treadmill_speed import get_treadmill_speed
-from locomotor_learning_model.learning.f_objective_asymmetric_nominal_8d_to_10d import f_objective_asymmetric_nominal_8d_to_10d
-from locomotor_learning_model.learning.compute_model_dynamics_model_rls_no_singular import compute_model_dynamics_model_rls_no_singular
-from locomotor_learning_model.learning.compute_energy_dynamics_model_rls_no_singular import compute_energy_dynamics_model_rls_no_singular
-from locomotor_learning_model.learning.compute_steady_energy_gradient_v2_no_singular import compute_steady_energy_gradient_v2_no_singular
-from locomotor_learning_model.learning.gradient_of_error_from_memory_compute import gradient_of_error_from_memory_compute
+from locomotor_learning_model.initializing.get_treadmill_speed import get_treadmill_speed
+from locomotor_learning_model.learning.compute_energy_dynamics_model_rls_no_singular import (
+    compute_energy_dynamics_model_rls_no_singular,
+)
+from locomotor_learning_model.learning.compute_model_dynamics_model_rls_no_singular import (
+    compute_model_dynamics_model_rls_no_singular,
+)
+from locomotor_learning_model.learning.compute_steady_energy_gradient_v2_no_singular import (
+    compute_steady_energy_gradient_v2_no_singular,
+)
 from locomotor_learning_model.learning.error_from_memory_compute import error_from_memory_compute
+from locomotor_learning_model.learning.f_objective_asymmetric_nominal_8d_to_10d import (
+    f_objective_asymmetric_nominal_8d_to_10d,
+)
+from locomotor_learning_model.learning.gradient_of_error_from_memory_compute import (
+    gradient_of_error_from_memory_compute,
+)
 
 
 def simulate_learning_step_by_step(
@@ -38,6 +51,11 @@ def simulate_learning_step_by_step(
     param_controller_gains,
     return_diagnostics: bool = False,
     verbose: bool = True,
+    *,
+    resume_state: dict[str, Any] | None = None,
+    checkpoint_callback: Callable[[dict[str, Any]], None] | None = None,
+    checkpoint_every: int | None = None,
+    stop_after: int | None = None,
 ) -> np.ndarray | tuple[np.ndarray, dict[str, Any]]:
     """Run stride-by-stride adaptation of the locomotor controller.
 
@@ -48,12 +66,13 @@ def simulate_learning_step_by_step(
 
     if verbose:
         print(
-            f"Simulating Learning While Walking ... ({param_fixed['num_iterations']} strides)"
+            f"Simulating Learning While Walking ... ({param_fixed['num_iterations']} learning iterations)"
         )
 
-    noise_std = param_fixed['Learner']['noiseSTDExploratory']
-    num_iterations = param_fixed['num_iterations']
-    include_internal_model = param_fixed['Learner']['includeInternalModel']
+    rng = param_fixed.get("_rng", np.random)
+    noise_std = param_fixed["Learner"]["noiseSTDExploratory"]
+    num_iterations = param_fixed["num_iterations"]
+    include_internal_model = param_fixed["Learner"]["includeInternalModel"]
 
     p_input_controller_asymmetric_nominal = p_input_controller_asymmetric_nominal[
         [0, 1, 2, 5, 6, 7, 8, 9]
@@ -61,7 +80,7 @@ def simulate_learning_step_by_step(
     num_learning_dimensions = len(p_input_controller_asymmetric_nominal)
     num_state_dimensions = len(state_var0_model)
 
-    alpha_energy_learning_rate = param_fixed['Learner']['LearningRate']
+    alpha_energy_learning_rate = param_fixed["Learner"]["LearningRate"]
 
     p_input_now = p_input_controller_asymmetric_nominal.copy()
     t_start = 0.0
@@ -73,57 +92,112 @@ def simulate_learning_step_by_step(
 
     g_energy_gradient_now = np.zeros_like(p_input_controller_asymmetric_nominal)
 
-    p_input_controller_store_ones_tried: List[np.ndarray] = []
-    state_var_now_store: List[np.ndarray] = []
-    state_var_next_store: List[np.ndarray] = []
-    edot_store: List[float] = []
-    energy_store: List[float] = []
-    t_end_store: List[float] = []
-    fall_penalty_store: List[float] = []
-    min_com_store: List[float] = []
-    nominal_step_length_asymmetry_store: List[float] = []
-    p_input_controller_store_ones_considered_good: List[np.ndarray] = []
-    gradient_energy_estimate_store: List[np.ndarray] = []
-    adynamics_model_store: List[np.ndarray] = []
-    adynamics_energy_store: List[np.ndarray] = []
+    p_input_controller_store_ones_tried: list[np.ndarray] = []
+    state_var_now_store: list[np.ndarray] = []
+    state_var_next_store: list[np.ndarray] = []
+    edot_store: list[float] = []
+    energy_store: list[float] = []
+    t_end_store: list[float] = []
+    fall_penalty_store: list[float] = []
+    min_com_store: list[float] = []
+    nominal_step_length_asymmetry_store: list[float] = []
+    p_input_controller_store_ones_considered_good: list[np.ndarray] = []
+    gradient_energy_estimate_store: list[np.ndarray] = []
+    adynamics_model_store: list[np.ndarray] = []
+    adynamics_energy_store: list[np.ndarray] = []
 
-    error_old_dynamics_model_store: List[np.ndarray] = []
-    error_new_dynamics_model_store: List[np.ndarray] = []
-    error_old_energy_model_store: List[np.ndarray] = []
-    error_new_energy_model_store: List[np.ndarray] = []
-    learning_on_or_not_store: List[int] = []
-    memory_to_gradient_direction_cosine_store: List[float] = []
+    error_old_dynamics_model_store: list[np.ndarray] = []
+    error_new_dynamics_model_store: list[np.ndarray] = []
+    error_old_energy_model_store: list[np.ndarray] = []
+    error_new_energy_model_store: list[np.ndarray] = []
+    learning_on_or_not_store: list[int] = []
+    memory_to_gradient_direction_cosine_store: list[float] = []
 
-    g_gradient_for_memory_update_store: List[np.ndarray] = []
-    error_from_memory_store: List[float] = []
-    p_input_memory_now_store: List[np.ndarray] = []
+    g_gradient_for_memory_update_store: list[np.ndarray] = []
+    error_from_memory_store: list[float] = []
+    p_input_memory_now_store: list[np.ndarray] = []
 
-    num_strides_to_use = param_fixed['Learner']['numStepsToUseForEstimator']
+    num_strides_to_use = param_fixed["Learner"]["numStepsToUseForEstimator"]
     state_var0_model_now = state_var0_model.copy()
     p_input_now_considered_good = p_input_now.copy()
 
-    for i_stride in range(1, num_iterations + 1):
+    completed = 0
+    if not isinstance(num_iterations, (int, np.integer)) or num_iterations < 1:
+        raise ValueError("num_iterations must be a positive integer")
+    limit = num_iterations if stop_after is None else stop_after
+    if not isinstance(limit, (int, np.integer)) or not 1 <= limit <= num_iterations:
+        raise ValueError("stop_after must be between 1 and num_iterations")
+    if checkpoint_every is not None and (
+        not isinstance(checkpoint_every, int) or checkpoint_every < 1
+    ):
+        raise ValueError("checkpoint_every must be a positive integer")
+    if resume_state is not None:
+        validate_learning_state(resume_state, param_fixed)
+        completed = resume_state["completed_iterations"]
+        if completed > limit:
+            raise ValueError("Cannot resume to an iteration before the checkpoint")
+        t_start = deepcopy(resume_state["t_start"])
+        context_now = deepcopy(resume_state["context_now"])
+        state_var0_model_now = deepcopy(resume_state["state_var0_model_now"])
+        p_input_now_considered_good = deepcopy(resume_state["p_input_now_considered_good"])
+        adynamics_model_now = deepcopy(resume_state["adynamics_model_now"])
+        adynamics_energy_now = deepcopy(resume_state["adynamics_energy_now"])
+        g_energy_gradient_now = deepcopy(resume_state["g_energy_gradient_now"])
+        p_input_controller_store_ones_tried = deepcopy(
+            resume_state["p_input_controller_store_ones_tried"]
+        )
+        state_var_now_store = deepcopy(resume_state["state_var_now_store"])
+        state_var_next_store = deepcopy(resume_state["state_var_next_store"])
+        edot_store = deepcopy(resume_state["edot_store"])
+        energy_store = deepcopy(resume_state["energy_store"])
+        t_end_store = deepcopy(resume_state["t_end_store"])
+        fall_penalty_store = deepcopy(resume_state["fall_penalty_store"])
+        min_com_store = deepcopy(resume_state["min_com_store"])
+        nominal_step_length_asymmetry_store = deepcopy(
+            resume_state["nominal_step_length_asymmetry_store"]
+        )
+        p_input_controller_store_ones_considered_good = deepcopy(
+            resume_state["p_input_controller_store_ones_considered_good"]
+        )
+        gradient_energy_estimate_store = deepcopy(resume_state["gradient_energy_estimate_store"])
+        adynamics_model_store = deepcopy(resume_state["adynamics_model_store"])
+        adynamics_energy_store = deepcopy(resume_state["adynamics_energy_store"])
+        error_old_dynamics_model_store = deepcopy(resume_state["error_old_dynamics_model_store"])
+        error_new_dynamics_model_store = deepcopy(resume_state["error_new_dynamics_model_store"])
+        error_old_energy_model_store = deepcopy(resume_state["error_old_energy_model_store"])
+        error_new_energy_model_store = deepcopy(resume_state["error_new_energy_model_store"])
+        learning_on_or_not_store = deepcopy(resume_state["learning_on_or_not_store"])
+        memory_to_gradient_direction_cosine_store = deepcopy(
+            resume_state["memory_to_gradient_direction_cosine_store"]
+        )
+        g_gradient_for_memory_update_store = deepcopy(
+            resume_state["g_gradient_for_memory_update_store"]
+        )
+        error_from_memory_store = deepcopy(resume_state["error_from_memory_store"])
+        p_input_memory_now_store = deepcopy(resume_state["p_input_memory_now_store"])
+
+    for i_stride in range(completed + 1, limit + 1):
         if verbose and i_stride % 50 == 0:
             print(f"iStride = {i_stride}")
 
-        delta_pinput_noise = noise_std * np.random.randn(num_learning_dimensions)
+        delta_pinput_noise = noise_std * rng.randn(num_learning_dimensions)
         delta_pinput_gradient = alpha_energy_learning_rate * (-g_energy_gradient_now)
 
-        if param_fixed['Learner']['shouldWeUseTrustRegion']:
+        if param_fixed["Learner"]["shouldWeUseTrustRegion"]:
             norm_grad = np.linalg.norm(delta_pinput_gradient)
-            if norm_grad > param_fixed['Learner']['trustRegionSize'] * np.sqrt(num_learning_dimensions):
+            if norm_grad > param_fixed["Learner"]["trustRegionSize"] * np.sqrt(
+                num_learning_dimensions
+            ):
                 delta_pinput_gradient = (
                     delta_pinput_gradient
                     / norm_grad
-                    * param_fixed['Learner']['trustRegionSize']
+                    * param_fixed["Learner"]["trustRegionSize"]
                     * np.sqrt(num_learning_dimensions)
                 )
 
-        p_input_memory_now = (
-            param_fixed['storedmemory']['nominalControl']
-            + param_fixed['storedmemory']['controlSlopeVsContext']
-            @ (context_now - param_fixed['storedmemory']['nominalContext'])
-        )
+        p_input_memory_now = param_fixed["storedmemory"]["nominalControl"] + param_fixed[
+            "storedmemory"
+        ]["controlSlopeVsContext"] @ (context_now - param_fixed["storedmemory"]["nominalContext"])
         p_input_memory_now_store.append(p_input_memory_now)
 
         dir_toward_memory = p_input_memory_now - p_input_now_considered_good
@@ -133,13 +207,13 @@ def simulate_learning_step_by_step(
         )
         memory_to_gradient_direction_cosine_store.append(temp)
 
-        power_move_to_memory = param_fixed['Learner']['powerToTheMoveToMemory']
+        power_move_to_memory = param_fixed["Learner"]["powerToTheMoveToMemory"]
         if np.isnan(temp):
-            temp = 1 * param_fixed['Learner']['LearningRateTowardMemory']
+            temp = 1 * param_fixed["Learner"]["LearningRateTowardMemory"]
         else:
             temp = (1 + temp) / 2
-            temp = temp ** power_move_to_memory
-            temp = temp * param_fixed['Learner']['LearningRateTowardMemory']
+            temp = temp**power_move_to_memory
+            temp = temp * param_fixed["Learner"]["LearningRateTowardMemory"]
 
         delta_pinput_memory = temp * dir_toward_memory
 
@@ -160,7 +234,7 @@ def simulate_learning_step_by_step(
             param_fixed,
             t_start,
         )
-        edot_now = edot_now * (1 + np.random.randn() * param_fixed['noiseEnergySensory'])
+        edot_now = edot_now * (1 + rng.randn() * param_fixed["noiseEnergySensory"])
 
         state_var_now_store.append(state_var0_model_now)
         state_var_next_store.append(state_var0_model_next)
@@ -242,18 +316,22 @@ def simulate_learning_step_by_step(
         adynamics_model_store.append(adynamics_model_now)
         adynamics_energy_store.append(adynamics_energy_now)
 
-        if param_fixed['Learner']['shouldWeThresholdPredictionError'] and i_stride > num_strides_to_use:
-            prediction_error_list_now = np.array(
-                [error_old_energy_model, error_new_energy_model]
-            )
-            if np.any(np.abs(prediction_error_list_now) > param_fixed['Learner']['predictionErrorThreshold']):
+        if (
+            param_fixed["Learner"]["shouldWeThresholdPredictionError"]
+            and i_stride > num_strides_to_use
+        ):
+            prediction_error_list_now = np.array([error_old_energy_model, error_new_energy_model])
+            if np.any(
+                np.abs(prediction_error_list_now)
+                > param_fixed["Learner"]["predictionErrorThreshold"]
+            ):
                 g_energy_gradient_now = 0 * g_energy_gradient_now
                 learning_on_or_not_store.append(0)
             else:
                 learning_on_or_not_store.append(1)
 
         g_gradient_for_memory_update = gradient_of_error_from_memory_compute(
-            param_fixed['storedmemory']['controlSlopeVsContext'],
+            param_fixed["storedmemory"]["controlSlopeVsContext"],
             p_input_now_considered_good,
             param_fixed,
             context_now,
@@ -271,23 +349,22 @@ def simulate_learning_step_by_step(
         dot_memory_to_current_v_current = safe_float(dot_product)
 
         temp = dot_memory_to_current_v_current
-        power_for_memory_formation = param_fixed['Learner']['powerToTheMemoryFormation']
+        power_for_memory_formation = param_fixed["Learner"]["powerToTheMemoryFormation"]
         if np.isnan(temp):
             temp = 0.0
         else:
             temp = (1 + temp) / 2
-            temp = temp ** power_for_memory_formation
-            temp = temp * param_fixed['Learner']['LearningRateForMemoryFormationUpdates']
+            temp = temp**power_for_memory_formation
+            temp = temp * param_fixed["Learner"]["LearningRateForMemoryFormationUpdates"]
 
-        param_fixed['storedmemory']['controlSlopeVsContext'] = (
-            param_fixed['storedmemory']['controlSlopeVsContext']
-            + temp * (-g_gradient_for_memory_update)
-        )
+        param_fixed["storedmemory"]["controlSlopeVsContext"] = param_fixed["storedmemory"][
+            "controlSlopeVsContext"
+        ] + temp * (-g_gradient_for_memory_update)
 
         g_gradient_for_memory_update_store.append(g_gradient_for_memory_update)
         error_from_memory_store.append(
             error_from_memory_compute(
-                param_fixed['storedmemory']['controlSlopeVsContext'],
+                param_fixed["storedmemory"]["controlSlopeVsContext"],
                 p_input_now_considered_good,
                 param_fixed,
                 context_now,
@@ -297,9 +374,22 @@ def simulate_learning_step_by_step(
         t_start = t_end
         state_var0_model_now = state_var0_model_next
 
-        v_a, v_b = get_treadmill_speed(t_start, param_fixed['imposedFootSpeeds'])
+        v_a, v_b = get_treadmill_speed(t_start, param_fixed["imposedFootSpeeds"])
         context_now = np.array([v_a, v_b])
-        context_now = context_now + param_fixed["noiseEnergySensory"] * np.random.randn()
+        context_now = context_now + param_fixed["noiseEnergySensory"] * rng.randn()
+
+        # The boundary is after learning, memory, environment and RNG updates.
+        # Save before post-processing, whose replay consumes its own random draws.
+        if checkpoint_callback is not None and (
+            i_stride == limit or (checkpoint_every is not None and i_stride % checkpoint_every == 0)
+        ):
+            namespace = locals()
+            snapshot = {name: deepcopy(namespace[name]) for name in _STATE_FIELDS}
+            snapshot["completed_iterations"] = i_stride
+            checkpoint_callback(snapshot)
+
+    if completed == limit and checkpoint_callback is not None:
+        checkpoint_callback(deepcopy(resume_state))
 
     controller_history = np.column_stack(p_input_controller_store_ones_tried)
     if not return_diagnostics:
@@ -316,3 +406,114 @@ def simulate_learning_step_by_step(
         ),
     }
     return controller_history, diagnostics
+
+
+_STATE_FIELDS = (
+    "t_start",
+    "context_now",
+    "state_var0_model_now",
+    "p_input_now_considered_good",
+    "adynamics_model_now",
+    "adynamics_energy_now",
+    "g_energy_gradient_now",
+    "p_input_controller_store_ones_tried",
+    "state_var_now_store",
+    "state_var_next_store",
+    "edot_store",
+    "energy_store",
+    "t_end_store",
+    "fall_penalty_store",
+    "min_com_store",
+    "nominal_step_length_asymmetry_store",
+    "p_input_controller_store_ones_considered_good",
+    "gradient_energy_estimate_store",
+    "adynamics_model_store",
+    "adynamics_energy_store",
+    "error_old_dynamics_model_store",
+    "error_new_dynamics_model_store",
+    "error_old_energy_model_store",
+    "error_new_energy_model_store",
+    "learning_on_or_not_store",
+    "memory_to_gradient_direction_cosine_store",
+    "g_gradient_for_memory_update_store",
+    "error_from_memory_store",
+    "p_input_memory_now_store",
+)
+
+
+def validate_learning_state(state: dict[str, Any], param_fixed: dict[str, Any]) -> None:
+    """Reject malformed checkpoints before continuing a learned trajectory."""
+    if not isinstance(state, dict) or set(state) != set(_STATE_FIELDS) | {"completed_iterations"}:
+        raise ValueError("Checkpoint learner state fields are incomplete or unsupported")
+    n = state["completed_iterations"]
+    if isinstance(n, bool) or not isinstance(n, int) or n < 1:
+        raise ValueError("Checkpoint iteration count must be a positive integer")
+    shapes = {
+        "context_now": (2,),
+        "state_var0_model_now": (5,),
+        "p_input_now_considered_good": (8,),
+        "adynamics_model_now": (4, 13),
+        "adynamics_energy_now": (1, 13),
+        "g_energy_gradient_now": (8,),
+    }
+    for key, shape in shapes.items():
+        value = state[key]
+        if (
+            not isinstance(value, np.ndarray)
+            or value.shape != shape
+            or value.dtype.kind not in "fiu"
+            or not np.all(np.isfinite(value))
+        ):
+            raise ValueError(f"Invalid checkpoint learner array: {key}")
+    if (
+        not isinstance(state["t_start"], (int, float, np.integer, np.floating))
+        or not np.isfinite(state["t_start"])
+        or state["t_start"] <= 0
+    ):
+        raise ValueError("Invalid checkpoint simulation time")
+    num_estimator = param_fixed["Learner"]["numStepsToUseForEstimator"]
+    errors = {
+        "error_old_dynamics_model_store",
+        "error_new_dynamics_model_store",
+        "error_old_energy_model_store",
+        "error_new_energy_model_store",
+    }
+    shapes.update(
+        {
+            "p_input_controller_store_ones_tried": (8,),
+            "state_var_now_store": (5,),
+            "state_var_next_store": (5,),
+            "p_input_controller_store_ones_considered_good": (8,),
+            "gradient_energy_estimate_store": (8,),
+            "adynamics_model_store": (4, 13),
+            "adynamics_energy_store": (1, 13),
+            "p_input_memory_now_store": (8,),
+            "g_gradient_for_memory_update_store": (8, 2),
+            "error_old_dynamics_model_store": (4, 1),
+            "error_new_dynamics_model_store": (4, 1),
+            "error_old_energy_model_store": (1, 1),
+            "error_new_energy_model_store": (1, 1),
+        }
+    )
+    for key in _STATE_FIELDS[7:]:
+        values = state[key]
+        expected = max(0, n - num_estimator) if key in errors else n
+        if (
+            key == "learning_on_or_not_store"
+            and not param_fixed["Learner"]["shouldWeThresholdPredictionError"]
+        ):
+            expected = 0
+        elif key == "learning_on_or_not_store":
+            expected = max(0, n - num_estimator)
+        if not isinstance(values, list) or len(values) != expected:
+            raise ValueError(f"Invalid checkpoint history length: {key}")
+        for value in values:
+            array = np.asarray(value)
+            if array.shape != shapes.get(key, ()) or array.dtype.kind not in "fiu":
+                raise ValueError(f"Invalid checkpoint history shape: {key}")
+            if key not in ("fall_penalty_store", "min_com_store") and not np.all(
+                np.isfinite(array)
+            ):
+                raise ValueError(f"Non-finite checkpoint history: {key}")
+    if float(state["t_end_store"][-1]) != float(state["t_start"]):
+        raise ValueError("Checkpoint time does not agree with history")

@@ -2,25 +2,46 @@
 Fixed detailed function comparison that properly sets up context for individual functions.
 """
 
-import numpy as np
-import sys
+# These diagnostic helpers collect individual failures; the pytest wrappers
+# require a perfect success rate, so unexpected exceptions still fail validation.
+# ruff: noqa: BLE001
+
 import os
+import sys
+
+import numpy as np
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 
-from locomotor_learning_model.parameter_loading.load_biped_model_parameters import load_biped_model_parameters
-from locomotor_learning_model.parameter_loading.load_sensory_noise_parameters import load_sensory_noise_parameters
-from locomotor_learning_model.parameter_loading.load_controller_gain_parameters import load_controller_gain_parameters
-from locomotor_learning_model.parameter_loading.load_learner_parameters import load_learner_parameters
-from locomotor_learning_model.parameter_loading.load_protocol_parameters import load_protocol_parameters
-from locomotor_learning_model.parameter_loading.load_stored_memory_parameters_control_vs_speed import load_stored_memory_parameters_control_vs_speed
-from locomotor_learning_model.initializing.load_learnable_parameters_initial import load_learnable_parameters_initial
 from locomotor_learning_model.initializing.load_initial_body_state import load_initial_body_state
-from locomotor_learning_model.initializing.get_treadmill_speed import get_treadmill_speed
-from locomotor_learning_model.learning.f_objective_asymmetric_nominal import f_objective_asymmetric_nominal
-from locomotor_learning_model.learning.single_pendulum_ode import single_pendulum_ode
+from locomotor_learning_model.initializing.load_learnable_parameters_initial import (
+    load_learnable_parameters_initial,
+)
 from locomotor_learning_model.learning.detect_endstance import detect_endstance
 from locomotor_learning_model.learning.detect_midstance import detect_midstance
+from locomotor_learning_model.learning.f_objective_asymmetric_nominal import (
+    f_objective_asymmetric_nominal,
+)
+from locomotor_learning_model.learning.single_pendulum_ode import single_pendulum_ode
 from locomotor_learning_model.learning.swing_cost_doke import swing_cost_doke
+from locomotor_learning_model.parameter_loading.load_biped_model_parameters import (
+    load_biped_model_parameters,
+)
+from locomotor_learning_model.parameter_loading.load_controller_gain_parameters import (
+    load_controller_gain_parameters,
+)
+from locomotor_learning_model.parameter_loading.load_learner_parameters import (
+    load_learner_parameters,
+)
+from locomotor_learning_model.parameter_loading.load_protocol_parameters import (
+    load_protocol_parameters,
+)
+from locomotor_learning_model.parameter_loading.load_sensory_noise_parameters import (
+    load_sensory_noise_parameters,
+)
+from locomotor_learning_model.parameter_loading.load_stored_memory_parameters_control_vs_speed import (
+    load_stored_memory_parameters_control_vs_speed,
+)
 
 
 def setup_complete_parameters():
@@ -41,7 +62,7 @@ def setup_complete_parameters():
     return param_fixed, param_controller_gains
 
 
-def test_pendulum_ode():
+def check_pendulum_ode():
     """Test single pendulum ODE with proper context."""
     print("🧮 Testing Single Pendulum ODE with proper context...")
     
@@ -66,7 +87,7 @@ def test_pendulum_ode():
             if len(result) == 3 and all(np.isfinite(result)):
                 success_count += 1
             else:
-                print(f"      ⚠️ Result not finite or wrong size")
+                print("      ⚠️ Result not finite or wrong size")
                 
         except Exception as e:
             print(f"   State {i+1}: ERROR - {e}")
@@ -81,7 +102,7 @@ def test_pendulum_ode():
     }
 
 
-def test_detection_functions():
+def check_detection_functions():
     """Test detection functions."""
     print("\\n🎯 Testing Detection Functions...")
     
@@ -125,7 +146,7 @@ def test_detection_functions():
     }
 
 
-def test_swing_cost_function():
+def check_swing_cost_function():
     """Test swing cost function with proper parameters."""
     print("\\n⚡ Testing Swing Cost Function with proper parameters...")
     
@@ -152,7 +173,7 @@ def test_swing_cost_function():
             if np.isfinite(cost) and cost >= 0:
                 success_count += 1
             else:
-                print(f"      ⚠️ Invalid cost value")
+                print("      ⚠️ Invalid cost value")
                 
         except Exception as e:
             print(f"   Case {i+1}: ERROR - {e}")
@@ -167,7 +188,7 @@ def test_swing_cost_function():
     }
 
 
-def test_objective_function_robustness():
+def check_objective_function_robustness():
     """Test objective function with parameter perturbations."""
     print("\\n🎯 Testing Objective Function Robustness...")
     
@@ -195,7 +216,7 @@ def test_objective_function_robustness():
             if np.isfinite(result[0]) and result[0] > 0:
                 success_count += 1
             else:
-                print(f"      ⚠️ Invalid objective value")
+                print("      ⚠️ Invalid objective value")
                 
         except Exception as e:
             print(f"   Perturbation {pert:6.2f}: ERROR - {e}")
@@ -219,10 +240,10 @@ def main():
     
     try:
         # Test individual functions with proper context
-        pendulum_results = test_pendulum_ode()
-        detection_results = test_detection_functions()
-        swing_cost_results = test_swing_cost_function()
-        objective_results = test_objective_function_robustness()
+        pendulum_results = check_pendulum_ode()
+        detection_results = check_detection_functions()
+        swing_cost_results = check_swing_cost_function()
+        objective_results = check_objective_function_robustness()
         
         # Collect all results
         all_results = {
@@ -280,6 +301,24 @@ def main():
         return 0.0
 
 
+def test_pendulum_ode():
+    assert check_pendulum_ode()["success_rate"] == 1.0
+
+
+def test_detection_functions():
+    assert check_detection_functions()["combined_success_rate"] == 1.0
+
+
+def test_swing_cost_function():
+    assert check_swing_cost_function()["success_rate"] == 1.0
+
+
+def test_objective_function_robustness():
+    assert check_objective_function_robustness()["success_rate"] == 1.0
+
+
 if __name__ == "__main__":
     success_rate = main()
     print(f"\\n🎯 Fixed validation score: {success_rate:.1%}")
+
+    sys.exit(0 if success_rate == 1.0 else 1)

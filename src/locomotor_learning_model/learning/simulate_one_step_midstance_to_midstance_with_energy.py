@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from typing import Tuple
 import numpy as np
 
-from locomotor_learning_model.learning.simulate_ip_until_endstance import simulate_ip_until_endstance
-from locomotor_learning_model.learning.simulate_ip_until_midstance import simulate_ip_until_midstance
+from locomotor_learning_model.learning.simulate_ip_until_endstance import (
+    simulate_ip_until_endstance,
+)
+from locomotor_learning_model.learning.simulate_ip_until_midstance import (
+    simulate_ip_until_midstance,
+)
 from locomotor_learning_model.learning.swing_cost_doke import swing_cost_doke
 
 
@@ -14,7 +17,7 @@ def simulate_one_step_midstance_to_midstance_with_energy(
     t_start: float,
     param_controller,
     param_fixed,
-) -> Tuple[
+) -> tuple[
     np.ndarray,
     np.ndarray,
     np.ndarray,
@@ -99,7 +102,7 @@ def simulate_one_step_midstance_to_midstance_with_energy(
     )
 
     delta_ydot_atMidstance_beltframe = delta_ydot_atMidstance_beltframe + (
-        param_fixed['velocitySensoryNoise'] * np.random.randn()
+        param_fixed['velocitySensoryNoise'] * param_fixed.get('_rng', np.random).randn()
     )
 
     delta_vFoot_labFrame = (
@@ -119,7 +122,8 @@ def simulate_one_step_midstance_to_midstance_with_energy(
     _cap = 0.95 * np.pi / 4
     if param_fixed.get("uncapStepAngle", False):
         _cap = param_fixed.get("stepAngleHardLimit", 0.49 * np.pi)
-    if param_controller['theta_end_thisStep'] > _cap:
+    # Retain the explicit comparison used in the MATLAB transcription.
+    if param_controller['theta_end_thisStep'] > _cap:  # noqa: PLR1730
         param_controller['theta_end_thisStep'] = _cap
 
     stateVar0 = np.array([angleTheta0, angleThetaDot0, yFoot0])
@@ -127,7 +131,6 @@ def simulate_one_step_midstance_to_midstance_with_energy(
         stateVar0, tspan, param_fixed, param_controller
     )
 
-    angleThetaEnd = statevarlistTillEndstance[-1, 0]
     dAngleThetaEnd = statevarlistTillEndstance[-1, 1]
 
     unit_vector_AlongCircle = np.array(

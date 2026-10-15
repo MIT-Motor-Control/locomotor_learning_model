@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import numpy as np
 
+from locomotor_learning_model.parameter_loading.make_treadmill_speed_split import (
+    make_treadmill_speed_split,
+)
 from locomotor_learning_model.parameter_loading.make_treadmill_speed_tied import (
     make_treadmill_speed_tied,
 )
-from locomotor_learning_model.parameter_loading.make_treadmill_speed_split import make_treadmill_speed_split
 
 
 def load_protocol_parameters(
@@ -18,6 +20,14 @@ def load_protocol_parameters(
 ) -> dict:
     """Return protocol parameters for the simulation."""
     split_or_tied = split_or_tied or param_fixed.get("SplitOrTied", "split")
+    effective_transition = transition_time if transition_time is not None else param_fixed.get("transitionTime", 15 if split_or_tied == "split" else 3)
+    if not np.isscalar(effective_transition) or not np.isfinite(effective_transition) or effective_transition <= 0:
+        raise ValueError("transition_time must be finite and positive")
+    if split_speed_diff_ms is not None:
+        if split_or_tied != "split":
+            raise ValueError("split_speed_diff_ms is only valid for split-belt runs")
+        if not np.isscalar(split_speed_diff_ms) or not np.isfinite(split_speed_diff_ms) or split_speed_diff_ms < 0:
+            raise ValueError("split_speed_diff_ms must be finite and non-negative")
 
     if split_or_tied == "split":
         param_fixed["SplitOrTied"] = "split"
@@ -54,6 +64,8 @@ def load_protocol_parameters(
 
     nominal_step_time = 1.7
     t_list = param_fixed["imposedFootSpeeds"]["tList"]
+    if not np.all(np.isfinite(t_list)) or not np.all(np.diff(t_list) > 0):
+        raise ValueError("transition_time must be shorter than every protocol phase")
     param_fixed["numStepsToLearn"] = t_list[-1] / nominal_step_time
     param_fixed["numStepsToLearn"] = round(param_fixed["numStepsToLearn"] / 100) * 100
 

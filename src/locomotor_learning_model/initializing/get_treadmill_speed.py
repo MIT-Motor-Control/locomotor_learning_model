@@ -1,8 +1,9 @@
 """Interpolation of imposed treadmill belt speeds."""
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+
 import numpy as np
-from typing import Mapping, Sequence, Tuple
 
 
 def _interp_extrap(t: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
@@ -26,7 +27,7 @@ def _interp_extrap(t: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
 def get_treadmill_speed(
     t: Sequence[float] | float,
     belt_speeds_imposed: Mapping[str, np.ndarray],
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Return the belt speeds corresponding to time ``t``.
 
     Scalar and vector time inputs are supported. Values outside the supplied
@@ -43,6 +44,6 @@ def get_treadmill_speed(
         np.asarray(belt_speeds_imposed["tList"], dtype=float),
         np.asarray(belt_speeds_imposed["footSpeed2List"], dtype=float),
     )
-    if foot_speed1.size == 1:
+    if np.ndim(t) == 0:
         return foot_speed1.item(), foot_speed2.item()
     return foot_speed1, foot_speed2

@@ -5,23 +5,44 @@ This module provides tests to verify that the Python implementation produces
 identical results to the MATLAB version for all key functions and scenarios.
 """
 
-import numpy as np
-import sys
 import os
+import sys
+from copy import deepcopy
+
+import numpy as np
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 
 # Import all the Python functions
-from locomotor_learning_model.parameter_loading.load_biped_model_parameters import load_biped_model_parameters
-from locomotor_learning_model.parameter_loading.load_sensory_noise_parameters import load_sensory_noise_parameters
-from locomotor_learning_model.parameter_loading.load_controller_gain_parameters import load_controller_gain_parameters
-from locomotor_learning_model.parameter_loading.load_learner_parameters import load_learner_parameters
-from locomotor_learning_model.parameter_loading.load_protocol_parameters import load_protocol_parameters
-from locomotor_learning_model.parameter_loading.load_stored_memory_parameters_control_vs_speed import load_stored_memory_parameters_control_vs_speed
-from locomotor_learning_model.initializing.load_learnable_parameters_initial import load_learnable_parameters_initial
-from locomotor_learning_model.initializing.load_initial_body_state import load_initial_body_state
 from locomotor_learning_model.initializing.get_treadmill_speed import get_treadmill_speed
-from locomotor_learning_model.learning.f_objective_asymmetric_nominal import f_objective_asymmetric_nominal
-from locomotor_learning_model.learning.simulate_learning_step_by_step import simulate_learning_step_by_step
+from locomotor_learning_model.initializing.load_initial_body_state import load_initial_body_state
+from locomotor_learning_model.initializing.load_learnable_parameters_initial import (
+    load_learnable_parameters_initial,
+)
+from locomotor_learning_model.learning.f_objective_asymmetric_nominal import (
+    f_objective_asymmetric_nominal,
+)
+from locomotor_learning_model.learning.simulate_learning_step_by_step import (
+    simulate_learning_step_by_step,
+)
+from locomotor_learning_model.parameter_loading.load_biped_model_parameters import (
+    load_biped_model_parameters,
+)
+from locomotor_learning_model.parameter_loading.load_controller_gain_parameters import (
+    load_controller_gain_parameters,
+)
+from locomotor_learning_model.parameter_loading.load_learner_parameters import (
+    load_learner_parameters,
+)
+from locomotor_learning_model.parameter_loading.load_protocol_parameters import (
+    load_protocol_parameters,
+)
+from locomotor_learning_model.parameter_loading.load_sensory_noise_parameters import (
+    load_sensory_noise_parameters,
+)
+from locomotor_learning_model.parameter_loading.load_stored_memory_parameters_control_vs_speed import (
+    load_stored_memory_parameters_control_vs_speed,
+)
 
 
 class MATLABPythonValidator:
@@ -154,9 +175,9 @@ class MATLABPythonValidator:
         }
         
         if speeds_symmetric:
-            print(f"✅ Initial treadmill speeds are symmetric")
+            print("✅ Initial treadmill speeds are symmetric")
         else:
-            print(f"❌ Initial treadmill speeds are not symmetric")
+            print("❌ Initial treadmill speeds are not symmetric")
     
     def test_short_learning_simulation(self, param_fixed, param_controller_gains):
         """Test a short learning simulation for consistency."""
@@ -176,11 +197,11 @@ class MATLABPythonValidator:
             np.random.seed(42)  # Reset seed for reproducibility
             
             result = simulate_learning_step_by_step(
-                param_fixed,
+                deepcopy(param_fixed),
                 p_input_controller.copy(),
                 state_var0_model.copy(),
                 context_now.copy(),
-                param_controller_gains
+                deepcopy(param_controller_gains)
             )
             results.append(result)
             print(f"Run {run+1}: Final shape {result.shape}, final param[0] = {result[0,-1]:.8f}")
@@ -258,7 +279,7 @@ class MATLABPythonValidator:
             param_fixed, param_controller_gains = self.test_parameter_consistency()
             
             # Test 2: Objective function determinism
-            p_input_controller, state_var0_model = self.test_objective_function_determinism(
+            self.test_objective_function_determinism(
                 param_fixed, param_controller_gains
             )
             
@@ -272,16 +293,14 @@ class MATLABPythonValidator:
             self.test_learning_convergence_properties(param_fixed, param_controller_gains)
             
             # Generate summary report
-            self.generate_summary_report()
+            return self.generate_summary_report() == 1.0
             
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - diagnostic suite reports failure for any exception
             print(f"\\n❌ Validation failed with error: {e}")
             import traceback
             traceback.print_exc()
             return False
         
-        return True
-    
     def generate_summary_report(self):
         """Generate a comprehensive summary report."""
         print("\\n" + "=" * 60)
@@ -370,6 +389,11 @@ def run_matlab_python_comparison():
     return success
 
 
+def test_python_baseline_validation():
+    """The legacy diagnostic report must fail pytest when a check fails."""
+    assert run_matlab_python_comparison()
+
+
 if __name__ == "__main__":
     print("Starting MATLAB-Python Functional Equivalence Validation...")
     success = run_matlab_python_comparison()
@@ -377,3 +401,5 @@ if __name__ == "__main__":
         print("\\n✅ Validation completed successfully!")
     else:
         print("\\n❌ Validation encountered errors!")
+
+    sys.exit(0 if success else 1)

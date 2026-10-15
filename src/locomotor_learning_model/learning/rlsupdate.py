@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Tuple
-
 import numpy as np
 from scipy.linalg import qr, solve_triangular
 
@@ -41,7 +39,7 @@ def rlsupdate(
     output_next_store: np.ndarray,
     mu_measurement: float,
     num_steps_to_use: int,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Update a rolling linear model from recent input/output histories.
 
     The optional parameters ``beta`` and ``mu_measurement`` are accepted for

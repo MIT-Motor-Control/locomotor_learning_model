@@ -1,0 +1,21 @@
+name: Software tests
+on: [push, pull_request]
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: conda-incubator/setup-miniconda@v4
+        with:
+          miniforge-version: latest
+          activate-environment: loco-ada
+          environment-file: environment.yml
+          auto-activate: false
+      - run: python -m pip check
+      - run: python -m pytest -q
+      - run: loco-simulate demo --output-dir outputs/ci-demo
+      - run: loco-simulate run --seed 42 --iterations 20 --stop-after 10 --output-dir outputs/ci-paused
+      - run: loco-simulate resume outputs/ci-paused/checkpoint.npz --output-dir outputs/ci-resumed

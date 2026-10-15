@@ -19,6 +19,8 @@ def convert_met_to_vo2(params: dict) -> tuple[np.ndarray, np.ndarray]:
     emet_rate_list = np.asarray(params["EmetRateList"], dtype=float)
     initial_window = min(30, len(emet_rate_list))
     emet_vo2_initial = float(np.mean(emet_rate_list[:initial_window]))
+    if len(t_span) == 1:
+        return t_span.copy(), np.array([emet_vo2_initial])
 
     def ode_met_to_vo2(t: float, emet_vo2: np.ndarray) -> np.ndarray:
         emet_now = np.interp(t, t_span, emet_rate_list)

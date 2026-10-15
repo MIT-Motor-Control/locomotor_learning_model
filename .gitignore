@@ -6,3 +6,20 @@ outputs/
 dist/
 build/
 *.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+data/publication/
+data/locomotor_learning_model-DATA/
+data/*.zip
+InvLocAd_PLOSBio_figure_code/
+
+# Scientific datasets and saved model state are distributed through Zenodo.
+checkpoints/
+*.npz
+*.mat
+*.c3d
+*.csv
+*.xlsx
+*.docx
+*.zip

@@ -1,0 +1,7 @@
+include README.md LICENSE CITATION.cff environment.yml requirements-lock.txt
+recursive-include docs *.md
+include data/README.md
+recursive-include matlab *.m *.json *.md
+recursive-include scripts *.py *.mjs
+recursive-include tests *.py
+recursive-include reproducibility *.md *.json

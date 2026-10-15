@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "Please cite the accompanying Kang, Mitra and Seethapathi manuscript and the archived code version you used. Add the final article DOI when assigned."
+title: "Code and data for: Safety prioritization shapes locomotor adaptation and performance"
+type: software
+authors:
+  - family-names: Kang
+    given-names: Inseung
+  - family-names: Mitra
+    given-names: Kanishka
+  - family-names: Seethapathi
+    given-names: Nidhi
+version: 0.2.0
+date-released: 2026-10-15
+repository-code: "https://github.com/MIT-Motor-Control/locomotor_learning_model"
+url: "https://doi.org/10.5281/zenodo.19547419"
+license: MIT
+keywords:
+  - locomotor adaptation
+  - motor learning
+  - reproducibility

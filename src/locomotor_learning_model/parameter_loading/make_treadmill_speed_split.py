@@ -18,8 +18,8 @@ def make_treadmill_speed_split(paramFixed):
     vNormal = -0.3276
     if 'splitSpeedDiffMS' in paramFixed:
         speed_diff_ms = float(paramFixed['splitSpeedDiffMS'])
-        if speed_diff_ms < 0:
-            raise ValueError("splitSpeedDiffMS must be non-negative")
+        if not np.isfinite(speed_diff_ms) or speed_diff_ms < 0:
+            raise ValueError("splitSpeedDiffMS must be finite and non-negative")
         half_delta = 5 * delta * speed_diff_ms
     else:
         speed_diff_ms = 1.0

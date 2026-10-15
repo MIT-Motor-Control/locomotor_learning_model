@@ -1,0 +1,149 @@
+{
+  "source": "Inseung handoff, 2026-10-12, code/model",
+  "files": [
+    {
+      "file": "DetectEndstance.m",
+      "original_sha256": "f66715374bb52bdfbacef871b09751e170fe6641d565e60f90189b6ecbc97faa"
+    },
+    {
+      "file": "DetectMidstance.m",
+      "original_sha256": "3d1d112ca3416747beb9d01319b4d0f04a41c83f15ba85b26aa1b0d88a4a11ce"
+    },
+    {
+      "file": "RLSupdate.m",
+      "original_sha256": "be265636dc67dce89082c439ca890195974d14b0e41b8d142969ab8ca3f551cf"
+    },
+    {
+      "file": "checkModelFall.m",
+      "original_sha256": "41c3f367fbcbc26d9fab62b17bdc367c6dee2d30fd841b471d5f19076b47e2a7"
+    },
+    {
+      "file": "computeEnergyDynamicsModelRLS_NoSingular.m",
+      "original_sha256": "586c81611c6b6b413dbf36db642551a0cca797d3ebaedac62f7777c50f82daeb"
+    },
+    {
+      "file": "computeModelDynamicsModelRLS_NoSingular.m",
+      "original_sha256": "15952e1246d9654a8b8f049de7439f9e08c64462d5faa0f4cb67b196ef90fd74"
+    },
+    {
+      "file": "computeSteadyEnergyGradientV2_NoSingular.m",
+      "original_sha256": "cb52102e058d059cb54cc7b104bc0387907427aae5e6f8abcd19305229a8e453"
+    },
+    {
+      "file": "convertMetToVO2.m",
+      "original_sha256": "6de41e19d28b561a8edfc1f4421dd5e18d64e362563026e6087fd46e6c6f9375"
+    },
+    {
+      "file": "errorFromMemoryCompute.m",
+      "original_sha256": "d0cc449e8b9a54de655f8364a9bd82116fb7e3f32d1f6e62894c0e979016ba9b"
+    },
+    {
+      "file": "fObjective_AsymmetricNominal.m",
+      "original_sha256": "6c9826f3aba4c46bb7380140f5aa7c0b9f99a18874200f7960f0ae28ba6182a9"
+    },
+    {
+      "file": "fObjective_AsymmetricNominal_8DTo10D.m",
+      "original_sha256": "a37c8879c9cc6dd04a76172ad14878b91413cf9ca94c8a969e154ad44d4c1088"
+    },
+    {
+      "file": "getTreadmillSpeed.m",
+      "original_sha256": "a46e71d095b39e555458123aef19574a30af8aa8de9c8ea654bae26955a0e1fe"
+    },
+    {
+      "file": "gradientOfErrorFromMemoryCompute.m",
+      "original_sha256": "2fd8e5ac5a382caebb6cdcc30ff15ec3730ab82d0aef1149a7510fcbc363ca7c"
+    },
+    {
+      "file": "kneeGivenBodyFoot.m",
+      "original_sha256": "c5973c6f3c087a64cfcd024328b129bf28460dd384c6c078a1850ded98188d58"
+    },
+    {
+      "file": "loadBipedModelParameters.m",
+      "original_sha256": "ebe13a75b9c864c4aa852541feb4a181ea945e9d4b63196d595b7e2ca1f37e4c"
+    },
+    {
+      "file": "loadControllerGainParameters.m",
+      "original_sha256": "b17ed9beeec071078e033dce3c7945b6205de2eb3d44d09e9522a92a9defdfbd"
+    },
+    {
+      "file": "loadHowLongParameters.m",
+      "original_sha256": "c6276ab01a2143fbe5b8bcfdbccee932387b5d0c2ec1e32f27668e69a24831a1"
+    },
+    {
+      "file": "loadInitialBodyState.m",
+      "original_sha256": "b41a5b60956a4f2391e22892e065a2cb45c6ea8912df319d6fb480a3b356585d"
+    },
+    {
+      "file": "loadLearnableParametersInitial.m",
+      "original_sha256": "383ee86a4a58b083b2e6c0a1cf1d58ef87da6e1881dd26fca77496a508fb5021"
+    },
+    {
+      "file": "loadLearnerParameters.m",
+      "original_sha256": "99accc130532cc3ef53d15ea5e7b4eaff4fffaab4d310fb4f284f4bff2babfc2"
+    },
+    {
+      "file": "loadProtocolParameters.m",
+      "original_sha256": "fa0ee05422f644393c263721792aba2586e1d8af8965966ff3b72aa6db431787"
+    },
+    {
+      "file": "loadSensoryNoiseParameters.m",
+      "original_sha256": "af6edd0a6654523deb1d4635491b9e466e42e5815212c402fedc218dcbc688a7"
+    },
+    {
+      "file": "loadStoredMemoryParameters_ControlVsSpeed.m",
+      "original_sha256": "ee698a25d4dcb62dce47db1a891628e8351ca36c5160840e558397ca75d3c34b"
+    },
+    {
+      "file": "makeTreadmillSpeed_Split.m",
+      "original_sha256": "99ca9c3857f0db6a19fad369d33ec3d4464ca153bfc50b63085ff528ef777d18"
+    },
+    {
+      "file": "makeTreadmillSpeed_Tied.m",
+      "original_sha256": "dd7d11b967e2077316b5aa835011add5a2fb78f33f96f62fb030688561645e7e"
+    },
+    {
+      "file": "postProcessAfterLearning.m",
+      "original_sha256": "89723abca144773361d60b3b45b8347d1fe463017dc453c4e1bc1e94d57c3eb6"
+    },
+    {
+      "file": "run_sim.m",
+      "original_sha256": "a7c1b9e6c588cdc69f2ce0b265828f4f2e5a00550b75abc98a5c981100eecd43"
+    },
+    {
+      "file": "simulateIPUntilEndstance.m",
+      "original_sha256": "f5bfa5ae90aefcb0e950fac26c55aabda972e5be40b4796f916a42b2e514fb44"
+    },
+    {
+      "file": "simulateIPUntilMidstance.m",
+      "original_sha256": "d15592ba208d542bb66fb80e507621310f5b276034c1d152c5d42d9b915da505"
+    },
+    {
+      "file": "simulateLearningStepByStep.m",
+      "original_sha256": "cbfaf4260b4f85d9b56b97d115c727c29f7863e3ef039b27ee58cf625d54452f"
+    },
+    {
+      "file": "simulateManySteps_AsymmetricControl.m",
+      "original_sha256": "5a670a4a73699831c5d65820dee6fb159a99581ab74f4e70aa8cda79f5fb168c"
+    },
+    {
+      "file": "simulateOneStep_MidstanceToMidstance_WithEnergy.m",
+      "original_sha256": "1c738cd3cb026d93f7fa2c92af367df77393276606d09b8211429c582892643b"
+    },
+    {
+      "file": "singlePendulumODE.m",
+      "original_sha256": "954bb173ae1813be1d5a3a4e5cc6776ecf454624337fc90a2c40cde49c8c41a0"
+    },
+    {
+      "file": "swingCostDoke.m",
+      "original_sha256": "31ac3fe401f39c1d200e79b0c90f062697ee03fd21c086c1d54783f74b7181df"
+    },
+    {
+      "file": "postProcessHelper_JustThePlots.m",
+      "original_sha256": "eb51e0704d737c301db03f8e538eb296cdef4792cf4d87ac9ff0309ae4e2855a"
+    }
+  ],
+  "modified": [
+    "run_sim.m: explicit seed, iteration limit, protocol options; original defaults retained",
+    "convertMetToVO2.m: bound initial smoothing window and handle single-iteration demonstration runs; full-length behavior unchanged"
+  ]
+}

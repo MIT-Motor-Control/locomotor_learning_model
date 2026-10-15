@@ -71,7 +71,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     """Compare the current Python implementation against a MATLAB export."""
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if not np.isfinite(args.tolerance) or args.tolerance < 0:
+        parser.error("tolerance must be finite and non-negative")
     matlab_reference = loadmat(args.reference)
 
     param_fixed = {}
@@ -127,7 +130,7 @@ def main(argv: list[str] | None = None) -> int:
     for name, value in comparisons.items():
         print(f"{name}: {value:.3e}")
 
-    if any(value > args.tolerance for value in comparisons.values()):
+    if any(not np.isfinite(value) or value > args.tolerance for value in comparisons.values()):
         print("Parity check failed.")
         return 1
 

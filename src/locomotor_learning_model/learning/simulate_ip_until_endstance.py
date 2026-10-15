@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from typing import Tuple
 import numpy as np
 from scipy.integrate import solve_ivp
 
-from locomotor_learning_model.learning.single_pendulum_ode import single_pendulum_ode
 from locomotor_learning_model.learning.detect_endstance import detect_endstance
+from locomotor_learning_model.learning.single_pendulum_ode import single_pendulum_ode
 
 
 def simulate_ip_until_endstance(
@@ -13,7 +12,7 @@ def simulate_ip_until_endstance(
     tspan: np.ndarray,
     param_fixed,
     param_controller,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Integrate the inverted pendulum dynamics until endstance."""
 
     def ode(t, y):

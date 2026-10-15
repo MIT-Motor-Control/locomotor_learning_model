@@ -4,79 +4,9 @@ function postProcessHelper_JustThePlots(stateVar0,tStore,stateStore, ...
     tTotalIterationStore)
 % this program makes the plots/figures
 
-%% do post-processing and plotting of things
-% tend = 0;
+% Animation is disabled in this baseline. Only compute values used in the
+% scientific summary plots; discarded swing-foot/knee geometry is omitted.
 paramFixed.numSteps = length(EmetStore);
-for iStep = 1:paramFixed.numSteps
-    thetaList = stateStore{iStep}(:,1);
-
-    yBodyList_inFootFrame = paramFixed.leglength*sin(thetaList+paramFixed.angleSlope);
-    zBodyList_inSlopeFrame = paramFixed.leglength*cos(thetaList+paramFixed.angleSlope);
-
-    if rem(iStep,2)==0
-        s1 = 'r';
-    else
-        s1 = 'b';
-    end
-end
-
-%% getting things in the lab frame
-for iStep = 1:paramFixed.numSteps
-    yFootStanceList{iStep} = stateStore{iStep}(:,3);
-end
-
-%% getting a interpolated swing foot trajectory, from stance foot to stance foot
-% just for visualization purposes
-
-for iStep = 1:paramFixed.numSteps
-
-    if (iStep<=1)||(iStep>=paramFixed.numSteps)
-
-        % no swing foot info for the first step and thee last step
-        % or we can just choose to animate steps from 2 to end-1
-        yFootSwingList{iStep} = NaN*ones(size(tStore{iStep}));
-        zFootSwingList{iStep} = NaN*ones(size(tStore{iStep}));
-
-    else
-
-        % end of last stance is beginning of current swing
-        % begin of next stance is end of current swing
-        swingFootBegin = yFootStanceList{iStep-1}(end);
-        swingFootEnd = yFootStanceList{iStep+1}(1);
-
-        % interpolating swing foot, constant velocity over the whole distance
-        yFootSwingList{iStep} = interp1([tStore{iStep}(1) tStore{iStep}(end)],[swingFootBegin swingFootEnd],tStore{iStep});
-
-        % interpolating swing foot, beginning and ending at rest
-        %         % achieved using a shifted cosine
-        %         Atemp = (swingFootBegin-swingFootEnd)/2; % amplitude of the necessary cosine
-        %         Amean = (swingFootEnd+swingFootBegin)/2; % mean of necessary cosine
-        %         Tswing = (tStore{iStep}(end)-tStore{iStep}(1));
-        %         yFootSwingList{iStep} = Amean+Atemp*cos(2*pi*(tStore{iStep}-tStore{iStep}(1))/(2*Tswing));
-        % okay the above interpolation is NOT good, because we want the foot to
-        % have belt speed at beginning and end, not zero speed!! perhaps a
-        % polynomial fit is best
-
-        % vertical foot excursion
-        footHeight = 0.03;
-        Amean = (0+footHeight)/2;
-        Atemp = (0-footHeight)/2;
-        Tswing = (tStore{iStep}(end)-tStore{iStep}(1));
-        zFootSwingList{iStep} = Amean+Atemp*cos(2*pi*(tStore{iStep}-tStore{iStep}(1))/(Tswing));
-
-    end
-
-    thetaList = stateStore{iStep}(:,1);
-    yBodyList_inFootFrame = paramFixed.leglength*sin(thetaList+paramFixed.angleSlope);
-    zBodyList_inSlopeFrame = paramFixed.leglength*cos(thetaList); % z body
-
-    yBodyList_inSlopeFrame = yBodyList_inFootFrame+yFootStanceList{iStep}; % y body in foot frame
-
-    % fake knee position
-    [ySwingKneeList{iStep},zSwingKneeList{iStep}] = ...
-        kneeGivenBodyFoot(yBodyList_inSlopeFrame,zBodyList_inSlopeFrame,yFootSwingList{iStep},zFootSwingList{iStep});
-
-end
 
 %% step lengths, step length asymmetry, step time, step time asymmetry
 tStanceList = zeros(paramFixed.numSteps,1);

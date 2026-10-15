@@ -1,8 +1,16 @@
 name: loco-ada
 channels:
   - conda-forge
+  - nodefaults
 dependencies:
-  - python=3.12
-  - numpy=1.26
-  - scipy=1.12
-  - matplotlib=3.8
+  - python=3.12.13
+  - pip=26.0.1
+  - setuptools=82.0.1
+  # Keep one exact scientific stack for figures and reusable checkpoints.
+  # Install these packages with pip inside Conda: the equivalent all-Conda
+  # solve imposes a newer Matplotlib through pandas' optional constraints.
+  - pip:
+      - -r requirements-lock.txt
+      - pytest==9.1.1
+      - ruff==0.17.0
+      - -e .[dev]

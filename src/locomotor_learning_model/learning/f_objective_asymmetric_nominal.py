@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-from typing import Tuple
-
 import numpy as np
 
-from locomotor_learning_model.learning.simulate_many_steps_asymmetric_control import (
-    simulate_many_steps_asymmetric_control,
-)
 from locomotor_learning_model.learning.fall_margin_penalty import (
     compute_fall_margin_penalty,
     compute_trial_min_com_height,
+)
+from locomotor_learning_model.learning.simulate_many_steps_asymmetric_control import (
+    simulate_many_steps_asymmetric_control,
 )
 
 
@@ -19,7 +17,7 @@ def f_objective_asymmetric_nominal(
     param_controller,
     param_fixed,
     t_start: float,
-) -> Tuple[float, np.ndarray, float, float, float]:
+) -> tuple[float, np.ndarray, float, float, float]:
     """Python port of ``fObjective_AsymmetricNominal.m``."""
 
     # unwrap controller parameters for odd and even steps
@@ -42,10 +40,10 @@ def f_objective_asymmetric_nominal(
         t_store,
         state_store,
         emet_total_store,
-        emet_per_time_store,
+        _emet_per_time_store,
         t_step_store,
-        ework_pushoff_store,
-        ework_heelstrike_store,
+        _ework_pushoff_store,
+        _ework_heelstrike_store,
     ) = simulate_many_steps_asymmetric_control(
         state_var0_model, param_controller, param_fixed, t_start
     )

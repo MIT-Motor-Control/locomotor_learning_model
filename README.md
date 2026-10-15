@@ -1,168 +1,152 @@
-# locomotor_learning_model
+# Locomotor learning model
 
-Code accompanying the manuscript "Fall risk-aware adaptation explains suboptimal locomotor performance."
+Code for **Safety prioritization shapes locomotor adaptation and performance**, by Inseung Kang, Kanishka Mitra and Nidhi Seethapathi.
 
-This repository contains two matched implementations of the same model:
+[Read the bioRxiv preprint](https://www.biorxiv.org/content/10.64898/2026.03.02.709033v1) · [Data on Zenodo](https://doi.org/10.5281/zenodo.19547419)
 
-- `matlab/`: MATLAB version
-- `src/locomotor_learning_model/`: Python version
+Use this repository to run the locomotor learning model, resume a saved learner, or reproduce the available manuscript figures from saved data.
 
-The two implementations agree on deterministic reference runs (see
-[MATLAB/Python parity](#matlabpython-parity) below). The Python version
-additionally exposes an optional explicit fall-risk reward term
-(`fallPenaltyWeight`); at its default weight of zero it reproduces the shared
-baseline model exactly.
+## Get started
 
-## Repository layout
+Install [Miniforge](https://github.com/conda-forge/miniforge#install) if you do not already have Conda. Open a terminal in this repository—the folder containing this README—and run:
+
+```sh
+conda env create -f environment.yml
+conda activate loco-ada
+loco-simulate demo
+```
+
+The demo runs 40 learning iterations with seed 42 and saves its results in `outputs/demo/`. Open `split_belt_summary.png` to see the result. This is a short installation check; it may finish before the treadmill reaches split-belt walking. No publication dataset or MATLAB installation is needed for the Python demo.
+
+The environment installs the package, testing tools and pinned scientific dependencies automatically. Keep this terminal's `loco-ada` environment active for the commands below.
+
+## Run a simulation
+
+Start a longer run:
+
+```sh
+loco-simulate run --seed 42 --iterations 1000
+```
+
+Results go to `outputs/run/`. A run saves:
+
+| File | Contents |
+|---|---|
+| `split_belt_summary.png` | Overview of the simulation (`tied_belt_summary.png` for tied walking) |
+| `run.npz` | Numerical results for later analysis or plotting |
+| `metadata.json` | Parameters, seed, runtime versions and completed iterations |
+| `checkpoint.npz` | Learner state for continuing the simulation |
+| `checkpoint.metadata.json` | Readable description of the saved learner state |
+
+To create a checkpoint and continue it, pause a short run halfway through:
+
+```sh
+loco-simulate run --seed 42 --iterations 20 --stop-after 10 --output-dir outputs/example
+loco-simulate resume outputs/example/checkpoint.npz
+```
+
+The second command continues from iteration 10 to the saved target of 20 and writes to `outputs/resumed/`, preserving the input checkpoint. These commands need only the code. Optional example checkpoints are included in the DATA release; they demonstrate the interface and are separate from the published fitted parameters.
+
+Use `--output-dir outputs/my-run` to keep a separate run; repeating a simulation command writes to the same default output folder. Add `--show-plots` to open interactive figures. For all options:
+
+```sh
+loco-simulate run --help
+loco-simulate resume --help
+```
+
+The [model guide](docs/model.md) covers pausing, extending runs, tied-belt protocols, the Python API and numerical reproducibility. The [manuscript MATLAB engine](matlab/manuscript/README.md) has a separate guide because its scientific settings differ from the Python baseline.
+
+## Reproduce the paper figures
+
+Use the DATA archive accompanying the same code release on [Zenodo](https://doi.org/10.5281/zenodo.19547419). Download `locomotor_learning_model-DATA.zip`, extract it, and put the extracted folder inside this repository's `data/` folder. The matching DATA release includes the experimental measurements, example checkpoints, and a nested `publication-data.zip` containing fitted models and saved simulation trials. Keep that inner ZIP compressed; preparation handles it automatically. GitHub contains the code, documentation and tests; the release data are distributed in the DATA ZIP.
+
+Your folders should look like this:
+
+```text
+data/
+└── locomotor_learning_model-DATA/
+    ├── processed_csv/
+    ├── processed_mat/
+    ├── raw_mocap_c3d/
+    ├── subject_information/
+    ├── checkpoints/                  Optional saved simulation examples
+    ├── publication-data.zip          Fitted models and saved simulation trials
+    └── README.md
+```
+
+An older experimental-only DATA download supports the available experimental panels in Figures 1 and S3 but lacks model fits and simulation sweeps. Use the matching DATA release for the model analyses. [Data setup](data/README.md) explains both cases.
+
+The updated DATA archive is prepared for release. Its upload to the existing Zenodo record is pending correction of that record's DOI/versioning configuration; the currently published DATA download is the older experimental-only version.
+
+```sh
+loco-publication prepare
+loco-publication verify-data
+loco-publication reproduce
+```
+
+Preparation creates `data/publication/`, checks the downloaded inputs, and records their provenance. It uses only the folders above. Without the companion archive, model-dependent analyses are reported as blocked; nothing is silently fetched from an author's computer.
+
+Open `outputs/publication/report.md`. Figures are in `outputs/publication/figures/`; numerical source tables are in `outputs/publication/tables/`. This saved-data workflow needs only the Conda environment, not MATLAB or Node. To repeat an existing run, add `--overwrite`. To generate only selected figures:
+
+```sh
+loco-publication reproduce --figures figure3 s1 s5 --output outputs/selected
+```
+
+Figures 1, 2 and S3 are partial with the available inputs. A successful plotting run verifies the available calculations, not every manuscript claim. See [reproduction details](docs/reproducibility.md) for coverage, source data, MATLAB cross-validation and manuscript checks.
+
+## Repository map
 
 ```text
 locomotor_learning_model/
-├── environment.yml
-├── matlab/
-│   ├── run_simulation.m
-│   ├── src/
-│   └── validation/
-├── scripts/
+├── README.md                         Start here
+├── environment.yml                   Conda setup
+├── requirements-lock.txt             Exact scientific dependency versions
+├── pyproject.toml                    Package metadata and command definitions
+├── MANIFEST.in                       Files included in a source release
+├── CITATION.cff                      Software citation metadata
+├── LICENSE                           Code license
 ├── src/locomotor_learning_model/
-├── tests/
-└── README.md
+│   ├── cli.py, __main__.py            Simulation commands
+│   ├── workflow.py, artifacts.py      Run orchestration and checkpoints
+│   ├── initializing/                 Initial physical/controller states
+│   ├── parameter_loading/            Model and treadmill settings
+│   ├── learning/                     Dynamics, learning and objectives
+│   ├── post_processing/              Results and plots
+│   └── publication/                  Figure analyses, data preparation and audits
+├── matlab/
+│   ├── run_simulation.m, src/         MATLAB baseline for Python comparisons
+│   ├── manuscript/                   Separate manuscript engine and seeded runs
+│   └── validation/                   Numerical comparisons
+├── data/
+│   ├── README.md                     Dataset setup and provenance
+│   ├── locomotor_learning_model-DATA/  Extracted DATA release, including model inputs and checkpoints
+│   └── publication/                  Prepared inputs; created by prepare
+├── docs/
+│   ├── model.md                      Simulation guide
+│   └── reproducibility.md            Figure workflow and source-data guide
+├── scripts/
+│   ├── validate_matlab_python_parity.py  Compare the two baseline implementations
+│   ├── build_source_workbook.mjs      Format the optional editor source workbook
+│   └── check_source_workbook.py       Check workbook values against source CSVs
+├── tests/                            Numerical, checkpoint and integrity tests
+├── reproducibility/
+│   ├── validation.md, validation.json  Cleanup checks and record
+│   ├── fresh-install.md, fresh-install.json  Clean Conda installation test
+│   └── final-manuscript-protocol-check.json  Cached treadmill-protocol check
+├── .github/workflows/                Automated software tests
+└── outputs/                          Generated runs and figures; excluded from Git
 ```
 
-Most important files:
+Each run belongs in `outputs/`, not among the source files. `dist/` is created only when packaging a release. The complete scientific dataset retains additional archived trials and original source formats for provenance and reuse; it is kept separate from the code.
 
-- `environment.yml`: Conda environment for the Python code
-- `scripts/run_python_simulation.py`: main Python entry point
-- `scripts/validate_matlab_python_parity.py`: Python/MATLAB parity check
-- `matlab/run_simulation.m`: main MATLAB entry point
-- `matlab/validation/export_reference_run.m`: deterministic MATLAB reference export
+## Check the installation
 
-## Python setup
-
-### If you do not have Conda yet
-
-Install Miniconda or Miniforge by following the official Conda installation guide:
-[Conda installation guide](https://docs.conda.io/projects/conda/en/stable/user-guide/install/index.html)
-
-Typical flow:
-
-1. Download the installer for your operating system.
-2. Run the installer and accept the default options.
-3. Close and reopen your terminal.
-4. Check that Conda is available:
-
-```bash
-conda --version
+```sh
+python -m pytest -q
 ```
 
-### Create the Conda environment
+Data-dependent tests skip if the publication dataset is absent. For a shell without activation, prefix commands with `conda run --no-capture-output -n loco-ada`. If another Python manager overrides Conda, check that `python -c "import sys; print(sys.executable)"` points inside `envs/loco-ada`; deactivate stacked environments and activate `loco-ada` again if needed.
 
-This repository includes a ready-to-use Conda environment named `loco-ada`.
+The clean-install test and its limits are recorded in [fresh-install validation](reproducibility/fresh-install.md).
 
-From the repository root, run:
-
-```bash
-conda env create -f environment.yml
-conda activate loco-ada
-```
-
-The Python environment includes:
-
-- `python=3.12`
-- `numpy=1.26`
-- `scipy=1.12`
-- `matplotlib=3.8`
-
-No extra package-install step is required after activating the Conda environment.
-
-## Run the Python version
-
-From the repository root:
-
-```bash
-conda activate loco-ada
-python scripts/run_python_simulation.py
-```
-
-Useful options:
-
-- `python scripts/run_python_simulation.py --no-plots`
-- `python scripts/run_python_simulation.py --iterations 100`
-- `python scripts/run_python_simulation.py --seed 42`
-- `python scripts/run_python_simulation.py --split-or-tied tied --speed-protocol 'single speed change'`
-
-## MATLAB setup
-
-### Required MATLAB toolboxes
-
-No additional MATLAB toolboxes are required.
-
-The MATLAB code uses base MATLAB functionality only, including:
-
-- `ode45`
-- `interp1`
-- standard plotting functions
-
-### Run the MATLAB version
-
-Open MATLAB, go to the `matlab/` folder, and run:
-
-```matlab
-run_simulation
-```
-
-This adds `matlab/src` to the path and runs the full MATLAB workflow.
-
-## MATLAB/Python parity
-
-The Python implementation has been checked against the MATLAB implementation using deterministic, no-noise reference runs.
-
-To export a MATLAB reference:
-
-```matlab
-cd matlab/validation
-export_reference_run('/tmp/locomotor_learning_model_reference.mat', 10)
-```
-
-To compare that reference against Python:
-
-```bash
-conda activate loco-ada
-python scripts/validate_matlab_python_parity.py /tmp/locomotor_learning_model_reference.mat
-```
-
-Additional validation scripts:
-
-```bash
-conda activate loco-ada
-python tests/test_matlab_python_equivalence.py
-python tests/test_detailed_function_comparison.py
-```
-
-## Main parameter files
-
-- Python protocol settings: `src/locomotor_learning_model/parameter_loading/load_protocol_parameters.py`
-- Python learner settings: `src/locomotor_learning_model/parameter_loading/load_learner_parameters.py`
-- MATLAB protocol settings: `matlab/src/loadProtocolParameters.m`
-- MATLAB learner settings: `matlab/src/loadLearnerParameters.m`
-
-## Data availability
-
-The experimental data supporting the manuscript (metabolic, motion-capture, and
-ground-reaction-force recordings, plus derived asymmetry time series) are archived
-separately on Zenodo: [10.5281/zenodo.19547420](https://doi.org/10.5281/zenodo.19547420).
-Access is restricted during peer review and will be made public upon publication.
-
-## Citation
-
-If you use this code, please cite the manuscript:
-
-> Kang I., Mitra K., Seethapathi N. "Fall risk-aware adaptation explains suboptimal
-> locomotor performance." Preprint: [10.64898/2026.03.02.709033](https://doi.org/10.64898/2026.03.02.709033)
-
-## License
-
-MIT License — see [LICENSE](LICENSE).
-
-## Questions
-
-For any questions, contact Kanishka Mitra at mitra819@mit.edu.
+Please cite the preprint and the archived version you use. Code is MIT licensed; data retain their own license and provenance. Questions: Kanishka Mitra, mitra819@mit.edu.

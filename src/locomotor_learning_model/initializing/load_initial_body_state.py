@@ -1,8 +1,9 @@
 """Initial mid-stance body state loader."""
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import numpy as np
-from typing import Sequence
 
 
 def load_initial_body_state(p_input_controller_asymmetric_nominal: Sequence[float]) -> np.ndarray:

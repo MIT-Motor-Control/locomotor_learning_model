@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import numpy as np
-from typing import List, Tuple
 
-from locomotor_learning_model.learning.simulate_many_steps_asymmetric_control import simulate_many_steps_asymmetric_control
+from locomotor_learning_model.learning.simulate_many_steps_asymmetric_control import (
+    simulate_many_steps_asymmetric_control,
+)
 
 
 def post_process_after_learning(
@@ -13,7 +14,7 @@ def post_process_after_learning(
     param_controller,
     param_fixed,
     do_animate: bool = False,
-) -> Tuple[np.ndarray, List, List, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, list, list, np.ndarray, np.ndarray]:
     """Post-process learned controller history into trajectories and energies.
     
     This function takes the stored controller parameters from the learning
