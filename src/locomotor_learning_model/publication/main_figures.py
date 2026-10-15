@@ -3,12 +3,24 @@
 from __future__ import annotations
 
 import csv
+from itertools import combinations
 from pathlib import Path
 
 import numpy as np
 from scipy.io import loadmat
 from scipy.optimize import least_squares
-from scipy.stats import ttest_rel
+from scipy.stats import (
+    f_oneway,
+    kruskal,
+    linregress,
+    mannwhitneyu,
+    rankdata,
+    t,
+    ttest_ind,
+    ttest_rel,
+)
+
+from .trajectory import trajectory_source_tables
 
 SPEEDS = (0.4, 0.7, 1.0)
 OPT_SPEEDS = np.array([0.2, 0.4, 0.6, 0.8, 1.0])
@@ -218,7 +230,7 @@ def figure1_tables(data_root: Path) -> dict[str, list[dict]]:
             "tied_energy_w_kg": 3.147,
             "energy_change_pct": float(e),
             "sla_change_percentage_points": float(s),
-            "source": "Hard-coded submitted OpenSim/Moco outputs; raw solutions unavailable",
+            "source": "Rounded five-condition values from the submitted plotting script; retained separately from the available OpenSim source subset",
         }
         for speed, e, s in zip(OPT_SPEEDS, OPT_ENERGY, OPT_SLA)
     ]
@@ -239,10 +251,10 @@ def _sanchez(data_root: Path) -> list[dict]:
     for participant in range(1, 16):
         e, s = getattr(energy, f"P{participant}"), getattr(sla, f"P{participant}")
         es, ss = np.asarray(e.Split).ravel(), np.asarray(s.Split).ravel()
-        eb, sb = (
-            float(np.asarray(e.Base).ravel()[-100:].mean()),
-            float(np.asarray(s.Base).ravel()[-100:].mean() * 100),
-        )
+        base_energy, base_sla = np.asarray(e.Base).ravel(), np.asarray(s.Base).ravel()
+        if any(len(v) < 100 or not np.isfinite(v).all() for v in (es, ss, base_energy, base_sla)):
+            raise ValueError("Sanchez inputs require at least 100 finite values in every record")
+        eb, sb = float(base_energy[-100:].mean()), float(base_sla[-100:].mean() * 100)
         end = int(np.floor(6 / 45 * len(es) + 0.5))
         window = slice(end - 100, end) if end > 100 else slice(0, 100)
         if max(window.stop, 100) > min(len(es), len(ss)) or eb == 0:
@@ -255,6 +267,20 @@ def _sanchez(data_root: Path) -> list[dict]:
                     "exposure": label,
                     "energy_change_pct": float((es[w].mean() - eb) / eb * 100),
                     "sla_change_percentage_points": float(ss[w].mean() * 100 - sb),
+                    "energy_baseline_w_kg": eb,
+                    "sla_baseline_pct": sb,
+                    "energy_split_samples": len(es),
+                    "sla_split_samples": len(ss),
+                    "energy_window_first_sample": w.start + 1
+                    if w.start >= 0
+                    else len(es) + w.start + 1,
+                    "energy_window_last_sample": w.stop if w.stop is not None else len(es),
+                    "sla_window_first_sample": w.start + 1
+                    if w.start >= 0
+                    else len(ss) + w.start + 1,
+                    "sla_window_last_sample": w.stop if w.stop is not None else len(ss),
+                    "baseline_samples": 100,
+                    "window_rule": "Short: round(6/45 * energy length), shared indices for both signals; long: last 100 of each signal",
                 }
             )
     return rows
@@ -269,7 +295,7 @@ def _figure1(data_root: Path, output_root: Path) -> dict:
             "Short SLA uses ceil(6/45 × total strides), preserving the submitted script's approximation; "
             "stored short_idx variables are not used."
         ),
-        "Optimization values are author-supplied constants; OpenSim solutions are not included.",
+        "The five optimization points retain the submitted script's rounded constants; saved-source subset calculations are exported separately when available.",
         "Fig 1E tests are two-sided paired t-tests without multiplicity correction, as submitted.",
     ]
     missing = [
@@ -280,8 +306,19 @@ def _figure1(data_root: Path, output_root: Path) -> dict:
     sanchez = [] if missing else _sanchez(data_root)
     if sanchez:
         outputs.append(_csv(output_root, "figure1_sanchez_participants", sanchez))
+        caveats.append(
+            "Sánchez short exposure uses the same energy-derived sample indices for energy and SLA, "
+            "preserving the source script even though the two signals have different sample counts."
+        )
     else:
         caveats.append("Sanchez comparison inputs are missing; Fig 1C/D are explicitly partial.")
+    trajectory = trajectory_source_tables(data_root)
+    if trajectory:
+        outputs.append(_csv(output_root, "figure1_optimization_source_subset", trajectory))
+        caveats.append(
+            "The saved optimization subset covers tied/0.4/0.7/1.0 m/s and does not recover the "
+            "plotted five-condition constants; it is evaluated without replacing those points."
+        )
     plt = _plotting()
     fig, axes = plt.subplots(2, 3, figsize=(11, 6.5))
     summaries = []
@@ -389,6 +426,11 @@ def _figure1(data_root: Path, output_root: Path) -> dict:
             "energy_n": [8, 9, 9],
             "sla_n": [7, 8, 8],
             "missing_sanchez_files": missing,
+            "sanchez_n": 15 if sanchez else 0,
+            "optimization_source_subset": {
+                "available": bool(trajectory),
+                "matches_published_five_point_series": False,
+            },
             "panels": {
                 "1C": "partial" if missing else "passed",
                 "1D": "partial" if missing else "passed",
@@ -713,6 +755,146 @@ def landscape_data(data_root: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray]
     return alpha, psi, rates
 
 
+def _rank_sum_probability(x, y, alternative: str) -> tuple[float, float, str]:
+    """Match MATLAB ranksum's small-sample exact test, including tied ranks."""
+    x, y = np.asarray(x), np.asarray(y)
+    ranks = rankdata(np.concatenate([x, y]))
+    observed = float(ranks[: len(x)].sum())
+    if min(len(x), len(y)) < 10 and len(x) + len(y) < 20:
+        sums = np.fromiter((sum(group) for group in combinations(ranks, len(x))), dtype=float)
+        p = np.mean(sums >= observed if alternative == "greater" else sums <= observed)
+        return observed, float(p), "exact allocation of average ranks, including ties"
+    test = mannwhitneyu(x, y, alternative=alternative, method="asymptotic", use_continuity=True)
+    return observed, float(test.pvalue), "normal approximation with ties and continuity correction"
+
+
+def parameter_statistics(data_root: Path) -> dict[str, list[dict]]:
+    """Reproduce the addendum's independent-cohort parameter comparisons.
+
+    These tests concern alpha and psi, not the landscape's fall probabilities.
+    Both stored realizations are labeled; Figure 4 uses the original fit.
+    """
+    summaries, tests = [], []
+    for source in ("original", "regenerated"):
+        path = Path(data_root) / source / "2d_sweep_trial50_param_result.mat"
+        if source == "regenerated" and not path.is_file():
+            continue
+        value = _mat(path)
+        counts = np.asarray(value["exp_subj_num"]).ravel()
+        parameters = np.asarray(value["static_params"])
+        if not np.array_equal(counts, [8, 9, 9]) or parameters.shape != (3, 9):
+            raise ValueError("Parameter comparisons require the independent 8/9/9 cohorts")
+        for name in ("learning_rate", "symmetry_weight"):
+            groups = [
+                np.array(
+                    [
+                        float(parameters[c, s].learning_rate)
+                        if name == "learning_rate"
+                        else 1 - float(parameters[c, s].sym_cost)
+                        for s in range(int(n))
+                    ]
+                )
+                for c, n in enumerate(counts)
+            ]
+            values = np.concatenate(groups)
+            if not np.isfinite(values).all() or (
+                np.any(values <= 0)
+                if name == "learning_rate"
+                else np.any((values < 0) | (values > 1))
+            ):
+                raise ValueError("Invalid fitted values in parameter comparisons")
+            for speed, group in zip(SPEEDS, groups):
+                summaries.append(
+                    {
+                        "fit_source": source,
+                        "parameter": name,
+                        "delta_mps": speed,
+                        "n": len(group),
+                        "median": float(np.median(group)),
+                        "mean": float(group.mean()),
+                        "sd": float(group.std(ddof=1)),
+                        "units": "model learning-rate parameter"
+                        if name == "learning_rate"
+                        else "dimensionless (1 - sym_cost)",
+                    }
+                )
+            common = {
+                "fit_source": source,
+                "parameter": name,
+                "n_04": 8,
+                "n_07": 9,
+                "n_10": 9,
+                "sampling_unit": "participant, independent condition cohorts",
+                "multiplicity_correction": "none, matching supplied analysis",
+            }
+            kw = kruskal(*groups)
+            anova = f_oneway(*groups)
+            regression = linregress(np.repeat(SPEEDS, counts.astype(int)), values)
+            margin = t.ppf(0.975, len(values) - 2) * regression.stderr
+            alternative = "greater" if name == "learning_rate" else "less"
+            extreme = ttest_ind(groups[0], groups[2], equal_var=True, alternative=alternative)
+            rank_sum, rank_p, rank_method = _rank_sum_probability(groups[0], groups[2], alternative)
+            for test, statistic, p, comparison, tail, method, lower, upper in (
+                (
+                    "kruskal_wallis",
+                    kw.statistic,
+                    kw.pvalue,
+                    "all three conditions",
+                    "any condition distribution differs",
+                    "tie-corrected H, chi-square reference, df=2",
+                    "",
+                    "",
+                ),
+                (
+                    "one_way_anova",
+                    anova.statistic,
+                    anova.pvalue,
+                    "all three conditions",
+                    "any condition mean differs",
+                    "independent groups, df=2,23",
+                    "",
+                    "",
+                ),
+                (
+                    "linear_trend",
+                    regression.slope,
+                    regression.pvalue,
+                    "parameter vs belt-speed difference (m/s)",
+                    "two-sided",
+                    "OLS slope per m/s; t reference df=24",
+                    regression.slope - margin,
+                    regression.slope + margin,
+                ),
+                (
+                    "two_sample_t",
+                    extreme.statistic,
+                    extreme.pvalue,
+                    "0.4 vs 1.0 m/s",
+                    alternative,
+                    "equal-variance independent t-test, df=15",
+                    "",
+                    "",
+                ),
+                ("rank_sum", rank_sum, rank_p, "0.4 vs 1.0 m/s", alternative, rank_method, "", ""),
+            ):
+                if not np.isfinite([statistic, p]).all():
+                    raise ValueError("Parameter comparison returned nonfinite statistics")
+                tests.append(
+                    {
+                        **common,
+                        "test": test,
+                        "statistic": float(statistic),
+                        "p_value": float(p),
+                        "comparison": comparison,
+                        "alternative": tail,
+                        "method": method,
+                        "slope_ci_lower_95": float(lower) if lower != "" else "",
+                        "slope_ci_upper_95": float(upper) if upper != "" else "",
+                    }
+                )
+    return {"parameter_summary": summaries, "parameter_tests": tests}
+
+
 def landscape_tables(data_root: Path) -> dict[str, list[dict]]:
     alpha, psi, rates = landscape_data(data_root)
     grid = [
@@ -782,6 +964,7 @@ def landscape_tables(data_root: Path) -> dict[str, list[dict]]:
         "participant_parameters": participants,
         "ellipses": ellipses,
         "ellipse_risk": risks,
+        **parameter_statistics(data_root),
     }
 
 
@@ -837,12 +1020,23 @@ def _figure4(data_root: Path, output_root: Path) -> dict:
         [
             "Original cached landscape; raw trial counts, seeds and simulation revision are absent from its MAT metadata.",
             "Ellipse values are arithmetic means of included grid nodes, not significance tests.",
+            "Across-condition tests compare fitted participant learning rates and symmetry weights; they do not test the gray/red ellipse fall-probability comparison.",
             "The manuscript risk-comparison p<.05 claim cannot be reproduced from the supplied analysis; no p-value is invented.",
             "Styling is portable; original manual Figma arrows and MATLAB colormap are not reproduced.",
         ],
         {
             "grid_shape": list(rates.shape),
             "participant_n": [8, 9, 9],
+            "parameter_kruskal_wallis": [
+                {
+                    "fit_source": r["fit_source"],
+                    "parameter": r["parameter"],
+                    "H": r["statistic"],
+                    "p_value": r["p_value"],
+                }
+                for r in tables["parameter_tests"]
+                if r["test"] == "kruskal_wallis"
+            ],
             "current_ellipse_displayed_pct": [
                 r["displayed_integer_pct"]
                 for r in tables["ellipse_risk"]

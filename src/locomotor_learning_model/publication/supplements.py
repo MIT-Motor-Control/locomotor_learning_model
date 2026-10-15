@@ -146,71 +146,78 @@ def _load_published(root: Path):
 
 
 def _figure2(root: Path, output: Path) -> dict:
-    """Port of revision/fig2b_timeseries.py, VARIANT=split SUBJ=7 AXIS=pct."""
-    parameters, nsub, energy = _load_published(root)
-    condition, subject = 1, 7  # Historical SUBJ is zero-based: participant 8, condition 2.
-    raw_exp = np.asarray(energy["split_energy"].condition_2, float)
-    st = parameters[condition, subject]
-    exp_fit = np.asarray(st.exp_energy, float)
-    exp_smoothed = matlab_movmean(raw_exp[subject], 180)
-    _, exp_scale = stored_fit_metrics(exp_smoothed, exp_fit)
-    exp_percent = (exp_smoothed - exp_scale) / exp_scale * 100
-    model_smoothed = matlab_movmean(np.asarray(st.model_energy_raw), 100)
-    model_fit = np.asarray(st.model_energy, float)
-    _, model_scale = stored_fit_metrics(model_smoothed, model_fit[: model_smoothed.size])
-    model_percent = (model_smoothed - model_scale) / model_scale * 100
-    # The historical handoff script truncates every model participant to the shortest rollout
-    # in this condition before it selects SUBJ=7. Preserve that exact convention.
-    model_length = min(
-        np.asarray(parameters[condition, s].model_energy_raw).size for s in range(nsub[condition])
+    """Addendum comment2_raw_sidebyside.py, SOURCE=verify PANEL=2 SPLIT=1."""
+    from .regenerated import (
+        REGENERATED_ENERGY,
+        REGENERATED_PARAMETERS,
+        figure2_group_trajectories,
     )
-    model_percent, model_fit = model_percent[:model_length], model_fit[:model_length]
-    series = [
-        ("experiment", exp_percent, exp_fit, "#990000"),
-        ("model", model_percent, model_fit, "#000099"),
-    ]
-    rows = []
-    fig, axes = plt.subplots(1, 2, figsize=(6.6, 2.7), sharey=True, layout="constrained")
-    lower = min(min(y.min(), f.min()) for _, y, f, _ in series) - 4
-    upper = max(max(y.max(), f.max()) for _, y, f, _ in series) + 4
-    for ax, (name, values, fit, color) in zip(axes, series):
-        percent = np.linspace(0, 100, values.size)
-        ax.plot(percent, values, color=color, alpha=0.28, lw=0.8, label="Smoothed signal")
-        ax.plot(percent, fit, color=color, lw=2, label="Stored fit")
-        ax.set(xlabel="Exposure (%)", title=name.capitalize(), xlim=(0, 100), ylim=(lower, upper))
-        rows.extend(
-            {
-                "source": name,
-                "condition": 2,
-                "delta_mps": 0.7,
-                "subject": 8,
-                "sample_index": i,
-                "exposure_pct": float(x),
-                "smoothed_energy_pct": float(y),
-                "stored_fit_pct": float(f),
-            }
-            for i, (x, y, f) in enumerate(zip(percent, values, fit))
+
+    groups, participants, metrics = figure2_group_trajectories(root)
+    grid = np.linspace(0, 100, 270)
+    rows, fits = [], []
+    overlay, axis = plt.subplots(figsize=(3.7, 3.0), layout="constrained")
+    boxes, axes = plt.subplots(1, 2, figsize=(6.6, 2.7), sharey=True, layout="constrained")
+    low, high = [], []
+
+    def exponential(x, a, tau, offset):
+        return a * np.exp(-x / tau) + offset
+
+    for ax, name, color, overlay_color in zip(
+        axes, ("experiment", "model"), ("#990000", "#000099"), ("black", "#1959d9")
+    ):
+        values = groups[name]
+        mean, sem = values.mean(axis=0), values.std(axis=0, ddof=1) / np.sqrt(len(values))
+        coefficients, _ = curve_fit(
+            exponential, grid, mean, p0=[mean[0] - mean[-1], 20.0, mean[-1]], maxfev=20000
         )
-    axes[0].set_ylabel("Energy change (%)")
-    axes[1].legend(frameon=False, fontsize=7)
-    outputs = [_write_csv(output, "figure2b_timeseries", rows)]
-    outputs += _save(fig, output, "figure2b_timeseries")
+        fitted = exponential(grid, *coefficients)
+        r2 = 1 - np.sum((mean - fitted) ** 2) / np.sum((mean - mean.mean()) ** 2)
+        axis.fill_between(grid, mean - sem, mean + sem, color=overlay_color, alpha=0.15, lw=0)
+        axis.plot(grid, mean, color=overlay_color, lw=2, label=name.capitalize())
+        ax.axhline(0, color=".8", lw=0.7, ls=":")
+        ax.plot(grid, mean, color=color, alpha=0.5, lw=1, label="Group mean")
+        ax.plot(grid, fitted, color=color, lw=2.4, label="Exponential fit to group mean")
+        ax.set(xlabel="Split exposure (%)", title=name.capitalize(), xlim=(0, 100))
+        low.append(min(mean.min(), fitted.min()))
+        high.append(max(mean.max(), fitted.max()))
+        rows.extend(
+            {"source": name, "condition": 2, "delta_mps": 0.7, "participants": len(values),
+             "sample_index": i, "exposure_pct": float(x), "group_mean_pct": float(y),
+             "sem_pct": float(se), "group_exponential_fit_pct": float(f)}
+            for i, (x, y, se, f) in enumerate(zip(grid, mean, sem, fitted))
+        )
+        fits.append(
+            {"source": name, "condition": 2, "amplitude_pct": float(coefficients[0]),
+             "tau_exposure_pct": float(coefficients[1]), "offset_pct": float(coefficients[2]),
+             "fit_endpoint_pct": float(fitted[-1]), "r2_group_fit": float(r2)}
+        )
+    for ax in axes:
+        ax.set_ylim(min(low) - 4, max(high) + 4)
+    axes[0].set_ylabel("Energy change from split onset (%)")
+    axes[1].legend(frameon=False, fontsize=6)
+    axis.set(xlabel="Split exposure (%)", ylabel="Metabolic change vs split onset (%)",
+             xlim=(0, 100), ylim=(min(low) - 4, max(max(high), 5) + 3), title="0.7 m/s (n = 9)")
+    axis.legend(frameon=False, fontsize=8, loc="upper right")
+    outputs = [
+        _write_csv(output, "figure2b_timeseries", rows),
+        _write_csv(output, "figure2b_participants", participants),
+        _write_csv(output, "figure2b_metrics", [metrics]),
+        _write_csv(output, "figure2b_group_fits", fits),
+    ]
+    outputs += _save(boxes, output, "figure2b_timeseries")
+    outputs += _save(overlay, output, "figure2b_raw_overlay")
     return _record(
-        "figure2",
-        outputs,
-        [PARAMETERS, ENERGY],
-        "replot_stored_fits",
+        "figure2", outputs, [REGENERATED_PARAMETERS, REGENERATED_ENERGY],
+        "regenerated_raw_group_trajectories",
         [
             "Figure 2B only; conceptual panels are not numerical analyses.",
-            "Historical handoff participant 8 is retained; its approximately −52% fitted plateau does not match the final PDF representative plot (approximately −25% experiment and −22% model). The final participant/source remains unresolved.",
-            "Experimental time and model strides each span 0–100% of their own exposure.",
-            "Model rollout is truncated to the shortest of all nine condition-2 rollouts.",
+            "Addendum source identifies group means from nine experimental and nine model participants; the final caption's representative-participant description still requires author correction.",
+            "Both channels use a 100-sample moving mean, remove the startup transient, normalize to the next 120 samples, and resample to 270 exposure points. Overlay bands are SEM, not confidence intervals.",
+            "Schematic exponential curves are refitted to displayed group means, as in SPLIT=1; stored individual fits use a different normalization.",
+            "Uses the regenerated realization; a new stochastic sweep will not be bit-identical.",
         ],
-        status="partial",
-        condition=2,
-        subject_one_based=8,
-        model_samples=int(model_length),
-        experiment_samples=int(exp_percent.size),
+        **metrics, samples_per_trajectory=270, participant_trajectories=18,
     )
 
 
@@ -315,10 +322,73 @@ def _s1_from_tables(prefix: Path, output: Path, mode: str, sources: list[str]) -
 
 
 def _s1(root: Path, output: Path) -> dict:
+    from .regenerated import S1_GRID_PREFIX
+
     sources = [f"{S1_PREFIX}_{suffix}.csv" for suffix in ("persubject", "stats", "test")]
     for source in sources:
         _require(root, source)
-    return _s1_from_tables(root / S1_PREFIX, output, "saved_reference_replot", sources)
+    record = _s1_from_tables(root / S1_PREFIX, output, "saved_reference_replot", sources)
+    grid_sources = [f"{S1_GRID_PREFIX}_{suffix}.csv" for suffix in ("summary", "persubject")]
+    if any((root / name).exists() for name in grid_sources):
+        for source in grid_sources:
+            _require(root, source)
+        _attach_s1_grid(root, root / S1_GRID_PREFIX, output, record, "saved_matlab_grid_sensitivity")
+        record["details"]["sources"] += grid_sources
+    else:
+        record["details"]["grid_sensitivity_available"] = False
+        record["caveats"].append(
+            "The additional shared-grid sensitivity check is not cached in this dataset; recompute-s1 can generate it in MATLAB."
+        )
+    return record
+
+
+def _attach_s1_grid(root: Path, prefix: Path, output: Path, record: dict, mode: str) -> None:
+    from .regenerated import TRIAL_AVERAGE_GRID, grid_finite_counts
+
+    summary = _read_csv(Path(f"{prefix}_summary.csv"))
+    participants = _read_csv(Path(f"{prefix}_persubject.csv"))
+    counts = grid_finite_counts(root)
+    if [int(row["minimum_finite_subjects"]) for row in summary] != [26, 17, 8]:
+        raise ValueError("S1 grid sensitivity must contain thresholds 26/17/8 in source order")
+    if len(participants) != 78:
+        raise ValueError("S1 grid sensitivity requires 26 participant folds for each of three grids")
+    expected_pairs = {(c, s) for c, n in enumerate((8, 9, 9), 1) for s in range(1, n + 1)}
+    for row, count in zip(summary, counts):
+        threshold = int(row["minimum_finite_subjects"])
+        folds = [p for p in participants if int(p["minimum_finite_subjects"]) == threshold]
+        if len(folds) != 26 or {(int(p["condition"]), int(p["subject"])) for p in folds} != expected_pairs:
+            raise ValueError("S1 grid sensitivity participant pairs are incomplete or duplicated")
+        cs, shared = (np.array([float(p[key]) for p in folds])
+                      for key in ("cond_specific", "common_size_matched"))
+        if not np.isfinite([cs, shared]).all():
+            raise ValueError("S1 grid sensitivity contains nonfinite held-out scores")
+        checks = {
+            "median_condition_specific": np.median(cs),
+            "median_common_size_matched": np.median(shared),
+            "median_ratio_common_over_specific": np.median(shared) / np.median(cs),
+            "pct_subjects_better": 100 * np.mean(cs < shared),
+            "admissible_cells": count["admissible_cells"],
+            "subsample_repeats": 200,
+            "rng_seed": 0,
+        }
+        for key, expected in checks.items():
+            if not np.isclose(float(row[key]), expected, rtol=1e-12, atol=1e-12):
+                raise ValueError(f"S1 grid sensitivity summary conflicts with source folds/grid: {key}")
+        pvalue = float(row["wilcoxon_two_sided_matlab_signrank_default"])
+        if not 0 <= pvalue <= 1:
+            raise ValueError("Invalid S1 grid sensitivity p value")
+    paths = [
+        _write_csv(output, "s1_grid_sensitivity_summary", summary),
+        _write_csv(output, "s1_grid_sensitivity_persubject", participants),
+        _write_csv(output, "s1_grid_finite_counts", counts),
+    ]
+    record["outputs"] += [str(path) for path in paths]
+    record["details"].update(grid_sensitivity_available=True, grid_sensitivity_mode=mode,
+                             grid_sensitivity_summary=summary)
+    record["details"]["sources"].append(TRIAL_AVERAGE_GRID)
+    record["caveats"].append(
+        "Additional grid sensitivity preserves MATLAB rng(0), 200 subsamples and threshold order 26/17/8; finite-cell counts are independently recomputed from the trial-average grid."
+    )
 
 
 def recompute_s1_matlab(
@@ -339,7 +409,10 @@ def recompute_s1_matlab(
     tables = (output_root / "tables" / "s1_matlab").resolve()
     tables.mkdir(parents=True, exist_ok=True)
     quote = lambda value: str(value).replace("'", "''")
-    command = f"addpath('{quote(vendor)}'); publication_s1_loso('{quote(grid)}','{quote(tables)}');"
+    command = (
+        f"addpath('{quote(vendor)}'); publication_s1_loso('{quote(grid)}','{quote(tables)}');"
+        f"publication_s1_grid_sensitivity('{quote(grid)}','{quote(tables)}');"
+    )
     result = subprocess.run(
         [executable, "-batch", command], capture_output=True, text=True, timeout=600, check=False
     )
@@ -351,6 +424,8 @@ def recompute_s1_matlab(
         record = _s1_from_tables(
             tables / "comment1_loso_cv", output_root, "fresh_matlab_loso_on_cached_grid", [source]
         )
+        _attach_s1_grid(data_root, tables / "comment1_grid_sensitivity", output_root, record,
+                        "fresh_matlab_grid_sensitivity_on_cached_grid")
     record["outputs"] += [str(log)] + [str(p) for p in sorted(tables.glob("*.csv"))]
     return record
 
@@ -640,37 +715,72 @@ def _s3(root: Path, output: Path) -> dict:
             ],
         ),
     ]
-    fig, axes = plt.subplots(1, 2, figsize=(5.7, 2.9), layout="constrained")
-    for ax, letter, title, x, y, color in (
-        (axes[0], "A", "Trajectory optimization", trajectory_speeds, trajectory_pct, "#009900"),
-        (axes[1], "C", "Experimental data", SPEEDS, means, "#990000"),
-    ):
+    from .regenerated import S3_SWEEP, s3_model_tables
+
+    missing_reason = None
+    try:
+        trials, model_participants, model_summary = s3_model_tables(root)
+    except FileNotFoundError as error:
+        missing_reason = str(error)
+        trials, model_participants, model_summary = [], [], []
+    panels = [("A", "Trajectory optimization", trajectory_speeds, trajectory_pct, "#009900")]
+    sources = [ENERGY, "reported trajectory-optimization constants in supplements.py"]
+    details = {"experimental_means": means}
+    if model_summary:
+        model_means = [row["mean_energy_change_pct"] for row in model_summary]
+        model_corr = float(np.corrcoef(model_means, means)[0, 1])
+        trajectory_at_conditions = np.polyval(np.polyfit(trajectory_speeds, trajectory_pct, 2), SPEEDS)
+        trajectory_corr = float(np.corrcoef(trajectory_at_conditions, means)[0, 1])
+        outputs += [
+            _write_csv(output, "s3b_model_trials", trials),
+            _write_csv(output, "s3b_model_participants", model_participants),
+            _write_csv(output, "s3b_model_summary", model_summary),
+            _write_csv(output, "s3_direction_correlations", [{
+                "model_vs_experiment_pearson_r": model_corr,
+                "trajectory_quadratic_vs_experiment_pearson_r": trajectory_corr,
+            }]),
+        ]
+        panels.append(("B", "Adaptation-aware model", SPEEDS, model_means, "#000099"))
+        sources += [PARAMETERS, S3_SWEEP]
+        details.update(model_means=model_means, unique_model_trials=len(trials),
+                       model_participants=len(model_participants),
+                       model_vs_experiment_pearson_r=model_corr,
+                       trajectory_quadratic_vs_experiment_pearson_r=trajectory_corr)
+    panels.append(("C", "Experimental data", SPEEDS, means, "#990000"))
+    fig, axes = plt.subplots(1, len(panels), figsize=(7.5 if model_summary else 5.7, 2.9),
+                             layout="constrained")
+    for ax, (letter, title, x, y, color) in zip(axes, panels):
         ax.axhline(0, color=".75", lw=0.7, ls=":")
         ax.plot(x, y, "o-", color=color, lw=1.8)
-        ax.set(
-            xlabel="Speed difference (m/s)",
-            ylabel="Energy change (%)",
-            title=f"{letter}  {title}",
-            xticks=x,
-        )
-    axes[0].set_ylim(-7, 2.5)
-    axes[1].set_ylim(-15, 27)
-    fig.suptitle("S3 partial reproduction — panel B unavailable", fontsize=9)
-    outputs += _save(fig, output, "s3_ac_partial")
+        ax.set(xlabel="Speed difference (m/s)", ylabel="Energy change (%)",
+               title=f"{letter}  {title}", xticks=x)
+        if letter == "A":
+            ax.set_ylim(-7, 2.5)
+        elif letter == "B":
+            ax.set(ylim=(-26.25, 350), yticks=[0, 100, 200, 300])
+        else:
+            ax.set_ylim(-15, 27)
+    caveats = [
+        "Panel A preserves five reported OpenSim/Moco constants; the addendum's four muscle-output STO conditions are a separate source check, not an exact five-point regeneration.",
+        "Panel C uses the original experimental means over the last 180 seconds of split and tied walking.",
+    ]
+    if model_summary:
+        caveats += [
+            "Panel B uses regenerated trials at the original published participant parameter cells; new stochastic sweeps need not be bit-identical.",
+            "Nonfalling trials use tied strides 31–70 (Python slice 30:70) and the final 100 strides. Participant medians across successful trials are averaged within condition; no uncertainty band is drawn.",
+            "Shared fitted cells are reused for multiple participants. Unique trial rows and participant-weighted fall counts are exported separately.",
+        ]
+    else:
+        fig.suptitle("S3 partial reproduction — panel B unavailable", fontsize=9)
+        caveats.append(f"Panel B unavailable: {missing_reason}")
+    outputs += _save(fig, output, "s3_abc" if model_summary else "s3_ac_partial")
     return _record(
-        "s3",
-        outputs,
-        [ENERGY, "trajectory-optimization constants in supplements.py"],
-        "experimental_reanalysis_and_reported_trajectory_values",
-        [
-            "Panel B is unavailable: raw regenerated model sweeps required for its tied baseline are missing.",
-            "Panel A uses five reported OpenSim/Moco outputs; trajectory optimization is not rerun.",
-            "The stale handoff S3 model CSV is deliberately not used.",
-        ],
-        status="partial",
-        reproduced_panels=["A", "C"],
-        missing_panels=["B"],
-        experimental_means=means,
+        "s3", outputs, sources,
+        "experimental_reanalysis_and_regenerated_model_trials" if model_summary
+        else "experimental_reanalysis_and_reported_trajectory_values",
+        caveats, status="passed" if model_summary else "partial",
+        reproduced_panels=[p[0] for p in panels], missing_panels=[] if model_summary else ["B"],
+        **details,
     )
 
 

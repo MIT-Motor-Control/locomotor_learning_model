@@ -26,7 +26,7 @@ No private directories, author handoff, MATLAB installation or network connectio
 | Download | Contents | Reproduction coverage |
 |---|---|---|
 | `locomotor_learning_model-DATA.zip` | Experimental CSVs, processed MAT files, raw C3D recordings, metadata, checkpoints and the embedded model-input ZIP | All available saved-data analyses, with known gaps explicitly reported |
-| Embedded `publication-data.zip` | Original and regenerated fits, cross-validation tables, fall trials, risk landscapes and supplementary model caches | Adds the available model figures and analyses; unresolved panels remain explicitly partial |
+| Embedded `publication-data.zip` | Original and regenerated fits, cross-validation and grid-sensitivity tables, fall trials, Sánchez data, OpenSim outputs and supplementary model caches | Adds the model figures and analyses, including regenerated Figure 2B and S3B |
 
 The experimental CSVs contain values rounded to six decimals. Their reconstructed arrays preserve that precision. The companion includes the original full-precision arrays; preparation checks their agreement with the CSVs within the rounding tolerance and retains the original arrays. Small last-decimal differences between experimental-only and full-input runs are expected. Neither route reruns raw C3D processing, COSMED preprocessing or the full stochastic simulation sweeps.
 
@@ -40,7 +40,7 @@ Use the CODE and DATA archives from the same Zenodo release. Earlier experimenta
 
 Download availability is controlled by the [Zenodo record](https://doi.org/10.5281/zenodo.19547419). Restricted files require access from the record owner. The repository's MIT license covers code; the experimental data record uses CC BY 4.0. Retain the downloaded metadata and provenance when redistributing the data.
 
-The updated DATA archive is prepared locally. Uploading it to the existing record is currently blocked: the published record uses the preprint DOI in its own DOI field, which disables new versions, and published file edits are locked after 30 days. The record's DOI/versioning configuration needs correction before this updated archive can be deposited there.
+Release 0.3.0 adds the supplementary source package dated October 15, 2026. Figure 2B, S1 and S3B use the regenerated realization; other main analyses retain the original published fits. The manifest records these sources separately. Fresh stochastic sweeps are expected to agree statistically, not trajectory by trajectory.
 
 ## Maintainers
 
@@ -59,3 +59,12 @@ loco-publication prepare --bundle /path/to/InvLocAd_PLOSBio_figure_code \
 ```
 
 These maintainer sources are not dependencies for readers using the released archives. The prepared dataset keeps original and regenerated results distinct and retains additional archived trials for reuse. See the [reproduction guide](../docs/reproducibility.md#coverage-and-limits) for coverage and limits.
+
+For maintainers extending an existing prepared dataset with the supplementary source package:
+
+```sh
+loco-publication import-addendum --source /path/to/kanishka_addendum_2026-10-15 \
+  --previous-bundle /path/to/InvLocAd_PLOSBio_figure_code
+```
+
+The importer verifies existing hashes and rejects conflicting numerical inputs. MATLAB grid-sensitivity tables may be added with `--generated-s1 /path/to/recomputed/tables` and `--generated-s1-script /path/to/publication_s1_grid_sensitivity.m`; their input and source hashes are preserved in the manifest. This is a release-preparation step, not a reader installation step.

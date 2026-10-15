@@ -14,7 +14,7 @@ loco-publication reproduce --figures figure3 s1 s4 --output outputs/selected
 loco-publication recompute-s1 --matlab /path/to/matlab
 ```
 
-`reproduce` runs all available workflows, including explicitly partial Figures 1, 2 and S3 with the companion archive. With only the experimental download, Figures 1 and S3 are partial and model-dependent analyses are blocked. Each run writes PNG/PDF/SVG figures, numerical CSV tables and `report.md`/`report.json`. Output formats depend on the figure. The report records input, source and output hashes and dependency versions. Reusing an existing managed output directory requires `--overwrite`.
+`reproduce` runs the numerical workflows for Figures 1–4, S1–S5 and fit-quality summaries. With only an older experimental download, Figures 1 and S3 are partial and model-dependent analyses are blocked. Each run writes PNG/PDF/SVG figures, numerical CSV tables and `report.md`/`report.json`. Output formats depend on the figure. The report records input, source and output hashes and dependency versions. Reusing an existing managed output directory requires `--overwrite`.
 
 Exit codes: **0** means the requested available workflows ran without unexpected errors; **1** means an integrity or execution failure; **2**, with `--strict`, means at least one requested analysis is partial or blocked. A successful exit without `--strict` does not mean every manuscript panel is complete.
 
@@ -22,8 +22,8 @@ Exit codes: **0** means the requested available workflows ran without unexpected
 
 | Input directory | Contents | Used for |
 |---|---|---|
-| `original/` | Published fit summaries, experimental measurements and original risk landscape | Main figures, S3 experimental/optimization panels, S4, fit quality |
-| `regenerated/` | July 2026 trial-averaged fit grid and saved cross-validation results | S1 |
+| `original/` | Published fit summaries, experimental measurements, Sánchez comparison, OpenSim outputs and original risk landscape | Figures 1, 4, S3A/C, S4, fit quality |
+| `regenerated/` | Regenerated fits, trial-average grid, cross-validation tables, COSMED arrays and 1,150 selected simulation rollouts | Figure 2B, S1 and S3B |
 | `fall_probability/` | Complete author fall-simulation files | Figure 3 |
 | `extensions/s2/`, `extensions/s5/` | Supplementary numerical results | S2, S5 |
 
@@ -35,9 +35,17 @@ Figure 3 requires every one of its 1,750 trials. A partial dataset is rejected r
 
 ## What the available inputs reproduce
 
-The report distinguishes a numerical reconstruction from a replot of a saved reference. S1 defaults to replotting the saved participant-level result; `recompute-s1` performs the original size-matched MATLAB analysis from the regenerated grid. MATLAB's approximate signed-rank p-value and the plotting script's exact SciPy p-value are distinct outputs, with their methods labeled.
+The report distinguishes a numerical reconstruction from a replot of a saved reference. S1 defaults to plotting verified MATLAB participant-level cross-validation and grid-sensitivity results. `recompute-s1` reruns both analyses from the regenerated trial-average grid. An independent release check found exact numerical agreement between these fresh results and the cached tables. It needs MATLAB with the Statistics and Machine Learning Toolbox; ordinary `reproduce` does not. MATLAB's approximate signed-rank p-value and the plotting script's exact SciPy p-value are distinct outputs, with their methods labeled.
 
-S2 and S5 use numerical results, not digitized images. S5 additionally refits all 750 cached cell means, reselects the models and recomputes all held-out predictions, noise-floor estimates and tests. Figure 4 and S4 use the saved original landscape. Figure 2 and fit-quality analyses use the original saved fits, but the Figure 2 handoff example does not match the final PDF. There is no neural-network training checkpoint: this model learns controller parameters and an internal dynamics estimate. See [model.md](model.md) for reusable simulations and resumable learner checkpoints.
+S2 and S5 use numerical results, not digitized images. S5 additionally refits all 750 cached cell means, reselects the models and recomputes all held-out predictions, noise-floor estimates and tests. Figure 4 and S4 use the saved original landscape. Fit-quality analyses retain the original published fit. There is no neural-network training checkpoint: this model learns controller parameters and an internal dynamics estimate. See [model.md](model.md) for reusable simulations and resumable learner checkpoints.
+
+The original inverse fit selects the lowest RMSE across parameter cells and individual stochastic trials. S1 instead scores the average normalized trajectory of nonfalling trials within each cell, requiring at least five survivors. Both the realization and the fitting estimator differ; comparing their RMSE values directly would be misleading.
+
+S2 uses 20 experimental participants (7/7/6 by condition) and five model seeds with shared learning rate 6×10⁻⁵, symmetry weight 1 and zero fall-penalty weight. These are the supplied shared Model A results, not the main participant-specific fits. Its reported STA test indicates no detected early-to-late difference, not proof of equivalence or zero adaptation. The manuscript's description of these predictions needs to identify this model variant.
+
+Figure 2B follows the supplied regenerated-trajectory analysis at Δv = 0.7 m/s: smooth and normalize each trajectory, align it to exposure percentage, then average the nine participants and nine fitted simulations. Its exported tables distinguish raw group trajectories from their exponential fits. This reproduces the supplied panel; the manuscript caption's description of a representative participant needs clarification.
+
+S3B reads exactly 50 regenerated trials at each of the 23 unique original best-fit parameter cells. It excludes falls, takes each participant's median energy change across surviving trials, and averages those medians by condition. Shared parameter cells are reused for their corresponding participants. The source table has 1,150 unique trials; participant-weighted counts in the condition summary are larger. The full 60,000-trial sweep is not needed to reconstruct this panel.
 
 The `validate-manuscript` command checks freshly generated results against the numerical claims in the reviewed manuscript revision. It verifies the PDF, inputs, analysis code and output hashes before comparison:
 
@@ -54,10 +62,12 @@ Figures have editable text and consistent rendering; manually composed schematic
 
 ## Coverage and limits
 
-- **Figures 1 and S3:** available experimental and supplied optimization values are reproduced. Comparison data and the S3B simulation set are incomplete.
-- **Figure 2:** the supplied participant example can be regenerated, but it is not the example in the final manuscript.
-- **Figures 3–4 and S1–S5:** available saved-data calculations are reproduced as described above; S3 remains partial. The additional Figure 4 significance comparison and S1 relaxed-grid analysis are not included.
-- **Simulation scope:** seeded examples and saved-result analyses are supported. Full original simulation sweeps, raw COSMED processing and OpenSim optimization are not reconstructed by this workflow. The manuscript engine records its supplied settings; saved-reference agreement does not establish agreement of every Methods statement.
+- **Figure 1:** experimental observations, paired tests and the Sánchez comparison are reconstructed, with the time windows exported alongside source values.
+- **Figure 2B:** the regenerated group-trajectory panel and its correlation are reconstructed. The caption's participant description remains unresolved.
+- **Figures 3–4 and S1–S5:** the supplied saved-data analyses, Figure 4 parameter tests, S1 relaxed-grid checks and S3B rollouts are available. The Figure 4 parameter test is not a test of the separate fall-probability claim in the text.
+- **S3A/OpenSim:** the five supplied optimization values are plotted. An independent calculation from the available muscle-output files is exported separately; those files do not establish all five published values. Running the original optimization from scratch is not supported by the supplied inputs.
+- **Numerical agreement:** the original 0.4 m/s cohort has mean inverse-fit RMSE 0.3715 across eight participants, whereas the manuscript reports 0.33. The code retains the eight valid observations. The supplied simulation engine also uses a 25-second transition and belt-speed division by 2; Methods state 20 seconds and division by √(g × leg length).
+- **Simulation scope:** seeded examples and saved-result analyses are supported. Full original stochastic sweeps and raw COSMED/C3D processing are not reconstructed by this workflow. Saved-reference agreement does not establish agreement of every Methods statement.
 
 Inspect each generated report for incomplete inputs and numerical comparisons before using its outputs.
 
@@ -78,12 +88,13 @@ Data-dependent tests skip when the prepared dataset is absent. A release check s
 
 ## Editor source workbook
 
-`outputs/source-data-review.xlsx` gathers the requested 1C/D/E, 3C, S1 and S3 source values. It includes participant observations, all 1,750 Figure 3 trials, units and the outstanding panel gaps. It is a review copy while the Sánchez comparison and S3B remain incomplete. The numerical CSVs are the primary reusable source files.
+The requested 1C/D/E, 3C, S1 and S3 numerical values are exported in `outputs/publication/tables/`. They include the Sánchez comparison, participant observations, all 1,750 Figure 3 trials and all 1,150 S3B trials. These CSVs and the documented pipeline provide the reusable figure source data.
 
-The optional workbook formatter is `scripts/build_source_workbook.mjs`; it requires Node and `@oai/artifact-tool`, as described in its usage header. The scientific pipeline does not depend on this formatter. Verify an exported workbook against its source CSVs and adjacent validation JSON with:
+To gather the editor-requested source values into a workbook, use the same Conda environment:
 
 ```sh
-python scripts/check_source_workbook.py outputs/publication outputs/source-data-review.xlsx
+python scripts/build_source_workbook.py outputs/publication outputs/source-data.xlsx
+python scripts/check_source_workbook.py outputs/publication outputs/source-data.xlsx
 ```
 
-The check uses the optional `openpyxl` dependency for reading only. The locked environment includes it.
+The builder preserves the CSV values, records their hashes, and labels data sources and units. The checker compares workbook cells with the CSVs. Both use `openpyxl`, already included in the locked Conda environment; no extra runtime or private formatting package is needed.

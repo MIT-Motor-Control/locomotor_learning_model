@@ -10,6 +10,8 @@ from scipy.io import loadmat, savemat
 
 from locomotor_learning_model.publication.data import prepare_data, sha256
 from locomotor_learning_model.publication.main_figures import (
+    _rank_sum_probability,
+    _sanchez,
     fall_filename,
     fall_tables,
     figure1_tables,
@@ -17,7 +19,14 @@ from locomotor_learning_model.publication.main_figures import (
     landscape_data,
     landscape_tables,
     matlab_box_summary,
+    parameter_statistics,
     render_main,
+)
+from locomotor_learning_model.publication.trajectory import (
+    SOURCE_FILES,
+    read_storage,
+    source_energy_cost,
+    trajectory_source_tables,
 )
 
 
@@ -109,6 +118,75 @@ def test_matlab_box_percentiles_and_whiskers():
     assert [box["whisker_low"], box["whisker_high"], box["hidden_outliers"]] == [0, 5, 1]
 
 
+def test_sanchez_preserves_shared_energy_indices_and_signal_specific_long_windows(tmp_path):
+    folder = tmp_path / "original/data/sanchez data"
+    folder.mkdir(parents=True)
+    energy = {
+        f"P{i}": {"Base": np.full(200, 2.0), "Split": 2 + 0.001 * np.arange(1500)}
+        for i in range(1, 16)
+    }
+    sla = {
+        f"P{i}": {"Base": np.full(300, 0.1), "Split": 0.1 + 0.0001 * np.arange(2400)}
+        for i in range(1, 16)
+    }
+    savemat(folder / "sanchez_energy.mat", {"MetabolicPower": energy})
+    savemat(folder / "sanchez_sla.mat", {"StepLengthAsymmetry": sla})
+    short, long = _sanchez(tmp_path)[:2]
+    assert short["energy_window_first_sample"] == short["sla_window_first_sample"] == 101
+    assert short["energy_window_last_sample"] == short["sla_window_last_sample"] == 200
+    np.testing.assert_allclose(
+        [short["energy_change_pct"], short["sla_change_percentage_points"]],
+        [7.475, 1.495],
+        atol=1e-12,
+    )
+    assert long["energy_window_first_sample"] == 1401
+    assert long["sla_window_first_sample"] == 2301
+    np.testing.assert_allclose(
+        [long["energy_change_pct"], long["sla_change_percentage_points"]],
+        [72.475, 23.495],
+        atol=1e-12,
+    )
+    energy["P1"]["Base"][0] = np.nan
+    savemat(folder / "sanchez_energy.mat", {"MetabolicPower": energy})
+    with pytest.raises(ValueError, match="finite values"):
+        _sanchez(tmp_path)
+
+
+def test_exact_rank_sum_includes_equal_allocations_with_ties():
+    # All six allocations of four observations are equiprobable. Three give
+    # the minimum rank sum when three observations share the same value.
+    statistic, p, method = _rank_sum_probability([1, 1], [1, 2], "less")
+    assert statistic == 4
+    assert p == 0.5
+    assert "exact" in method
+    assert _rank_sum_probability([1, 2], [1, 1], "greater")[1] == 0.5
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "time x\n0 1\n1 2\n",  # No storage header terminator.
+        "endheader\ntime x x\n0 1 2\n1 2 3\n",  # Ambiguous columns.
+        "endheader\ntime x\n0 1\n0 2\n",  # Duplicate times.
+        "endheader\ntime x\n0 1\n1 nan\n",  # Missing scientific value.
+    ],
+)
+def test_storage_rejects_incomplete_or_ambiguous_sources(tmp_path, content):
+    path = tmp_path / "source.sto"
+    path.write_text(content)
+    with pytest.raises(ValueError):
+        read_storage(path)
+
+
+def test_storage_retains_column_labels_and_values(tmp_path):
+    path = tmp_path / "source.sto"
+    path.write_text("version=3\nendheader\ntime\t/forceset/test|activation\n0\t0.1\n1\t0.2\n")
+    labels, values = read_storage(path)
+    assert labels == ["time", "/forceset/test|activation"]
+    np.testing.assert_array_equal(values, [[0, 0.1], [1, 0.2]])
+    assert trajectory_source_tables(tmp_path) == []
+
+
 def test_exp1_recovers_known_nonlinear_model():
     x = np.linspace(0.4, 1, 7)
     fit = fit_exp1(x, 1200 * np.exp(-1.8 * x))
@@ -144,8 +222,13 @@ def publication_data():
     path = Path(__file__).resolve().parents[1] / "data/publication"
     if not (path / "manifest.json").is_file():
         pytest.skip("Prepared publication data is required for audited numerical regression")
-    if json.loads((path / "manifest.json").read_text()).get("dataset_kind") == "zenodo_experimental":
-        pytest.skip("Full-precision reference regressions require the companion publication-data.zip")
+    if (
+        json.loads((path / "manifest.json").read_text()).get("dataset_kind")
+        == "zenodo_experimental"
+    ):
+        pytest.skip(
+            "Full-precision reference regressions require the companion publication-data.zip"
+        )
     return path
 
 
@@ -295,3 +378,109 @@ def test_original_landscape_audited_ellipse_values(publication_data):
     assert alpha[0] == 0.005
     np.testing.assert_allclose([psi[0], psi[9], psi[-1]], [0, 0.4736842105263158, 1])
     np.testing.assert_allclose(risk[0, -1, :] - risk[0, 0, :], [62, 42, -16], atol=1e-12, rtol=0)
+
+
+@pytest.mark.integration
+def test_parameter_comparisons_match_independent_matlab_with_ties(publication_data):
+    # MATLAB R2025a kruskalwallis/anova1/fitlm/ttest2/ranksum, evaluated on
+    # the original and regenerated arrays from the supplied addendum.
+    expected = {
+        ("original", "learning_rate"): [
+            9.1357212475633514,
+            0.010380143011048181,
+            0.10031126982056092,
+            -0.02214464733261725,
+            0.034174881826052737,
+            0.0094837700053482053,
+            0.00090497737556561111,
+        ],
+        ("original", "symmetry_weight"): [
+            9.1855517307324561,
+            0.01012471448533666,
+            0.0017957593771143585,
+            1.0005171659307002,
+            0.000392805731869932,
+            2.3168041127059721e-5,
+            0.00032908268202385847,
+        ],
+        ("regenerated", "learning_rate"): [
+            3.038920574566963,
+            0.21882996039886082,
+            0.23659918924390666,
+            -0.015306122448979612,
+            0.14461561661052991,
+            0.078370018059416846,
+            0.086137392019744963,
+        ],
+        ("regenerated", "symmetry_weight"): [
+            5.33281937272901,
+            0.069501309395593056,
+            0.0702727230437279,
+            0.57803238254366129,
+            0.023124724768154532,
+            0.011084507365048738,
+            0.006663924310983135,
+        ],
+    }
+    tables = parameter_statistics(publication_data)
+    assert len(tables["parameter_tests"]) == 20
+    for (source, parameter), numbers in expected.items():
+        rows = {
+            r["test"]: r
+            for r in tables["parameter_tests"]
+            if r["fit_source"] == source and r["parameter"] == parameter
+        }
+        actual = [
+            rows["kruskal_wallis"]["statistic"],
+            rows["kruskal_wallis"]["p_value"],
+            rows["one_way_anova"]["p_value"],
+            rows["linear_trend"]["statistic"],
+            rows["linear_trend"]["p_value"],
+            rows["two_sample_t"]["p_value"],
+            rows["rank_sum"]["p_value"],
+        ]
+        np.testing.assert_allclose(actual, numbers, rtol=2e-11, atol=2e-14)
+        assert all(
+            r["sampling_unit"] == "participant, independent condition cohorts"
+            for r in rows.values()
+        )
+
+
+@pytest.mark.integration
+def test_sanchez_addendum_matches_original_matlab_windows(publication_data):
+    if not (publication_data / "original/data/sanchez data/sanchez_energy.mat").is_file():
+        pytest.skip("Sánchez addendum inputs required")
+    rows = _sanchez(publication_data)
+    # First/last participant values independently evaluated from the original
+    # fig1_energy_sla_vs_trajopt.m section in MATLAB R2025a.
+    for participant, expected in (
+        ("P1", [39.841766146199127, 34.101988532304752, -5.7686971140829719, 2.3811102200814673]),
+        ("P15", [32.2157545896442, 11.812356790051719, -6.4204800056208731, 2.3510865075084189]),
+    ):
+        short, long = [r for r in rows if r["participant"] == participant]
+        actual = [
+            short["energy_change_pct"],
+            long["energy_change_pct"],
+            short["sla_change_percentage_points"],
+            long["sla_change_percentage_points"],
+        ]
+        np.testing.assert_allclose(actual, expected, rtol=1e-12, atol=1e-12)
+    assert len(rows) == 30
+
+
+@pytest.mark.integration
+def test_optimization_source_subset_matches_original_energy_equations(publication_data):
+    folder = publication_data / "original/data/trajectory optimization"
+    if not (folder / "model_13d24m_sbt.osim").is_file():
+        pytest.skip("OpenSim addendum inputs required")
+    # Original scalar MATLAB computeOsimEnergy.m, with the 24 force/length
+    # parameters read from the supplied OSIM XML instead of the OpenSim API.
+    expected = [3.5183137519303593, 3.251264129677224, 3.2334139295303213, 2.8268725674956321]
+    actual = [
+        source_energy_cost(folder / name, folder / "model_13d24m_sbt.osim")["net_cost_j_kg_m"]
+        for name in SOURCE_FILES.values()
+    ]
+    np.testing.assert_allclose(actual, expected, atol=2e-14, rtol=1e-13)
+    rows = trajectory_source_tables(publication_data)
+    assert [r["delta_mps"] for r in rows] == [0, 0.4, 0.7, 1.0]
+    assert rows[0]["energy_change_pct"] == 0

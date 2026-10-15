@@ -1,24 +1,27 @@
 {
   "date": "2026-10-15",
-  "environment_name": "loco-ada-readme-test-20261015",
+  "release": "0.3.0",
+  "environment_name": "loco-ada-addendum-test-20261015",
   "environment": {
     "python": "3.12.13",
     "platform": "macOS-26.6.2-arm64-arm-64bit",
     "packages": {
-      "locomotor-learning-model": "0.2.0",
+      "locomotor-learning-model": "0.3.0",
       "numpy": "1.26.4",
       "scipy": "1.17.1",
       "matplotlib": "3.8.2",
-      "pandas": "3.0.1"
+      "pandas": "3.0.1",
+      "openpyxl": "3.1.5",
+      "pytest": "9.1.1",
+      "ruff": "0.17.0"
     }
   },
-  "execution_surface": "Workspace shell; Computer Use refused access to co.zeit.hyper for safety reasons",
-  "isolation": "Separate source copy; no original prepared data or outputs copied in. Fresh Conda environment, clean shell, user-site packages disabled. Only experimental DATA and candidate companion ZIP supplied.",
-  "conda_create": "conda env create -n loco-ada-readme-test-20261015 -f environment.yml",
+  "isolation": "New Conda environment; separate code copy without author source folders. Actual verified DATA release ZIP extracted into its documented data/ location. Reader commands used only the code copy and that DATA archive.",
+  "conda_create": "conda env create -n loco-ada-addendum-test-20261015 -f environment.yml",
   "environment_file_changed": false,
   "pip_check": "passed",
   "tests": {
-    "passed": 137,
+    "passed": 174,
     "failed": 0,
     "skipped": 0
   },
@@ -26,121 +29,394 @@
   "simulation_iterations": {
     "demo": 40,
     "run_seed42": 1000,
+    "pause_seed42": 10,
     "resume_seed42": 20
   },
-  "experimental_only": {
-    "inputs": {
-      "checked_files": 8,
-      "manifest_sha256": "6ed9c36a901bb31383b3c4f3609378b330502292cd45dfb2151f28f501b958d8",
-      "dataset_kind": "zenodo_experimental",
-      "purpose": "Public experimental data for partial Figure 1 and S3 reproduction; model caches are absent",
-      "caveats": [
-        "Input integrity does not imply complete manuscript reproduction: model fits, fall trials, supplementary model caches, Sanchez data and optimization solutions are absent.",
-        "Public CSVs are six-decimal exports; reconstruction preserves CSV values and is not byte-exact recovery of full-precision author MAT files. Source rounding is at most 0.5e-6 in measured units for the audited dataset.",
-        "Per-subject processed MAT files, raw C3D recordings and participant metadata are not copied or required for this CSV import.",
-        "Missing tied2 energy and SLA short_idx values are not synthesized; the submitted analysis uses available tied/split measurements and fractional-stride windows.",
-        "The public DSA CSV includes absent final samples in some records; their positions are retained and listed in participant_mapping, never filled or interpolated."
-      ],
-      "errors": []
-    },
-    "statuses": {
-      "figure1": "partial",
-      "figure2": "blocked",
-      "figure3": "blocked",
-      "figure4": "blocked",
-      "s1": "blocked",
-      "s2": "blocked",
-      "s3": "partial",
-      "s4": "blocked",
-      "s5": "blocked",
-      "r2": "blocked"
-    },
-    "artifacts": 19
+  "matlab_engine": "Seeded repeatability, saved-trial reuse, configuration rejection and sweep restart passed in MATLAB R2025a.",
+  "matlab_s1": "Independent fresh MATLAB LOSO and three sensitivity grids exactly matched cached numerical tables, including all 78 sensitivity folds.",
+  "data_archive": {
+    "bytes": 13335231738,
+    "sha256": "14e9e46710afffd3998d0f5a5f33933c42d5599f2856eb743e1f025f5ac17cea",
+    "crc_members_checked": 105,
+    "manifest_payloads_checked": 104
   },
   "companion_archive": {
-    "path": "dist/publication-data.zip",
-    "bytes": 1041974240,
-    "sha256": "aab4c976ef798efdc264a79479f2755c294c0576ed482e76b1508884c56d7717",
-    "uploaded": false
+    "bytes": 1352215131,
+    "sha256": "7c9d64b8140db3d5f67781301036c0b2cd8a6ece734b6e3bde5597aad5c13b90"
   },
   "full_inputs": {
-    "checked_files": 3878,
-    "manifest_sha256": "907a361197b348c38cd08d0be1e0f9d32169568684f9d33a7a3399a68cbe51bb",
+    "checked_files": 5166,
+    "manifest_sha256": "cc540416c5aa6ecdb38ca7334b3a16dfbf6dd72692ad52e9fa2165fd9f567162",
     "dataset_kind": "publication_cache",
     "purpose": "Cached numerical reproduction of the submitted publication; not a raw simulation rerun",
     "caveats": [
       "Original and regenerated realizations are retained separately.",
-      "Raw COSMED and OpenSim optimization inputs are not supplied by this import.",
       "Reference tables may describe earlier analyses; use per-figure exported tables for plotted data.",
-      "No regenerated S3 rollout subset is synthesized or inferred from fitted parameters."
+      "No regenerated S3 rollout subset is synthesized or inferred from fitted parameters.",
+      "Supplied COSMED recordings and OpenSim source outputs are retained; available optimization conditions do not by themselves establish a complete optimization rerun."
     ],
     "errors": []
   },
   "full_statuses": {
-    "figure1": "partial",
-    "figure2": "partial",
+    "figure1": "passed",
+    "figure2": "passed",
     "figure3": "passed",
     "figure4": "passed",
     "s1": "passed",
     "s2": "passed",
-    "s3": "partial",
+    "s3": "passed",
     "s4": "passed",
     "s5": "passed",
     "r2": "passed"
   },
-  "figure_pngs": 14,
-  "source_tables": 47,
   "numerical_comparison": {
-    "tables_compared": 47,
-    "differing_tables": [
+    "summary": {
+      "tables": 61,
+      "byte_identical": 51,
+      "maximum_absolute_difference": 5.2248640969310145e-09,
+      "figures_png": 15,
+      "figure_files": 45,
+      "input_manifest": "cc540416c5aa6ecdb38ca7334b3a16dfbf6dd72692ad52e9fa2165fd9f567162",
+      "statuses": {
+        "figure1": "passed",
+        "figure2": "passed",
+        "figure3": "passed",
+        "figure4": "passed",
+        "s1": "passed",
+        "s2": "passed",
+        "s3": "passed",
+        "s4": "passed",
+        "s5": "passed",
+        "r2": "passed"
+      }
+    },
+    "tables": [
+      {
+        "table": "figure1_cd_summary.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "figure1_e_box_summary.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "figure1_energy_participants.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "figure1_energy_timeseries.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "figure1_optimization.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "figure1_optimization_source_subset.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "figure1_paired_tests.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "figure1_sanchez_participants.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "figure1_sla_participants.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "figure2b_group_fits.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "figure2b_metrics.csv",
+        "byte_identical": false,
+        "maximum_absolute_difference": 1.1102230246251565e-15
+      },
+      {
+        "table": "figure2b_participants.csv",
+        "byte_identical": false,
+        "maximum_absolute_difference": 7.105427357601002e-15
+      },
       {
         "table": "figure2b_timeseries.csv",
-        "rows_match": true,
-        "max_numeric_difference": 7.37188088351104e-14
+        "byte_identical": false,
+        "maximum_absolute_difference": 3.552713678800501e-15
+      },
+      {
+        "table": "figure3_b_traces.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "figure3_c_counts.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "figure3_d_fit_coefficients.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "figure3_d_fit_curves.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "figure3_d_fit_inputs.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "figure3_trials.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "figure4_ellipse_risk.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "figure4_ellipses.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "figure4_landscape.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "figure4_parameter_summary.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "figure4_parameter_tests.csv",
+        "byte_identical": false,
+        "maximum_absolute_difference": 1.7763568394002505e-15
+      },
+      {
+        "table": "figure4_participant_parameters.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "inverse_fit_rmse_subjects.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "inverse_fit_rmse_summary.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
       },
       {
         "table": "r2_expfit.csv",
-        "rows_match": true,
-        "max_numeric_difference": 1.2724329288924673e-13
+        "byte_identical": false,
+        "maximum_absolute_difference": 1.2724329288924673e-13
       },
       {
         "table": "r2_summary.csv",
-        "rows_match": true,
-        "max_numeric_difference": 1.1102230246251565e-16
+        "byte_identical": false,
+        "maximum_absolute_difference": 1.1102230246251565e-16
+      },
+      {
+        "table": "r2_timescale_comparison.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "r2_timescale_summary.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "s1_grid_finite_counts.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "s1_grid_sensitivity_persubject.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "s1_grid_sensitivity_summary.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "s1_loso_matlab_test.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "s1_loso_persubject.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "s1_loso_stats.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "s1_loso_summary.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "s2_adapted.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "s2_participants.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "s2_sta_statistics.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "s2_symmetry_sweep.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "s2_timeseries.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "s3_direction_correlations.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "s3a_trajectory_optimization.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "s3b_model_participants.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "s3b_model_summary.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "s3b_model_trials.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "s3c_experimental.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "s3c_group_means.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "s4_endpoint_summary.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "s4_plotted_points.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "s5_energy_timeseries.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "s5_experimental_subjects.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
       },
       {
         "table": "s5_loso_folds.csv",
-        "rows_match": true,
-        "max_numeric_difference": 5.2248640969310145e-09
+        "byte_identical": false,
+        "maximum_absolute_difference": 5.2248640969310145e-09
       },
       {
         "table": "s5_loso_summary.csv",
-        "rows_match": true,
-        "max_numeric_difference": 1.8272019453036137e-09
+        "byte_identical": false,
+        "maximum_absolute_difference": 1.8272019453036137e-09
       },
       {
         "table": "s5_loso_tests.csv",
-        "rows_match": true,
-        "max_numeric_difference": 1.809048022494153e-09
+        "byte_identical": false,
+        "maximum_absolute_difference": 1.809048022494153e-09
+      },
+      {
+        "table": "s5_mechanical_cells.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
+      },
+      {
+        "table": "s5_mechanical_weight_slices.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
       },
       {
         "table": "s5_recomputed_selection.csv",
-        "rows_match": true,
-        "max_numeric_difference": 1.7540449093189636e-09
+        "byte_identical": false,
+        "maximum_absolute_difference": 1.7540449093189636e-09
+      },
+      {
+        "table": "s5_selected_models.csv",
+        "byte_identical": true,
+        "maximum_absolute_difference": 0.0
       }
     ]
   },
-  "wheel": {
-    "sha256": "2bc5fea68ef4b7d3a173fddebcb544bad8d12f32fcb059b9f61e40bdfe1ae744",
-    "outside_repository_import": true,
-    "two_iteration_simulation": "passed",
-    "experimental_import_and_figures": "passed"
+  "workbook": {
+    "sheets": 15,
+    "tables": 25,
+    "source_csvs": 25,
+    "verified_cells": 29397,
+    "status": "passed",
+    "runtime": "standard Conda environment, openpyxl"
+  },
+  "wheel": "Built 0.3.0 wheel, imported it outside source checkout, verified bundled MATLAB sensitivity source and ran a two-iteration simulation.",
+  "manuscript_numerical_claim_groups": {
+    "matched": 19,
+    "mismatch": 1,
+    "unverified": 0
   },
   "limits": [
-    "macOS arm64 tested; Linux/Windows and remote CI not run here",
-    "Local user-supplied experimental archive used; anonymous Zenodo download cannot be verified while files are restricted",
-    "Companion archive is a local release candidate, not yet deposited",
-    "Saved-data reproduction; no full stochastic sweeps, raw C3D/COSMED processing, OpenSim optimization or fresh MATLAB S1 recomputation in this test",
-    "Known partial panels and manuscript discrepancies remain documented"
+    "Saved-data reconstruction; not all original stochastic sweeps or raw-to-paper preprocessing.",
+    "Manually assembled illustrations and final manuscript layout are separate artwork.",
+    "Original OpenSim optimization and some manuscript descriptions remain unresolved; see docs/reproducibility.md.",
+    "Fresh environment tested on macOS arm64; this record does not claim Windows testing.",
+    "The DATA upload was still running when this validation was recorded; archive checks do not establish anonymous download access."
   ]
 }

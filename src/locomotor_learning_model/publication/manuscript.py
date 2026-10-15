@@ -6,6 +6,7 @@ import csv
 import json
 import math
 from collections import Counter
+from itertools import pairwise
 from pathlib import Path
 
 from .reporting import sha256, source_hashes, utc_now, verify_data
@@ -194,39 +195,54 @@ def numerical_claims(results_root: Path, reproduction: dict) -> list[dict]:
         [0.008],
         0.0005,
     )
+    check(
+        "S1 advantage increases when the common parameter grid is relaxed",
+        15,
+        "s1_grid_sensitivity_summary",
+        lambda rows: [
+            int(len(rows) == 3 and all(
+                float(b["median_ratio_common_over_specific"])
+                > float(a["median_ratio_common_over_specific"])
+                for a, b in pairwise(rows)
+            ))
+        ],
+        [1],
+        0,
+    )
+    check(
+        "S3B model energy penalty increases with belt-speed difference",
+        17,
+        "s3b_model_summary",
+        lambda rows: [
+            int(len(rows) == 3 and all(
+                float(b["mean_energy_change_pct"]) > float(a["mean_energy_change_pct"])
+                for a, b in pairwise(rows)
+            ))
+        ],
+        [1],
+        0,
+    )
     return claims
 
 
 AUDITED_LIMITATIONS = [
     {
-        "claim": "Figure 1C/D Sánchez comparison",
-        "page": 3,
-        "status": "unverified",
-        "reason": "The comparison MAT inputs are absent; local participant data are available.",
-    },
-    {
         "claim": "Figure 2B representative participant",
         "page": 4,
         "status": "mismatch",
-        "reason": "Handoff participant 8 has an approximately -52% plateau; the final PDF example is approximately -25% experiment and -22% model. Its source/participant is unresolved.",
+        "reason": "The addendum identifies the correct regenerated source, which averages nine experimental and nine model trajectories. It does not plot the representative participant described in the caption.",
     },
     {
-        "claim": "S3 model predictions and trajectory optimization",
+        "claim": "S3A trajectory optimization source reconstruction",
         "page": 17,
         "status": "unverified",
-        "reason": "S3B rollouts are absent. S3A is supplied constants; original OpenSim solutions are absent.",
+        "reason": "S3B is now reconstructed from all 1,150 selected regenerated rollouts. S3A retains five supplied rounded constants; the available muscle-output files cover a different condition subset and yield different energy values. They do not independently establish those five constants.",
     },
     {
         "claim": "Figure 4 risk-comparison p < 0.05",
         "page": 5,
         "status": "unverified",
-        "reason": "Ellipse arithmetic means are reproducible, but no matching statistical test or analysis unit is supplied.",
-    },
-    {
-        "claim": "S1 robustness to relaxed parameter grids",
-        "page": 15,
-        "status": "unverified",
-        "reason": "The additional grid analysis described in S1 Text is not supplied.",
+        "reason": "Ellipse means and the addendum's Kruskal–Wallis tests are reproducible (alpha p=0.01038, psi p=0.01012). Those tests compare fitted parameters, not the separate fall-probability claim in the text; its statistical test and analysis unit are still unspecified.",
     },
     {
         "claim": "Simulation transition duration",
@@ -244,7 +260,13 @@ AUDITED_LIMITATIONS = [
         "claim": "Inverse-fitting estimator and original sweep regeneration",
         "page": 9,
         "status": "unverified",
-        "reason": "Original best-trial fits and regenerated trial-average S1 fits use different estimators. Original fits cannot be independently regenerated from the supplied sweep.",
+        "reason": "Original fitting minimizes RMSE over parameters and individual stochastic trials; S1 scores the average normalized nonfalling trajectory in each cell, requiring at least five survivors. Both estimator and realization differ. The supplied subset cannot independently refit the entire original sweep; published saved fits remain available.",
+    },
+    {
+        "claim": "S2 model provenance and parameter-free prediction wording",
+        "page": 16,
+        "status": "unverified",
+        "reason": "The supplied S2 results use 20 experimental participants (7/7/6) and five seeds of shared Model A (alpha=6e-5, psi=1, fall weight=0), rather than the main participant-specific fits. The source notes selection of this variant after examining its SLA behavior; the prediction wording needs qualification. STA p=0.573 indicates no detected early/late difference, not equivalence.",
     },
     {
         "claim": "R² improvement range scope",
@@ -286,7 +308,7 @@ AUDITED_LIMITATIONS = [
         "claim": "Zenodo DOI in final PDF",
         "page": 11,
         "status": "unverified",
-        "reason": "The audited PDF contains zenodo.XXXXXXX; a final public deposit link still needs confirmation.",
+        "reason": "The audited PDF contains zenodo.XXXXXXX. Replace its placeholders with the corrected archive DOI 10.5281/zenodo.19547419, or the specific version DOI used for the final release.",
     },
 ]
 
@@ -319,7 +341,7 @@ def validate_manuscript(
         "manuscript_title": MANUSCRIPT_TITLE,
         "manuscript_sha256": MANUSCRIPT_SHA256,
         "reproduction_report_sha256": sha256(results_root / "report.json"),
-        "status": "incomplete",
+        "status": "matched" if all(item["status"] == "matched" for item in claims + limitations) else "incomplete",
         "claims": claims,
         "audited_limitations": limitations,
         "counts": dict(Counter(item["status"] for item in claims + limitations)),

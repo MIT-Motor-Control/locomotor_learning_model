@@ -32,6 +32,12 @@ def build_parser() -> argparse.ArgumentParser:
     prepare.add_argument("--data", default=Path("data/publication"), type=Path)
     verify = commands.add_parser("verify-data", help="Check every prepared input against its SHA-256 manifest.")
     verify.add_argument("--data", default=Path("data/publication"), type=Path)
+    addendum = commands.add_parser("import-addendum", help="Maintainers: merge verified supplementary source inputs into a prepared dataset.")
+    addendum.add_argument("--source", required=True, type=Path)
+    addendum.add_argument("--previous-bundle", type=Path)
+    addendum.add_argument("--generated-s1", type=Path, help="Directory containing freshly recomputed MATLAB grid-sensitivity CSVs.")
+    addendum.add_argument("--generated-s1-script", type=Path, help="MATLAB source used for those grid-sensitivity CSVs; required with --generated-s1.")
+    addendum.add_argument("--data", default=Path("data/publication"), type=Path)
     reproduce = commands.add_parser("reproduce", help="Write figures, source tables and an honest completion report.")
     reproduce.add_argument("--data", default=Path("data/publication"), type=Path)
     reproduce.add_argument("--output", default=Path("outputs/publication"), type=Path)
@@ -190,6 +196,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Prepared {len(manifest['files'])} inputs in {args.data.resolve()}")
             if manifest.get("dataset_kind") == "zenodo_experimental":
                 print("Experimental data only: Figure 1 and S3 are partial; model analyses need publication-data.zip. See data/README.md.")
+        elif args.command == "import-addendum":
+            from .data import integrate_addendum
+
+            manifest = integrate_addendum(
+                args.source, args.data, previous_bundle=args.previous_bundle,
+                generated_s1=args.generated_s1, generated_s1_script=args.generated_s1_script,
+            )
+            print(f"Prepared {len(manifest['files'])} inputs in {args.data.resolve()}")
         elif args.command == "verify-data":
             result = require_integrity(args.data)
             print(f"Verified {result['checked_files']} input files.")

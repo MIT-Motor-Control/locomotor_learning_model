@@ -5,11 +5,13 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import re
 import shutil
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
-from .reporting import sha256
+from .reporting import sha256, verify_data
 
 
 def prepare_data(
@@ -260,4 +262,318 @@ def prepare_data(
     temporary = destination / ".manifest.json.tmp"
     temporary.write_text(json.dumps(manifest, indent=2) + "\n")
     temporary.replace(destination / "manifest.json")
+    return manifest
+
+
+def _same_energy(left: Path, right: Path) -> bool:
+    import numpy as np
+    from scipy.io import loadmat
+
+    a, b = [loadmat(path, struct_as_record=False, squeeze_me=True) for path in (left, right)]
+    fields = {"split_energy", "tied1_energy", "tied2_energy"}
+    if any({key for key in values if not key.startswith("__")} != fields for values in (a, b)):
+        return False
+    for field in fields:
+        if set(getattr(a[field], "_fieldnames", [])) != set(getattr(b[field], "_fieldnames", [])):
+            return False
+        for condition in a[field]._fieldnames:
+            x, y = (
+                np.asarray(getattr(a[field], condition)),
+                np.asarray(getattr(b[field], condition)),
+            )
+            if not np.isfinite(x).all() or not np.array_equal(x, y):
+                return False
+    return True
+
+
+def _validate_s3_rollouts(parameter_file: Path, rollouts: dict[str, Path]) -> dict:
+    import numpy as np
+    from scipy.io import loadmat
+
+    values = loadmat(parameter_file, struct_as_record=False, squeeze_me=True)
+    n = np.atleast_1d(values["exp_subj_num"]).astype(int)
+    params = np.asarray(values["static_params"], dtype=object).reshape(3, -1)
+    learning, symmetry = [
+        np.atleast_1d(values[key]).astype(float) for key in ("learning_pool", "sym_cost_pool")
+    ]
+    if len(n) != 3 or np.any(n < 1) or np.any(n > params.shape[1]):
+        raise ValueError("Invalid original-fit participant layout for S3")
+    if any(
+        len(pool) < 2 or not np.isfinite(pool).all() or np.any(np.diff(pool) <= 0)
+        for pool in (learning, symmetry)
+    ):
+        raise ValueError("Invalid S3 parameter grid")
+    expected = {
+        (
+            condition,
+            int(np.argmin(abs(learning - params[condition, subject].learning_rate))),
+            int(np.argmin(abs(symmetry - params[condition, subject].sym_cost))),
+        )
+        for condition in range(3)
+        for subject in range(n[condition])
+    }
+    pattern = re.compile(
+        r"model_split45_trans20_slow([0-9.]+)_fast([0-9.]+)_noise0\.01_"
+        r"learning([0-9.]+)_energysym([0-9.]+)_swingcost1_trial(\d+)\.mat"
+    )
+    trials, falls = set(), 0
+    for relative, path in rollouts.items():
+        match = pattern.fullmatch(path.name)
+        if not match:
+            raise ValueError(f"Unrecognized S3 rollout filename: {path.name}")
+        slow, fast, rate, weight = map(float, match.groups()[:4])
+        trial = int(match.group(5))
+        condition = int(np.argmin(abs(np.array([0.8, 0.65, 0.5]) - slow)))
+        ia, ip = int(np.argmin(abs(learning - rate))), int(np.argmin(abs(symmetry - weight)))
+        if (
+            abs(slow - (0.8, 0.65, 0.5)[condition]) > 1e-9
+            or abs(slow + fast - 2) > 1e-9
+            or abs(learning[ia] - rate) > 5.1e-7
+            or abs(symmetry[ip] - weight) > 5.1e-6
+        ):
+            raise ValueError(f"S3 rollout does not match the published grid: {relative}")
+        key = (condition, ia, ip, trial)
+        if (condition, ia, ip) not in expected or not 1 <= trial <= 50 or key in trials:
+            raise ValueError(f"Unexpected or duplicate S3 cell/trial: {relative}")
+        trials.add(key)
+        result = loadmat(path, variable_names=["energy", "fall_flag"], squeeze_me=True)
+        energy, flag = np.atleast_1d(result["energy"]), np.atleast_1d(result["fall_flag"])
+        if flag.shape != (2,) or flag[0] not in (0, 1) or not np.isfinite(energy).all():
+            raise ValueError(f"Invalid S3 energy or fall flag: {relative}")
+        if not flag[0] and energy.size < 100:
+            raise ValueError(f"Nonfalling S3 rollout lacks the analysis windows: {relative}")
+        falls += int(flag[0])
+    required = {(*cell, trial) for cell in expected for trial in range(1, 51)}
+    if trials != required:
+        raise ValueError(
+            f"Incomplete S3 rollout library: {len(required - trials)} required trials missing"
+        )
+    return {
+        "path": "regenerated/data/2d sweep fine",
+        "required_trials_per_cell": 50,
+        "available_files": len(trials),
+        "required_files": len(required),
+        "required_unique_cells": len(expected),
+        "condition_unique_cells": [sum(cell[0] == c for cell in expected) for c in range(3)],
+        "verified_cell_trial_identities": True,
+        "falling_trials": falls,
+        "expectation_source": "Original published static_params nearest learning_pool and sym_cost_pool grid cells; 50 trials per cell",
+        "note": "Every required cell/trial filename and finite energy array was verified; stochastic simulations were not rerun.",
+    }
+
+
+def integrate_addendum(
+    source: Path,
+    destination: Path,
+    *,
+    previous_bundle: Path | None = None,
+    generated_s1: Path | None = None,
+    generated_s1_script: Path | None = None,
+) -> dict:
+    """Add verified scientific inputs transactionally, preserving every existing input.
+
+    Only the aggregate original energy MAT may differ in byte representation, and
+    only when all three structs match exactly. Its existing bytes are retained.
+    Optional S1 grid-check CSVs require the generating MATLAB script for provenance.
+    """
+    if Path(destination).is_symlink():
+        raise ValueError("The prepared dataset must not be a symlink")
+    destination = Path(destination).resolve()
+    integrity = verify_data(destination)
+    if integrity["errors"]:
+        raise ValueError(
+            f"Existing prepared dataset failed integrity verification: {integrity['errors'][0]}"
+        )
+    manifest_path = destination / "manifest.json"
+    initial_manifest = manifest_path.read_bytes()
+    manifest = json.loads(initial_manifest)
+    records = {entry["path"]: entry for entry in manifest["files"]}
+    roots = {"addendum": Path(source).resolve()}
+    if previous_bundle is not None:
+        roots["previous_bundle"] = Path(previous_bundle).resolve()
+    if (generated_s1 is None) != (generated_s1_script is None):
+        raise ValueError("Generated S1 tables require both their folder and MATLAB source script")
+    if generated_s1 is not None:
+        roots["generated_s1"] = Path(generated_s1).resolve()
+    for label, root in roots.items():
+        if not root.is_dir():
+            raise FileNotFoundError(f"Scientific source folder not found: {label}")
+        if root.is_relative_to(destination) or destination.is_relative_to(root):
+            raise ValueError("Scientific sources and destination must not overlap")
+    if not (roots["addendum"] / "code/verify").is_dir():
+        raise FileNotFoundError("Expected the addendum's code/verify folder")
+    additions: dict[str, Path] = {}
+    observations = []
+
+    def add(path: Path, relative: str, label: str, generated: dict | None = None):
+        if not path.is_file():
+            return
+        if path.is_symlink() or not path.resolve().is_relative_to(roots[label]):
+            raise ValueError(f"Scientific input escapes its source: {path.name}")
+        provenance = f"{label}:/{path.relative_to(roots[label]).as_posix()}"
+        digest = sha256(path)
+        observations.append({"source": provenance, "sha256": digest})
+        comparison = "SHA-256 identical"
+        if relative in records:
+            existing = additions.get(relative, destination / relative)
+            if records[relative]["sha256"] != digest:
+                if (
+                    relative != "original/data/cosmed/processed/processedEnergyData.mat"
+                    or not _same_energy(existing, path)
+                ):
+                    raise ValueError(f"Conflicting scientific input: {relative}")
+                comparison = "All split_energy, tied1_energy and tied2_energy fields exactly equal; existing MAT bytes preserved"
+            record = records[relative]
+            if provenance != record["source"] and provenance not in record.setdefault(
+                "corroborating_sources", []
+            ):
+                record["corroborating_sources"].append(provenance)
+            if provenance != record["source"] or comparison != "SHA-256 identical":
+                detail = {"source": provenance, "sha256": digest, "comparison": comparison}
+                if detail not in record.setdefault("corroborating_files", []):
+                    record["corroborating_files"].append(detail)
+        else:
+            records[relative] = {
+                "path": relative,
+                "sha256": digest,
+                "size": path.stat().st_size,
+                "source": provenance,
+                "transformation": "Copied byte-for-byte",
+                "corroborating_sources": [],
+            }
+            additions[relative] = path
+        if generated:
+            records[relative]["generation"] = generated
+
+    for label, root in roots.items():
+        if label == "generated_s1":
+            continue
+        original = root / "code/original_data"
+        paths = list(original.glob("*.mat"))
+        paths += list((original / "data/cosmed/processed").glob("*.mat"))
+        paths += list((original / "data/sanchez data").glob("sanchez_*.mat"))
+        paths += [
+            p
+            for p in (original / "data/trajectory optimization").rglob("*")
+            if p.suffix in {".sto", ".osim"}
+        ]
+        for path in sorted(paths):
+            add(path, "original/" + path.relative_to(original).as_posix(), label)
+        if label != "addendum":
+            continue
+        verify = root / "code/verify"
+        paths = list(verify.glob("*.mat"))
+        paths += [p for p in (verify / "data/cosmed").rglob("*") if p.suffix in {".mat", ".csv"}]
+        paths += list((verify / "data/2d sweep fine").glob("*.mat"))
+        paths += list((verify / "figures").glob("comment1_loso_cv_*.csv"))
+        for path in sorted(paths):
+            add(path, "regenerated/" + path.relative_to(verify).as_posix(), label)
+    if generated_s1 is not None:
+        import csv
+
+        import numpy as np
+
+        script = Path(generated_s1_script)
+        generated = {
+            "method": "MATLAB grid-sensitivity analysis",
+            "script": script.name,
+            "script_sha256": sha256(script),
+            "inputs": [
+                {
+                    "path": "regenerated/2d_sweep_trial50_param_result_trialavg.mat",
+                    "sha256": records["regenerated/2d_sweep_trial50_param_result_trialavg.mat"][
+                        "sha256"
+                    ],
+                }
+            ],
+        }
+        observations.append(
+            {"source": f"analysis:/{script.name}", "sha256": generated["script_sha256"]}
+        )
+        for name in (
+            "comment1_grid_sensitivity_summary.csv",
+            "comment1_grid_sensitivity_persubject.csv",
+        ):
+            path = roots["generated_s1"] / name
+            if not path.is_file():
+                raise FileNotFoundError(f"Generated S1 table missing: {name}")
+            with path.open() as stream:
+                rows = list(csv.DictReader(stream))
+            if not rows or any(None in row or None in row.values() for row in rows):
+                raise ValueError(f"Malformed generated S1 table: {name}")
+            for row in rows:
+                for value in row.values():
+                    try:
+                        number = float(value)
+                    except ValueError:
+                        continue
+                    if not np.isfinite(number):
+                        raise ValueError(f"Nonfinite generated S1 value: {name}")
+            add(path, f"regenerated/figures/{name}", "generated_s1", generated)
+    original_fit = "original/2d_sweep_trial50_param_result.mat"
+    rollout_paths = {
+        relative: additions.get(relative, destination / relative)
+        for relative in records
+        if relative.startswith("regenerated/data/2d sweep fine/")
+    }
+    rollout_info = _validate_s3_rollouts(
+        additions.get(original_fit, destination / original_fit), rollout_paths
+    )
+    manifest["files"] = [records[key] for key in sorted(records)]
+    manifest["missing_inputs"] = [
+        key for key in manifest.get("missing_inputs", []) if key not in records
+    ]
+    manifest.setdefault("missing_analyses", {})["s3_rollouts"] = rollout_info
+    manifest.setdefault("counts", {}).update(
+        files=len(records), s3_rollout_files=len(rollout_paths)
+    )
+    manifest["caveats"] = [
+        note
+        for note in manifest.get("caveats", [])
+        if note != "Raw COSMED and OpenSim optimization inputs are not supplied by this import."
+    ]
+    note = "Supplied COSMED recordings and OpenSim source outputs are retained; available optimization conditions do not by themselves establish a complete optimization rerun."
+    if note not in manifest["caveats"]:
+        manifest["caveats"].append(note)
+    identity = hashlib.sha256(json.dumps(observations, sort_keys=True).encode()).hexdigest()
+    history = manifest.setdefault("scientific_addenda", [])
+    if not any(item["source_inventory_sha256"] == identity for item in history):
+        history.append(
+            {
+                "source_inventory_sha256": identity,
+                "integrated_at": datetime.now(UTC).isoformat(),
+                "added_files": sorted(additions),
+                "source_files": observations,
+            }
+        )
+    encoded = (json.dumps(manifest, indent=2) + "\n").encode()
+    if json.loads(initial_manifest) == manifest:
+        return manifest
+    with tempfile.TemporaryDirectory(
+        prefix=".publication-addendum-", dir=destination.parent
+    ) as temporary:
+        staging = Path(temporary) / "publication"
+        shutil.copytree(destination, staging)
+        for relative, path in additions.items():
+            target = staging / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, target)
+        (staging / "manifest.json").write_bytes(encoded)
+        checked = verify_data(staging)
+        if checked["errors"]:
+            raise ValueError(
+                f"Staged addendum failed integrity verification: {checked['errors'][0]}"
+            )
+        if manifest_path.read_bytes() != initial_manifest or verify_data(destination)["errors"]:
+            raise ValueError("Prepared dataset changed during addendum integration")
+        backup = destination.with_name(destination.name + ".before-addendum")
+        if backup.exists():
+            raise ValueError(f"A prior dataset backup needs attention: {backup.name}")
+        destination.rename(backup)
+        try:
+            staging.rename(destination)
+        except OSError:
+            backup.rename(destination)
+            raise
+        shutil.rmtree(backup)
     return manifest

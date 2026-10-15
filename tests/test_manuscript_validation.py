@@ -96,3 +96,14 @@ def test_significant_decreases_must_match_every_interval(tmp_path, p_values, t_v
     claims = manuscript.numerical_claims(results, report)
     claim = next(item for item in claims if "Figure 1E" in item["claim"] and "0.7" in item["claim"])
     assert claim["status"] == expected
+
+
+@pytest.mark.parametrize("ratios,expected", [([1.9, 2.2, 2.6], "matched"), ([1.9, 1.5, 2.6], "mismatch"), ([1.9, 2.2], "mismatch")])
+def test_grid_advantage_requires_all_three_increasing_comparisons(tmp_path, ratios, expected):
+    data, results = reproduction(tmp_path)
+    table = results / "tables/s1_grid_sensitivity_summary.csv"
+    table.write_text("median_ratio_common_over_specific\n" + "\n".join(map(str, ratios)) + "\n")
+    report = write_report(results, [], verify_data(data))
+    claims = manuscript.numerical_claims(results, report)
+    claim = next(item for item in claims if item["claim"].startswith("S1 advantage"))
+    assert claim["status"] == expected

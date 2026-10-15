@@ -8,6 +8,13 @@ import numpy as np
 import pytest
 from scipy.io import savemat
 
+from locomotor_learning_model.publication.regenerated import (
+    S3_SWEEP,
+    TRIAL_AVERAGE_GRID,
+    grid_finite_counts,
+    normalize_raw_trajectory,
+    s3_model_tables,
+)
 from locomotor_learning_model.publication.s5_analysis import fit_energy_exponential
 from locomotor_learning_model.publication.supplements import (
     ENERGY,
@@ -45,6 +52,77 @@ def test_stored_fit_recovers_scale_without_refitting_shape():
         stored_fit_metrics(signal[:-1], normalized)
     with pytest.raises(ValueError, match="zero variance"):
         stored_fit_metrics(np.ones(4), normalized)
+
+
+def test_figure2_addendum_normalization_preserves_matlab_trim_and_padding():
+    signal = np.linspace(3, 1, 150)
+    padded = np.r_[np.nan, 0, signal, np.inf, 0]
+    smooth = matlab_movmean(signal, 100)
+    # n0=30; the supplied MATLAB/Python source starts at sample30 (index29).
+    trimmed = smooth[29:]
+    expected = (trimmed - trimmed[:120].mean()) / trimmed[:120].mean() * 100
+    np.testing.assert_array_equal(normalize_raw_trajectory(padded), expected)
+    with pytest.raises(ValueError, match="startup-trim"):
+        normalize_raw_trajectory(np.ones(20))
+
+
+def test_s1_finite_grid_counts_exclude_padded_participant(tmp_path):
+    path = tmp_path / TRIAL_AVERAGE_GRID
+    path.parent.mkdir(parents=True)
+    grid = np.full((3, 9, 20, 20), np.nan)
+    for condition, count in enumerate((8, 9, 9)):
+        grid[condition, :count, 0, :10] = 1
+        if condition < 2:
+            grid[condition, :count, 1, :] = 2
+        if condition == 0:
+            grid[condition, :count, 2, :] = 3
+    grid[0, 8] = 1  # padding must never count as a27th participant
+    savemat(path, {"rmse_matrix": grid, "exp_subj_num": [8, 9, 9]})
+    assert [r["admissible_cells"] for r in grid_finite_counts(tmp_path)] == [10, 30, 50]
+
+
+def test_s3_trials_use_tied_window_nonfall_medians_and_shared_cells(tmp_path):
+    params = np.empty((3, 9), object)
+    for condition in range(3):
+        for subject in range(9):
+            params[condition, subject] = {"learning_rate": 0.001, "sym_cost": 0.1}
+    original = tmp_path / "original/2d_sweep_trial50_param_result.mat"
+    original.parent.mkdir(parents=True)
+    savemat(original, {"static_params": params, "exp_subj_num": [8, 9, 9],
+                       "learning_pool": [0.001, 0.002], "sym_cost_pool": [0.1, 0.2]})
+    sweep = tmp_path / S3_SWEEP
+    sweep.mkdir(parents=True)
+    last = None
+    for condition, (slow, fast) in enumerate(((0.8, 1.2), (0.65, 1.35), (0.5, 1.5)), 1):
+        for trial in range(1, 51):
+            energy = np.full(300, 2.0)
+            energy[-100:] = 2 * (1 + trial / 100 + condition / 10)
+            last = sweep / (f"model_split45_trans20_slow{slow}_fast{fast}_noise0.01_"
+                            f"learning0.001_energysym0.1_swingcost1_trial{trial}.mat")
+            savemat(last, {"energy": energy, "fall_flag": [int(trial == 50), 0]})
+    trials, participants, summary = s3_model_tables(tmp_path)
+    assert len(trials) == 150 and len(participants) == 26
+    np.testing.assert_allclose([r["mean_energy_change_pct"] for r in summary], [35, 45, 55])
+    assert [r["participant_weighted_falls"] for r in summary] == [8, 9, 9]
+    assert [r["unique_cells"] for r in summary] == [1, 1, 1]
+    assert sum(r["fall_flag"] for r in trials) == 3
+    assert all(r["energy_change_pct"] is None for r in trials if r["fall_flag"])
+    for flag in ([0.5, 0], [np.nan, 0], [0]):
+        savemat(last, {"energy": energy, "fall_flag": flag})
+        with pytest.raises(ValueError, match="fall flag"):
+            s3_model_tables(tmp_path)
+    savemat(last, {"energy": np.r_[np.nan, energy[1:]], "fall_flag": [1, 0]})
+    with pytest.raises(ValueError, match="energy signal"):
+        s3_model_tables(tmp_path)
+    savemat(last, {"energy": energy, "fall_flag": [1, 0]})
+    off_grid = last.with_name(last.name.replace("learning0.001_", "learning0.0014_"))
+    last.rename(off_grid)
+    with pytest.raises(ValueError, match="does not identify"):
+        s3_model_tables(tmp_path)
+    off_grid.rename(last)
+    last.unlink()
+    with pytest.raises(FileNotFoundError, match="1 S3 rollouts"):
+        s3_model_tables(tmp_path)
 
 
 def test_s5_preserves_historical_symmetric_even_window_and_onset():
@@ -124,22 +202,44 @@ def test_all_supplement_values_against_publication_sources(publication_data, tmp
     if not (publication_data / "extensions/s5/analysis_summary.json").is_file():
         pytest.skip("Original reviewer-response numerical sources were not imported")
     results = {r["id"]: r for r in render_supplements(publication_data, tmp_path)}
+    has_addendum = (publication_data / S3_SWEEP).is_dir()
     assert {key: r["status"] for key, r in results.items()} == {
-        "figure2": "partial",
+        "figure2": "passed",
         "s1": "passed",
         "s2": "passed",
-        "s3": "partial",
+        "s3": "passed" if has_addendum else "partial",
         "s5": "passed",
         "r2": "passed",
     }
-    assert results["figure2"]["details"]["subject_one_based"] == 8
-    assert results["figure2"]["details"]["model_samples"] == 2069
+    figure2 = results["figure2"]["details"]
+    assert figure2["n_data"] == figure2["n_model"] == 9
+    assert figure2["samples_per_trajectory"] == 270
+    assert figure2["pearson_r"] == pytest.approx(0.9445316549299377)
+    assert figure2["rmse_pct"] == pytest.approx(3.021338300307935)
+    assert figure2["data_plateau_pct"] == pytest.approx(-26.373025592007593)
+    assert figure2["model_plateau_pct"] == pytest.approx(-25.333063008683794)
+    group_fits = read_rows(tmp_path / "tables/figure2b_group_fits.csv")
+    np.testing.assert_allclose([float(r["tau_exposure_pct"]) for r in group_fits],
+                               [10.483039601467793, 11.685268815874876], rtol=1e-7)
+    assert len(read_rows(tmp_path / "tables/figure2b_participants.csv")) == 18 * 270
     s1 = results["s1"]["details"]
     assert s1["mode"] == "saved_reference_replot"
     assert s1["median_condition_specific"] == pytest.approx(8.87651802846845)
     assert s1["median_common_size_matched"] == pytest.approx(16.9351104934933)
     assert s1["wilcoxon_two_sided_exact_scipy"] == pytest.approx(2.9802322387695312e-8)
     assert s1["wilcoxon_two_sided_matlab_signrank_default"] == pytest.approx(8.29809930635733e-6)
+    if s1["grid_sensitivity_available"]:
+        rows = s1["grid_sensitivity_summary"]
+        assert [int(r["admissible_cells"]) for r in rows] == [138, 307, 384]
+        np.testing.assert_allclose([float(r["median_common_size_matched"]) for r in rows],
+                                   [16.93511049349334, 21.07943040972788, 25.09174114501218])
+    if has_addendum:
+        np.testing.assert_allclose(results["s3"]["details"]["model_means"],
+                                   [30.681741357807397, 106.79465294047486, 318.6162033053468])
+        assert results["s3"]["details"]["unique_model_trials"] == 1150
+        summary = read_rows(tmp_path / "tables/s3b_model_summary.csv")
+        assert [int(r["participant_weighted_falls"]) for r in summary] == [193, 253, 306]
+        assert [int(r["unique_cells"]) for r in summary] == [8, 8, 7]
     assert results["s2"]["details"]["max_reference_error"] < 1e-12
     assert results["s2"]["details"]["participants"] == 20
     assert results["r2"]["details"]["reference_verified"]

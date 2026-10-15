@@ -9,7 +9,7 @@ authors:
     given-names: Kanishka
   - family-names: Seethapathi
     given-names: Nidhi
-version: 0.2.0
+version: 0.3.0
 date-released: 2026-10-15
 repository-code: "https://github.com/MIT-Motor-Control/locomotor_learning_model"
 url: "https://doi.org/10.5281/zenodo.19547419"

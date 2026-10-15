@@ -1,40 +1,48 @@
-# Fresh installation test — October 15, 2026
+# Release 0.3.0 installation check — October 15, 2026
 
-The README workflow was tested in a separate source copy and a newly created Conda environment on macOS arm64. The copy initially contained no prepared data, generated outputs or private author folders. The environment YAML installed successfully without changes. The test used `loco-ada-readme-test-20261015` instead of `loco-ada` to preserve the existing environment.
-
-Computer Use refused access to Hyper for safety reasons, so execution took place in the workspace shell. An inherited Python-manager path initially selected an unrelated Python 2.7 installation after Conda activation. A clean shell selected the new environment correctly; all reported results below used its Python 3.12.13 with user-site packages disabled.
+The README workflow passed in a new Conda environment on macOS arm64, using a separate code copy and the actual release DATA ZIP. The copy started without prepared data, outputs or author source folders. No additional scientific packages were installed manually. The test used the environment name `loco-ada-addendum-test-20261015` to preserve the existing installation; the environment YAML was unchanged.
 
 | Check | Result |
 |---|---|
-| Conda installation and dependency consistency | Passed; no extra scientific packages installed manually |
+| Conda installation and dependency consistency | Passed; Python 3.12.13 and the pinned scientific stack |
 | README demo | Completed 40 learning iterations |
-| README longer simulation | Completed 1,000 iterations / 2,000 physical steps, seed 42 |
-| Supplied checkpoint | Resumed from iteration 10 to 20 |
-| Experimental DATA import | Eight prepared files; original downloads unchanged |
-| Experimental-only reproduction | Figures 1 and S3 partial; other eight workflows blocked; no execution failures |
-| Companion ZIP installation | Upgraded the experimental dataset and verified all 3,878 inputs |
-| Full available figure workflow | Seven passed; Figures 1, 2 and S3 partial; 14 plots in PNG/PDF/SVG and 47 CSV tables |
-| Selected-figure command | Figure 3, S1 and S5 passed |
-| Full test suite | **137 passed**, no failures or skips |
-| Static checks and `pip check` | Passed |
-| Built wheel outside the source checkout | Imports, two-iteration simulation, public-data import and experimental figures passed |
+| Longer seeded simulation | Completed 1,000 iterations / 2,000 physical steps |
+| Pause and resume | Continued from iteration 10 to 20, preserving the input checkpoint |
+| DATA archive | All 105 ZIP members and 104 payload hashes checked; extracted into the documented location |
+| Data preparation | All 5,166 scientific inputs verified |
+| Full figure workflow, strict mode | All ten workflows passed; 15 plots in PNG/PDF/SVG and 61 CSV tables |
+| Selected figures | Figure 3, S1 and S5 passed |
+| Full test suite | **174 passed**, no failures or skips |
+| Lint, whitespace and dependency checks | Passed |
+| MATLAB manuscript engine | Seed repeatability, completed-trial reuse, setting-mismatch rejection and sweep restart passed |
+| S1 MATLAB recomputation | LOSO and three grid-sensitivity summaries, including all 78 sensitivity folds, exactly matched cached numerical values |
+| Editor source workbook | 15 sheets, 25 CSV tables and 29,397 source cells verified using the standard Conda environment |
+| Built wheel | Imported outside the source checkout; bundled MATLAB source present; two-iteration simulation passed |
 
-The full-input tables were compared with the preceding validated run. Forty of 47 were byte-identical. Seven had numerical differences of at most 5.23 × 10⁻⁹, below the reported precision. The scientific inputs and their manifest were unchanged. The experimental CSV route preserves six-decimal source rounding and does not claim to recover unavailable precision.
+Across the isolated run and working-copy run, 51 of 61 numerical tables were byte-identical. Differences in the remaining ten tables were at most **5.23 × 10⁻⁹**, below the reported precision. The scientific input manifest was identical. Independent comparisons with the supplied scripts also matched all Figure 2B source metrics and all 26 S3B participant medians; the Sánchez values agreed with MATLAB within 1.14 × 10⁻¹³.
 
-## Downloads and release status
+The figure workflow includes original published fits and the separate regenerated realization used for Figures 2B, S1 and S3B. It does not substitute newly simulated trajectories for saved manuscript results.
 
-The experimental data came from the user-supplied `locomotor_learning_model-DATA` folder, copied into the documented `data/` location. The additional model inputs came solely from a standalone `publication-data.zip`; the isolated workflow did not read author research or handoff directories.
+## Archive identity
 
-`dist/publication-data.zip` is the local candidate for depositing alongside the experimental archive. Its SHA-256 is:
+The DATA archive has 13,335,231,738 bytes and SHA-256:
 
 ```text
-aab4c976ef798efdc264a79479f2755c294c0576ed482e76b1508884c56d7717
+14e9e46710afffd3998d0f5a5f33933c42d5599f2856eb743e1f025f5ac17cea
 ```
 
-The archive has not been uploaded by this test. The latest Zenodo page inspected still has restricted files, so an anonymous download-to-figure test remains a release requirement. This local result does not imply that the existing Zenodo DATA download alone contains the model inputs.
+Its embedded `publication-data.zip` has 1,352,215,131 bytes and SHA-256:
+
+```text
+7c9d64b8140db3d5f67781301036c0b2cd8a6ece734b6e3bde5597aad5c13b90
+```
+
+The inputs were supplied solely by that archive in the isolated test. No external author directories were used. Download availability and file access are controlled by the [Zenodo record](https://doi.org/10.5281/zenodo.19547419); this local installation test alone does not establish anonymous download access.
 
 ## Evidence and limits
 
-`fresh-install.json` records environment versions, archive identity, input hashes, figure statuses and numerical comparisons. Local figures and reports are under `outputs/fresh-conda-validation/`; `figures.html` provides a gallery. Those generated outputs are excluded from Git.
+`fresh-install.json` records versions, archive identities, input hashes, figure statuses and all numerical table comparisons. Local test outputs are under `outputs/readme-addendum-check/` and are excluded from Git. `final-manuscript-protocol-check.json` retains the check of all 1,750 cached Figure 3 speed profiles.
 
-This verifies the Python baseline simulation and available saved-data analyses. It does not rerun all stochastic model sweeps, raw C3D/COSMED processing, OpenSim optimization or the separate MATLAB S1 computation. MATLAB S1 and the optional Node workbook formatter are not dependencies of the README figure commands. Windows, Linux and remote CI were not run in this session. See the [reproduction guide](../docs/reproducibility.md#coverage-and-limits) for coverage and limits.
+The manuscript comparison matches **19 of 20 numerical claim groups**. The low-speed inverse-fit mean RMSE remains 0.3715 versus the printed 0.33. Separate source and interpretation issues also remain, including the group-average Figure 2B caption, supplied OpenSim values, Figure 4 risk significance, S2 model provenance and simulation settings. See the [reproduction guide](../docs/reproducibility.md#coverage-and-limits).
+
+This verifies the software and available saved-data reconstruction. It does not rerun the full original stochastic sweeps, raw C3D/COSMED processing or OpenSim optimization, and does not certify manually assembled artwork. Windows was not tested in this session. MATLAB is only needed for the explicit MATLAB workflows; no Node or private formatting package is needed for figures or the source workbook.

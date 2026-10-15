@@ -76,7 +76,7 @@ data/
 
 An older experimental-only DATA download supports the available experimental panels in Figures 1 and S3 but lacks model fits and simulation sweeps. Use the matching DATA release for the model analyses. [Data setup](data/README.md) explains both cases.
 
-The updated DATA archive is prepared for release. Its upload to the existing Zenodo record is pending correction of that record's DOI/versioning configuration; the currently published DATA download is the older experimental-only version.
+Use the DATA archive labeled **code release 0.3.0** or later. It includes the additional inputs for Figures 1C/D, 2B, S1 and S3B.
 
 ```sh
 loco-publication prepare
@@ -92,7 +92,9 @@ Open `outputs/publication/report.md`. Figures are in `outputs/publication/figure
 loco-publication reproduce --figures figure3 s1 s5 --output outputs/selected
 ```
 
-Figures 1, 2 and S3 are partial with the available inputs. A successful plotting run verifies the available calculations, not every manuscript claim. See [reproduction details](docs/reproducibility.md) for coverage, source data, MATLAB cross-validation and manuscript checks.
+**Figures 2B, S1 and S3B use the regenerated simulation realization.** The other main analyses use the original published fits. S3B combines the published fitted parameters with 50 regenerated trials at each selected parameter cell. These sources are kept separate in the dataset. A new stochastic sweep will give statistically comparable results rather than identical trajectories.
+
+The commands reproduce the available numerical panels and export their source values, including the Sánchez comparison, S1 grid checks and all 1,150 S3B rollouts. Conceptual illustrations and final page assembly remain separate artwork. Some manuscript wording, model settings and the original OpenSim optimization still require clarification; a successful run does not certify every statement in the paper. See [reproduction details](docs/reproducibility.md) for coverage and limitations.
 
 ## Repository map
 
@@ -126,11 +128,10 @@ locomotor_learning_model/
 │   └── reproducibility.md            Figure workflow and source-data guide
 ├── scripts/
 │   ├── validate_matlab_python_parity.py  Compare the two baseline implementations
-│   ├── build_source_workbook.mjs      Format the optional editor source workbook
+│   ├── build_source_workbook.py       Export the editor source workbook
 │   └── check_source_workbook.py       Check workbook values against source CSVs
 ├── tests/                            Numerical, checkpoint and integrity tests
 ├── reproducibility/
-│   ├── validation.md, validation.json  Cleanup checks and record
 │   ├── fresh-install.md, fresh-install.json  Clean Conda installation test
 │   └── final-manuscript-protocol-check.json  Cached treadmill-protocol check
 ├── .github/workflows/                Automated software tests
