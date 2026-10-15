@@ -64,7 +64,7 @@ Download and install the matching DATA release from [Zenodo](https://doi.org/10.
 python scripts/download_data.py
 ```
 
-The command downloads 54 smaller pieces, verifies their checksums, rebuilds the original DATA ZIP and extracts it into `data/locomotor_learning_model-DATA/`. The download is 13.34 GB; allow about **42 GB of free space** during installation. If interrupted, run the same command again: verified pieces are reused and the interrupted piece restarts. Temporary downloads are removed after successful installation. An existing DATA folder is never overwritten.
+The command prefers the complete DATA ZIP when available; otherwise it downloads and joins the 54 smaller pieces. It verifies the original archive's checksum before extracting it into `data/locomotor_learning_model-DATA/`. The download is 13.34 GB; allow about **42 GB of free space** to cover either installation method. If interrupted, run the same command again: the complete ZIP resumes when the server supports it, and verified split pieces are reused. Temporary downloads are removed after successful installation. An existing DATA folder is never overwritten.
 
 The DATA release includes the experimental measurements, example checkpoints, and a nested `publication-data.zip` containing fitted models and saved simulation trials. Keep that inner ZIP compressed; preparation handles it automatically. GitHub contains the code, documentation and tests. The data download uses only Python's standard library.
 
@@ -135,7 +135,7 @@ locomotor_learning_model/
 │   ├── model.md                      Simulation guide
 │   └── reproducibility.md            Figure workflow and source-data guide
 ├── scripts/
-│   ├── download_data.py              Download, verify and install the split DATA release
+│   ├── download_data.py              Download, verify and install the DATA release
 │   ├── validate_matlab_python_parity.py  Compare the two baseline implementations
 │   ├── build_source_workbook.py       Export the editor source workbook
 │   └── check_source_workbook.py       Check workbook values against source CSVs

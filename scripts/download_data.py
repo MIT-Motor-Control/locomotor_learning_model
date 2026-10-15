@@ -1,4 +1,4 @@
-"""Download, verify and install the split DATA release using Python's standard library.
+"""Download, verify and install the DATA release using Python's standard library.
 
 Run from the repository root: python scripts/download_data.py
 For downloaded pieces: python scripts/download_data.py --parts-dir /path/to/pieces
@@ -74,9 +74,11 @@ def validate_manifest(value: dict) -> dict:
     return value
 
 
-def request(url: str):
+def request(url: str, *, headers: dict | None = None):
     return urllib.request.urlopen(
-        urllib.request.Request(url, headers={"User-Agent": "locomotor-learning-model/0.3.0"}),
+        urllib.request.Request(
+            url, headers={"User-Agent": "locomotor-learning-model/0.3.0", **(headers or {})}
+        ),
         timeout=60,
     )
 
@@ -110,40 +112,86 @@ def free_space(directory: Path, needed: int):
         raise OSError(f"Need at least {needed / 1e9:.2f} GB free for the next step in {directory}")
 
 
-def download_part(item: dict, cache: Path) -> Path:
+def download_file(
+    item: dict, cache: Path, *, resume: bool = False, missing_ok: bool = False
+) -> Path | None:
     target = cache / item["name"]
     if verified(target, item):
         print(f"Verified cached {item['name']}", flush=True)
         return target
     partial = target.with_name(target.name + ".partial")
     regular(partial)
-    free_space(cache, item["bytes"])
     url = RECORD_URL + urllib.parse.quote(item["name"])
     for attempt in range(1, 4):
-        print(f"Downloading {item['name']} ({item['bytes'] / 1e6:.1f} MB)", flush=True)
+        offset = partial.stat().st_size if resume and partial.exists() else 0
+        if offset > item["bytes"]:
+            raise ValueError(
+                f"Cached partial exceeds expected size; remove {partial} before retrying"
+            )
+        if offset == item["bytes"]:
+            if verified(partial, item):
+                os.replace(partial, target)
+                return target
+            partial.unlink()
+            raise ValueError(f"Cached partial failed its checksum and was removed: {item['name']}")
+        free_space(cache, item["bytes"] - offset)
+        action = f"Resuming at {offset / 1e6:.1f} MB:" if offset else "Downloading"
+        print(f"{action} {item['name']} ({item['bytes'] / 1e6:.1f} MB)", flush=True)
         digest, count = hashlib.sha256(), 0
         try:
-            with request(url) as response, partial.open("wb") as output:
+            headers = {"Accept-Encoding": "identity"}
+            if offset:
+                headers["Range"] = f"bytes={offset}-"
+            response = request(url, headers=headers) if resume else request(url)
+            with response:
+                status = getattr(response, "status", 200)
+                if status == 206:
+                    match = re.fullmatch(
+                        r"bytes (\d+)-(\d+)/(\d+)", response.headers.get("Content-Range", "")
+                    )
+                    if not match or tuple(map(int, match.groups())) != (
+                        offset,
+                        item["bytes"] - 1,
+                        item["bytes"],
+                    ):
+                        raise ValueError(f"Unexpected partial-download range for {item['name']}")
+                elif status == 200:
+                    # A server may ignore Range: restart rather than append the full response.
+                    offset = 0
+                else:
+                    raise ValueError(f"Unexpected HTTP status {status} for {item['name']}")
+                if response.headers.get("Content-Encoding", "identity").lower() != "identity":
+                    raise ValueError(f"Unexpected content encoding for {item['name']}")
                 length = response.headers.get("Content-Length")
-                if length is not None and int(length) != item["bytes"]:
+                if length is not None and int(length) != item["bytes"] - offset:
                     raise ValueError(f"Unexpected download size for {item['name']}")
-                while block := response.read(min(CHUNK_SIZE, item["bytes"] - count + 1)):
-                    count += len(block)
-                    if count > item["bytes"]:
-                        raise ValueError(f"Download exceeds expected size: {item['name']}")
-                    digest.update(block)
-                    output.write(block)
+                if offset:
+                    with partial.open("rb") as existing:
+                        for block in iter(lambda: existing.read(CHUNK_SIZE), b""):
+                            digest.update(block)
+                    count = offset
+                with partial.open("ab" if offset else "wb") as output:
+                    while block := response.read(min(CHUNK_SIZE, item["bytes"] - count + 1)):
+                        count += len(block)
+                        if count > item["bytes"]:
+                            raise ValueError(f"Download exceeds expected size: {item['name']}")
+                        digest.update(block)
+                        output.write(block)
             if count < item["bytes"]:
                 raise http.client.IncompleteRead(b"", item["bytes"] - count)
             if digest.hexdigest() != item["sha256"]:
-                raise ValueError(f"Downloaded piece failed its size/checksum check: {item['name']}")
+                if resume:
+                    partial.unlink()
+                raise ValueError(f"Downloaded file failed its size/checksum check: {item['name']}")
             os.replace(partial, target)
             return target
-        except (OSError, urllib.error.URLError, http.client.HTTPException):
+        except (OSError, urllib.error.URLError, http.client.HTTPException) as error:
+            if missing_ok and isinstance(error, urllib.error.HTTPError) and error.code == 404:
+                return None
             if attempt == 3:
                 raise
             print(
-                f"Connection interrupted; retrying this piece (attempt {attempt + 1}/3)", flush=True
+                f"Connection interrupted; retrying this file (attempt {attempt + 1}/3)", flush=True
             )
             time.sleep(attempt)
     raise AssertionError("Unreachable download state")
@@ -245,15 +293,7 @@ def extract(archive_path: Path, destination: Path) -> int:
     return len(members)
 
 
-def install(
-    manifest: dict,
-    destination: Path,
-    cache: Path,
-    parts_dir: Path | None = None,
-    *,
-    keep_downloads: bool = False,
-) -> dict:
-    manifest = validate_manifest(manifest)
+def installation_paths(destination: Path, cache: Path, parts_dir: Path | None = None):
     destination, cache = Path(destination).absolute(), Path(cache).absolute()
     if destination.exists() or destination.is_symlink():
         raise FileExistsError(
@@ -267,20 +307,20 @@ def install(
     if parts_dir is not None and cache.resolve() == Path(parts_dir).resolve():
         raise ValueError("Use a separate cache directory to preserve locally supplied pieces")
     cache.mkdir(parents=True, exist_ok=True)
-    parts = []
-    for item in manifest["parts"]:
-        if parts_dir is None:
-            part = download_part(item, cache)
-        else:
-            part = Path(parts_dir) / item["name"]
-            if not verified(part, item):
-                raise ValueError(f"Local piece is missing or failed its checksum: {part}")
-            print(f"Verified local {item['name']}", flush=True)
-        parts.append(part)
-    archive = assemble(parts, manifest, cache)
+    return destination, cache
+
+
+def finish_install(
+    archive: Path,
+    item: dict,
+    destination: Path,
+    cache: Path,
+    downloaded: list[Path],
+    keep_downloads: bool,
+) -> dict:
     count = extract(archive, destination)
     if not keep_downloads:
-        for path in [archive, *(parts if parts_dir is None else [])]:
+        for path in downloaded:
             try:
                 path.unlink()
             except OSError as error:
@@ -290,17 +330,55 @@ def install(
             cache.rmdir()
         except OSError:
             pass
-    return {
-        "destination": str(destination),
-        "files": count,
-        "archive_sha256": manifest["archive"]["sha256"],
-    }
+    return {"destination": str(destination), "files": count, "archive_sha256": item["sha256"]}
+
+
+def install(
+    manifest: dict,
+    destination: Path,
+    cache: Path,
+    parts_dir: Path | None = None,
+    *,
+    keep_downloads: bool = False,
+) -> dict:
+    manifest = validate_manifest(manifest)
+    destination, cache = installation_paths(destination, cache, parts_dir)
+    parts = []
+    for item in manifest["parts"]:
+        if parts_dir is None:
+            part = download_file(item, cache)
+        else:
+            part = Path(parts_dir) / item["name"]
+            if not verified(part, item):
+                raise ValueError(f"Local piece is missing or failed its checksum: {part}")
+            print(f"Verified local {item['name']}", flush=True)
+        parts.append(part)
+    archive = assemble(parts, manifest, cache)
+    return finish_install(
+        archive,
+        manifest["archive"],
+        destination,
+        cache,
+        [archive, *(parts if parts_dir is None else [])],
+        keep_downloads,
+    )
+
+
+def install_release(destination: Path, cache: Path, *, keep_downloads: bool = False) -> dict:
+    """Prefer the complete pinned ZIP; only an HTTP404 selects the split route."""
+    destination, cache = installation_paths(destination, cache)
+    item = {"name": ARCHIVE_NAME, "bytes": ARCHIVE_BYTES, "sha256": ARCHIVE_SHA256}
+    archive = download_file(item, cache, resume=True, missing_ok=True)
+    if archive is not None:
+        return finish_install(archive, item, destination, cache, [archive], keep_downloads)
+    print("Complete DATA ZIP is absent; using the verified split release", flush=True)
+    return install(load_manifest(MANIFEST_URL), destination, cache, keep_downloads=keep_downloads)
 
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--manifest", help="Local release manifest (default: pinned Zenodo release URL)"
+        "--manifest", help="Use the split route with this local or pinned release manifest"
     )
     parser.add_argument(
         "--parts-dir", type=Path, help="Use pieces and manifest already downloaded here"
@@ -308,7 +386,7 @@ def main(argv=None) -> int:
     parser.add_argument("--destination", type=Path, default=Path("data") / DATA_ROOT)
     parser.add_argument("--cache-dir", type=Path, default=Path("outputs/data-download/23402153"))
     parser.add_argument(
-        "--keep-downloads", action="store_true", help="Retain verified cached pieces and joined ZIP"
+        "--keep-downloads", action="store_true", help="Retain verified cached ZIP and any pieces"
     )
     args = parser.parse_args(argv)
     try:
@@ -318,22 +396,25 @@ def main(argv=None) -> int:
                 f"Destination already exists and is unchanged: {args.destination}. "
                 "Run loco-publication prepare, or choose another --destination."
             )
-        location = args.manifest or (
-            str(args.parts_dir / MANIFEST_NAME) if args.parts_dir is not None else MANIFEST_URL
-        )
-        result = install(
-            load_manifest(location),
-            args.destination,
-            args.cache_dir,
-            args.parts_dir,
-            keep_downloads=args.keep_downloads,
-        )
+        if args.parts_dir is not None or args.manifest is not None:
+            location = args.manifest or str(args.parts_dir / MANIFEST_NAME)
+            result = install(
+                load_manifest(location),
+                args.destination,
+                args.cache_dir,
+                args.parts_dir,
+                keep_downloads=args.keep_downloads,
+            )
+        else:
+            result = install_release(
+                args.destination, args.cache_dir, keep_downloads=args.keep_downloads
+            )
     except KeyboardInterrupt:
-        print("\nInterrupted. Verified pieces are retained; run the same command to continue.")
+        print("\nInterrupted. Cached downloads are retained; run the same command to continue.")
         return 130
     except (OSError, ValueError, zipfile.BadZipFile, http.client.HTTPException) as error:
         parser.exit(
-            1, f"DATA installation stopped: {error}\nVerified pieces are retained for retry.\n"
+            1, f"DATA installation stopped: {error}\nCached downloads are retained for retry.\n"
         )
     print(f"DATA installed in {result['destination']} ({result['files']} files).")
     print(f"Verified archive SHA-256: {result['archive_sha256']}")

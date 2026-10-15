@@ -6,9 +6,11 @@ From the repository root, download and install the matching [Zenodo DATA release
 python scripts/download_data.py
 ```
 
-The release distributes the original 13,335,231,738-byte `locomotor_learning_model-DATA.zip` as 54 pieces: the first 53 are 250,000,000 bytes each and the final piece is 85,231,738 bytes. The downloader checks the pinned manifest and every piece, reconstructs the original ZIP, verifies its complete SHA-256, and safely extracts `data/locomotor_learning_model-DATA/`. No extra download package is needed.
+The downloader accepts either the original 13,335,231,738-byte `locomotor_learning_model-DATA.zip` or the split version on the same Zenodo record. It prefers the complete ZIP. Only a “file not found” response selects the split version; connection failures and checksum mismatches stop or retry the download instead. Both routes verify the same pinned complete SHA-256 before safely extracting `data/locomotor_learning_model-DATA/`. No extra download package is needed.
 
-Allow about **42 GB free** while downloading, joining and extracting; the installed DATA folder occupies about 14.88 GB before publication preparation. Verified pieces are cached in `outputs/data-download/23402153/`. Rerun the same command after an interruption: completed pieces are reused, while an incomplete piece restarts. Cache files created by the command are removed after a successful installation; use `--keep-downloads` to retain them. Existing datasets and unrelated cache files are never overwritten or removed.
+The split version consists of 54 pieces and a pinned manifest: the first 53 pieces are 250,000,000 bytes each and the final piece is 85,231,738 bytes. Every piece is checked before joining the original ZIP.
+
+Allow about **42 GB free** to cover either installation method; a fresh complete-ZIP download needs about 29 GB while downloading and extracting. The installed DATA folder occupies about 14.88 GB before publication preparation. Downloads are cached in `outputs/data-download/23402153/`. Rerun the same command after an interruption: the complete ZIP resumes from its cached byte offset if the server supports HTTP Range requests, otherwise it restarts safely. For split downloads, completed pieces are reused and an incomplete piece restarts. Cache files created by the command are removed after a successful installation; use `--keep-downloads` to retain them. Existing datasets and unrelated cache files are never overwritten or removed.
 
 If you downloaded the pieces manually, place all 54 `locomotor_learning_model-DATA.zip.part001` through `.part054` files and `locomotor_learning_model-DATA.manifest.json` in one directory, then run:
 
@@ -48,6 +50,7 @@ No private directories, author handoff, MATLAB installation or network connectio
 
 | Download | Contents | Reproduction coverage |
 |---|---|---|
+| `locomotor_learning_model-DATA.zip` | Experimental CSVs, processed MAT files, raw C3D recordings, metadata, checkpoints and the embedded model-input ZIP | All available saved-data analyses, with known gaps explicitly reported |
 | `locomotor_learning_model-DATA.zip.part001`–`.part054` and the download manifest | Reassemble the unchanged DATA ZIP: experimental CSVs, processed MAT files, raw C3D recordings, metadata, checkpoints and the embedded model-input ZIP | All available saved-data analyses, with known gaps explicitly reported |
 | Embedded `publication-data.zip` | Original and regenerated fits, cross-validation and grid-sensitivity tables, fall trials, Sánchez data, OpenSim outputs and supplementary model caches | Adds the model figures and analyses, including regenerated Figure 2B and S3B |
 
