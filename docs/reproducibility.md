@@ -9,8 +9,8 @@ From the repository root, after installation:
 ```sh
 loco-publication prepare
 loco-publication verify-data
-loco-publication reproduce
-loco-publication reproduce --figures figure3 s1 s4 --output outputs/selected
+loco-publication reproduce --strict
+loco-publication reproduce --strict --figures figure3 s1 s4 --output outputs/selected
 loco-publication recompute-s1 --matlab /path/to/matlab
 ```
 

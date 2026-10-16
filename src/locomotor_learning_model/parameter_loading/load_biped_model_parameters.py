@@ -34,17 +34,15 @@ def load_biped_model_parameters(param_fixed: dict | None = None) -> dict:
     param_fixed['lambdaEnergyVsSymmetry'] = 0.75
     param_fixed['symmetryMultiplier'] = 10
 
-    # Optional explicit fall-risk reward term. A zero weight
-    # preserves the original energy/symmetry objective exactly. See
-    # locomotor_learning_model.learning.fall_margin_penalty for the definitions.
+    # Optional local stability penalty; disabled in the baseline objective.
+    # Definitions: learning.fall_margin_penalty.
     param_fixed['fallPenaltyWeight'] = 0.0            # w; 0 => baseline model
     param_fixed['fallPenaltyMode'] = 'com_margin'     # primary local penalty
     param_fixed['fallPenaltyPower'] = 2.0
     param_fixed['fallPenaltyEpsilon'] = 1e-6
-    # COM-margin normalization, pre-registered from the baseline per-step min-COM
-    # range (~0.90-0.95 across conditions). The margin is 0 above fallSafeComHeight
-    # and saturates at 1 by fallGroundComHeight. w is a free scale, so results are
-    # invariant to this choice up to a rescaling of w.
+    # The dimensionless COM margin is zero above the safe height and saturates
+    # at one at or below the ground reference. These are extension settings,
+    # not the manuscript engine's fall-termination threshold.
     param_fixed['fallSafeComHeight'] = 0.95           # margin starts below this COM height
     param_fixed['fallGroundComHeight'] = 0.90         # margin saturates (=1) at/below this
     # capture_point (robustness alternative) parameters

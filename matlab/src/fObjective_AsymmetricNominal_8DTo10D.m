@@ -11,4 +11,4 @@ pInputControllerNominal = temp;
     fObjective_AsymmetricNominal(pInputControllerNominal,stateVar0_Model, ...
     paramController,paramFixed,tStart);
 
-end % checked and essential
+end

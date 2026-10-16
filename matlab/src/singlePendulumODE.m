@@ -1,20 +1,9 @@
 function dStateVar = singlePendulumODE(t,stateVar,paramFixed,paramController)
-% SINGLEPENDULUMODEFILE This is the ODE file for a single pendulum with
-% massless links, and point-masses at the end of each link (see text book 
-% for the equations)
-
-% fixed parameters
-% m1 = paramFixed.mbody; 
-% L1 = paramFixed.leglength; 
-% % could be changed so that the left and right legs are of different
-% lengths 
-% g = paramFixed.gravg;
+% Inverted-pendulum dynamics with a massless stance leg and point body mass.
 
 % unwrapping the state variables
 angleTheta = stateVar(1); % angle wrt ground
 dangleTheta = stateVar(2);
-% yFoot = stateVar(3);
-% INTy = stateVar(4); % integral of body position
 
 %% inertial force for acceleration 
 
@@ -45,4 +34,4 @@ dyFoot = paramController.PushoffFootSpeedNow; % treadmill speed
 
 dStateVar = [dangleTheta; ddAngleTheta; dyFoot];
 
-end % code checked and essential
+end

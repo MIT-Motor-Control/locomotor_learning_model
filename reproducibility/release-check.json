@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-15",
+  "release": "0.3.0",
+  "scope": "Post-cleanup working-copy verification. The separate fresh Conda installation is recorded in fresh-install.json.",
+  "environment": {
+    "python": "3.12.13",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "packages": {
+      "locomotor-learning-model": "0.3.0",
+      "numpy": "1.26.4",
+      "scipy": "1.17.1",
+      "matplotlib": "3.8.2",
+      "pandas": "3.0.1"
+    }
+  },
+  "tests": {
+    "passed": 229,
+    "failed": 0,
+    "skipped": 0,
+    "new_step_budget_regressions": 6
+  },
+  "lint": "passed",
+  "dependency_check": "passed",
+  "input_source": "The standalone locomotor_learning_model-DATA folder, prepared into an empty destination; no author source packages required.",
+  "inputs": {
+    "checked_files": 5166,
+    "manifest_sha256": "cc540416c5aa6ecdb38ca7334b3a16dfbf6dd72692ad52e9fa2165fd9f567162",
+    "dataset_kind": "publication_cache",
+    "purpose": "Cached numerical reproduction of the submitted publication; not a raw simulation rerun",
+    "caveats": [
+      "Original and regenerated realizations are retained separately.",
+      "Reference tables may describe earlier analyses; use per-figure exported tables for plotted data.",
+      "No regenerated S3 rollout subset is synthesized or inferred from fitted parameters.",
+      "Supplied COSMED recordings and OpenSim source outputs are retained; available optimization conditions do not by themselves establish a complete optimization rerun."
+    ],
+    "errors": []
+  },
+  "workflows": {
+    "figure1": "passed",
+    "figure2": "passed",
+    "figure3": "passed",
+    "figure4": "passed",
+    "s1": "passed",
+    "s2": "passed",
+    "s3": "passed",
+    "s4": "passed",
+    "s5": "passed",
+    "r2": "passed"
+  },
+  "outputs": {
+    "plots": 15,
+    "figure_files": 45,
+    "csv_tables": 61
+  },
+  "table_comparison": {
+    "reference": "Previous validated release reconstruction",
+    "tables": 61,
+    "byte_identical": 59,
+    "maximum_absolute_difference": 1.0159895147410225e-10,
+    "changed_tables": [
+      {
+        "table": "r2_timescale_comparison.csv",
+        "byte_identical": false,
+        "maximum_absolute_difference": 1.0159895147410225e-10,
+        "text_changes": 0
+      },
+      {
+        "table": "r2_timescale_summary.csv",
+        "byte_identical": false,
+        "maximum_absolute_difference": 1.2699896689838397e-11,
+        "text_changes": 0
+      }
+    ],
+    "interpretation": "Only floating-point rounding differences; agreement is well within reported precision."
+  },
+  "source_workbook": {
+    "sheets": 15,
+    "source_csvs": 25,
+    "verified_cells": 29397,
+    "status": "passed"
+  },
+  "simulations": {
+    "demo_iterations": 40,
+    "pause_and_resume": "10 to 20 iterations; original checkpoint retained",
+    "data_example_checkpoint": "Resumed from the standalone DATA folder to 20 iterations",
+    "matlab_step_configuration": "Both baseline helpers passed actual MATLAB checks for requested step counts 2, 3 and 4; 3 normalizes to 4 before iteration budgeting.",
+    "matlab_python_parity": {
+      "iterations": 40,
+      "objective_max_abs_difference": 5.786e-12,
+      "controller_max_abs_difference": 5.016e-16
+    }
+  },
+  "data_archive": {
+    "name": "locomotor_learning_model-DATA.zip",
+    "bytes": 13335229428,
+    "sha256": "7fcd2f925102bb8a2231932ab79d3bebaee9b92e32c3917150d52d09294424d6",
+    "md5": "c32537d8b10bbdfdb69590301e10bf86",
+    "members_verified": 105,
+    "payload_checksums_verified": 104,
+    "crc": "passed"
+  },
+  "split_download": {
+    "name": "locomotor_learning_model-DATA.manifest.json",
+    "bytes": 12685,
+    "sha256": "1040a607ffb7418436804ad63ebd79e834d5f988afd9006a3301d3e723bbbb4e",
+    "md5": "c7dffbc885877940edd3cd77b264edd7",
+    "pieces": 54,
+    "independent_piece_hashes": "passed",
+    "concatenated_archive_hash": "passed",
+    "downloader_manifest_validation": "passed"
+  },
+  "data_refresh": "Only the standalone README and its checksum index changed relative to the earlier verified ZIP. All 103 scientific/supporting payload files are byte-identical.",
+  "manuscript_agreement": {
+    "numerical_claim_groups_matched": 19,
+    "numerical_claim_groups_checked": 20,
+    "status": "incomplete",
+    "coverage": "../docs/reproducibility.md#coverage-and-limits"
+  },
+  "limits": [
+    "Full original stochastic sweeps, raw-recording preprocessing and original OpenSim optimization were not rerun.",
+    "This does not establish anonymous Zenodo download availability."
+  ]
+}

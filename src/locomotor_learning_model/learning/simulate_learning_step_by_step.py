@@ -6,24 +6,6 @@ from typing import Any
 
 import numpy as np
 
-
-def safe_float(value):
-    """Safely convert array or scalar to float."""
-    if np.isscalar(value):
-        return float(value)
-
-    # Convert to numpy array and flatten
-    arr = np.asarray(value).flatten()
-
-    if arr.size == 1:
-        return float(arr[0])
-    elif arr.size == 0:
-        return 0.0
-    else:
-        # For multi-element arrays, take the sum (common for dot products)
-        return float(np.sum(arr))
-
-
 from locomotor_learning_model.initializing.get_treadmill_speed import get_treadmill_speed
 from locomotor_learning_model.learning.compute_energy_dynamics_model_rls_no_singular import (
     compute_energy_dynamics_model_rls_no_singular,
@@ -41,6 +23,20 @@ from locomotor_learning_model.learning.f_objective_asymmetric_nominal_8d_to_10d 
 from locomotor_learning_model.learning.gradient_of_error_from_memory_compute import (
     gradient_of_error_from_memory_compute,
 )
+
+
+def safe_float(value):
+    """Convert a scalar or summed array to float; empty arrays return zero."""
+    if np.isscalar(value):
+        return float(value)
+
+    arr = np.asarray(value).flatten()
+    if arr.size == 1:
+        return float(arr[0])
+    elif arr.size == 0:
+        return 0.0
+    else:
+        return float(np.sum(arr))
 
 
 def simulate_learning_step_by_step(

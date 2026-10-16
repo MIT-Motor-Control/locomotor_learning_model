@@ -1,6 +1,6 @@
 # Running and resuming the Python model
 
-The Python package is the baseline locomotor adaptation implementation. Its seeded examples and checkpoints are **not participant fits or checkpoints from the submitted PLOS figures**. Use the publication commands and reference-data manifests for those figures. The separate manuscript MATLAB engine preserves the settings in Inseung's handoff.
+The Python package is the baseline locomotor adaptation implementation. Its seeded examples and checkpoints are **not participant fits or checkpoints from the paper figures**. Use the publication commands and reference-data manifests for those figures. The separate manuscript MATLAB engine preserves the supplied simulation settings.
 
 ## Run an example
 
@@ -23,8 +23,8 @@ An output directory receives `run.npz`, `metadata.json`, `checkpoint.npz`, `chec
 ## Pause and resume
 
 ```sh
-loco-simulate run --seed 42 --iterations 100 --stop-after 40 --output-dir outputs/example
-loco-simulate resume outputs/example/checkpoint.npz
+loco-simulate run --seed 42 --iterations 100 --stop-after 40 --output-dir outputs/paused-example
+loco-simulate resume outputs/paused-example/checkpoint.npz
 ```
 
 `--iterations` is the **total target**, not an additional count. Omitting it on resume uses the saved target. It may be increased; it cannot be less than the completed count. `--stop-after` is also an absolute completed-iteration count. The new commands supply a checkpoint path automatically. A checkpoint is saved at each requested interval and at the last completed learning iteration. Interruption between saves loses only work since the last save.
@@ -40,6 +40,8 @@ The pause/resume commands above create their own checkpoint and need no data dow
 ```sh
 loco-simulate resume data/locomotor_learning_model-DATA/checkpoints/example_seed42.npz --output-dir outputs/checkpoint-example
 ```
+
+If DATA is beside the repository, use `../locomotor_learning_model-DATA/checkpoints/example_seed42.npz` as the checkpoint path instead.
 
 The same DATA `checkpoints/` folder contains `manuscript_seed42_trial.mat` and its metadata: a completed seeded manuscript-engine trial that terminated at a detected model fall on iteration 104. This is a reusable numerical result, not a resumable Python learner or a published fitted model. The [manuscript engine guide](../matlab/manuscript/README.md) explains its API.
 
@@ -64,17 +66,18 @@ The high-level API owns a private random generator and does not reseed NumPy's g
 
 ## Scientific scope and validation
 
-The release work preserves the baseline model equations and default learner/noise/memory choices. The submitted manuscript pipeline uses different settings: its MATLAB handoff divides belt speeds by 2, sets a 25-second transition, disables the baseline memory-learning rates, and uses another learning-rate scale. The manuscript describes Froude-like speed scaling and a 20-second transition. These differences are recorded for author review; this baseline runner does not resolve or silently alter them. Original fitted MAT files, regenerated trial-averaged grids, and new seeded examples have distinct provenance.
+The baseline model equations and learner/noise/memory defaults are preserved. The manuscript engine uses different settings: it divides belt speeds by 2, sets a 25-second transition, disables the baseline memory-learning rates, and uses another learning-rate scale. The manuscript describes Froude-like speed scaling and a 20-second transition. These source/Methods discrepancies remain unresolved. Original fitted MAT files, regenerated trial-averaged grids, and new seeded examples have distinct provenance.
 
 Baseline Python/MATLAB deterministic parity can be checked with:
 
 ```matlab
 addpath('matlab/validation');
-export_reference_run('/tmp/locad_reference.mat', 40);
+if ~isfolder('outputs'), mkdir('outputs'); end
+export_reference_run('outputs/locad_reference.mat', 40);
 ```
 
 ```sh
-python scripts/validate_matlab_python_parity.py /tmp/locad_reference.mat
+python scripts/validate_matlab_python_parity.py outputs/locad_reference.mat
 python -m pytest tests/test_checkpoints.py tests/test_detailed_function_comparison.py tests/test_matlab_python_equivalence.py
 ```
 

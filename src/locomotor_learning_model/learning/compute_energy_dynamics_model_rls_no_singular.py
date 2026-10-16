@@ -14,11 +14,11 @@ def compute_energy_dynamics_model_rls_no_singular(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Update the linear energy dynamics model using recent stride data."""
 
-    beta = 0.5  # Unused but kept for API compatibility
+    beta = 0.5  # Retained in the MATLAB-compatible RLS signature.
 
     aold = adynamics_now
 
-    mu_measurement = 0.0  # Dummy variable, not used
+    mu_measurement = 0.0
 
     # Ensure arrays have the same number of columns by taking the minimum
     min_cols = min(state_var_now_store.shape[1], p_input_controller_now_store.shape[1])
@@ -28,13 +28,9 @@ def compute_energy_dynamics_model_rls_no_singular(
     
     input_now_store = np.vstack((state_var_trimmed, p_input_trimmed))
     
-    # Ensure output_next_store is 2D and has the right number of columns
+    # Store energy observations as a row vector, with one column per stride.
     output_next_store = np.atleast_2d(edot_store)
-    if output_next_store.shape[0] == 1:
-        # If it's a row vector, we want it as a row for compatibility with column indexing
-        pass
-    else:
-        # If it's a column vector, transpose to row
+    if output_next_store.shape[0] != 1:
         output_next_store = output_next_store.T
     
     # Trim to match the minimum columns

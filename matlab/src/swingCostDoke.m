@@ -13,4 +13,4 @@ epsilon = 0.01;
 
 C = paramFixed.swingCost.Coeff*sqrt(ForceRate^2+epsilon^2)^paramFixed.swingCost.alpha;
 
-end % code checked and essential
+end

@@ -6,11 +6,6 @@ timePerPhaseInMin = 2;
 
 paramFixed.transitionTime = 3;
 
-% vNormal = -0.35;
-% vFast = -0.425;
-% vSlow = -0.275;
-% vVeryFast = -0.5;
-% vVerySlow = -0.20;
 
 vNormal = -0.35;
 vSlow = -0.35*0.75;
@@ -23,7 +18,7 @@ vFast = -0.35*1.25;
 switch paramFixed.speedProtocol
     case 'single speed'
 
-        %% transitioning from one speed to next takes 10 seconds, say
+        %% transition duration in nondimensional time
         tDurationTransition = paramFixed.transitionTime/timeScaling;
 
         %% phase 1: warmup
@@ -37,7 +32,7 @@ switch paramFixed.speedProtocol
         footSpeed2_phase2 = vNormal;
 
         %% phase 3: adaptation
-        tDuration3 = 1*60/timeScaling; % default is 20
+        tDuration3 = 1*60/timeScaling;
         footSpeed1_phase3 = vNormal;
         footSpeed2_phase3 = vNormal;
 
@@ -57,7 +52,7 @@ switch paramFixed.speedProtocol
 
     case 'single speed change pulse'
 
-        %% transitioning from one speed to next takes 10 seconds, say
+        %% transition duration in nondimensional time
         tDurationTransition = paramFixed.transitionTime/timeScaling;
 
         %% phase 1: warmup
@@ -71,7 +66,7 @@ switch paramFixed.speedProtocol
         footSpeed2_phase2 = vNormal;
 
         %% phase 3: adaptation
-        tDuration3 = timePerPhaseInMin*60/timeScaling; % default is 20
+        tDuration3 = timePerPhaseInMin*60/timeScaling;
         footSpeed1_phase3 = vFast;
         footSpeed2_phase3 = vFast;
 
@@ -91,7 +86,7 @@ switch paramFixed.speedProtocol
 
     case 'single speed change'
 
-        %% transitioning from one speed to next takes 10 seconds, say
+        %% transition duration in nondimensional time
         tDurationTransition = paramFixed.transitionTime/timeScaling;
 
         %% phase 1: warmup
@@ -121,7 +116,7 @@ switch paramFixed.speedProtocol
 
     case 'two speed changes'
 
-        %% transitioning from one speed to next takes 10 seconds, say
+        %% transition duration in nondimensional time
         tDurationTransition = paramFixed.transitionTime/timeScaling;
 
         %% phase 1: warmup
@@ -135,7 +130,7 @@ switch paramFixed.speedProtocol
         footSpeed2_phase2 = vFast;
 
         %% phase 3: adaptation
-        tDuration3 = timePerPhaseInMin*60/timeScaling; % default is 20
+        tDuration3 = timePerPhaseInMin*60/timeScaling;
         footSpeed1_phase3 = vNormal; % faster
         footSpeed2_phase3 = vNormal; % slower
 
@@ -160,7 +155,7 @@ switch paramFixed.speedProtocol
 
     case 'four speed changes'
 
-        %% transitioning from one speed to next takes 10 seconds, say
+        %% transition duration in nondimensional time
         tDurationTransition = paramFixed.transitionTime/timeScaling;
 
         %% phase 1: warmup
@@ -174,7 +169,7 @@ switch paramFixed.speedProtocol
         footSpeed2_phase2 = vSlow;
 
         %% phase 3: adaptation
-        tDuration3 = timePerPhaseInMin*60/timeScaling; % default is 20
+        tDuration3 = timePerPhaseInMin*60/timeScaling;
         footSpeed1_phase3 = vNormal; % faster
         footSpeed2_phase3 = vNormal; % slower
 
@@ -222,7 +217,7 @@ switch paramFixed.speedProtocol
 
     case 'four speed changes 1'
 
-        %% transitioning from one speed to next takes 10 seconds, say
+        %% transition duration in nondimensional time
         tDurationTransition = paramFixed.transitionTime/timeScaling;
 
         %% phase 1: warmup
@@ -236,7 +231,7 @@ switch paramFixed.speedProtocol
         footSpeed2_phase2 = vFast;
 
         %% phase 3: adaptation
-        tDuration3 = timePerPhaseInMin*60/timeScaling; % default is 20
+        tDuration3 = timePerPhaseInMin*60/timeScaling;
         footSpeed1_phase3 = vNormal; % faster
         footSpeed2_phase3 = vNormal; % slower
 
@@ -284,7 +279,7 @@ switch paramFixed.speedProtocol
 
     case 'four speed changes 2'
 
-        %% transitioning from one speed to next takes 10 seconds, say
+        %% transition duration in nondimensional time
         tDurationTransition = paramFixed.transitionTime/timeScaling;
 
         %% phase 1: warmup
@@ -298,7 +293,7 @@ switch paramFixed.speedProtocol
         footSpeed2_phase2 = vVerySlow;
 
         %% phase 3: adaptation
-        tDuration3 = timePerPhaseInMin*60/timeScaling; % default is 20
+        tDuration3 = timePerPhaseInMin*60/timeScaling;
         footSpeed1_phase3 = vNormal; % faster
         footSpeed2_phase3 = vNormal; % slower
 
@@ -346,7 +341,7 @@ switch paramFixed.speedProtocol
 
     case 'four speed changes 3'
 
-        %% transitioning from one speed to next takes 10 seconds, say
+        %% transition duration in nondimensional time
         tDurationTransition = paramFixed.transitionTime/timeScaling;
 
         %% phase 1: warmup
@@ -360,7 +355,7 @@ switch paramFixed.speedProtocol
         footSpeed2_phase2 = vVeryFast;
 
         %% phase 3: adaptation
-        tDuration3 = timePerPhaseInMin*60/timeScaling; % default is 20
+        tDuration3 = timePerPhaseInMin*60/timeScaling;
         footSpeed1_phase3 = vNormal; % faster
         footSpeed2_phase3 = vNormal; % slower
 
@@ -409,7 +404,7 @@ switch paramFixed.speedProtocol
 
     case 'four speed changes 4'
 
-        %% transitioning from one speed to next takes 10 seconds, say
+        %% transition duration in nondimensional time
         tDurationTransition = paramFixed.transitionTime/timeScaling;
 
         %% phase 1: warmup
@@ -423,7 +418,7 @@ switch paramFixed.speedProtocol
         footSpeed2_phase2 = vFast;
 
         %% phase 3: adaptation
-        tDuration3 = timePerPhaseInMin*60/timeScaling; % default is 20
+        tDuration3 = timePerPhaseInMin*60/timeScaling;
         footSpeed1_phase3 = vNormal; % faster
         footSpeed2_phase3 = vNormal; % slower
 
@@ -471,7 +466,7 @@ switch paramFixed.speedProtocol
 
     case 'four speed changes 5'
 
-        %% transitioning from one speed to next takes 10 seconds, say
+        %% transition duration in nondimensional time
         tDurationTransition = paramFixed.transitionTime/timeScaling;
 
         %% phase 1: warmup
@@ -485,7 +480,7 @@ switch paramFixed.speedProtocol
         footSpeed2_phase2 = vVerySlow;
 
         %% phase 3: adaptation
-        tDuration3 = timePerPhaseInMin*60/timeScaling; % default is 20
+        tDuration3 = timePerPhaseInMin*60/timeScaling;
         footSpeed1_phase3 = vNormal; % faster
         footSpeed2_phase3 = vNormal; % slower
 
@@ -551,15 +546,6 @@ for iTran = 2:length(tStore)
         footSpeed2Store_new = [footSpeed2Store_new; footSpeed2Store(iTran)];
     end
 end
-
-%% plot the things
-% figure(2555);
-% plot(tStore_new,abs(footSpeed1Store_new),'linewidth',2); hold on;
-% plot(tStore_new,abs(footSpeed2Store_new),'linewidth',2);
-% xlabel('t'); ylabel('treadmill speeds(m/s)');
-% legend('(abs) fast belt','(abs) slow belt');
-% ylim([0 0.6]);
-% title('Tied belt speed change protocol');
 
 %% store in a structure
 beltSpeedsImposed.tList = tStore_new;

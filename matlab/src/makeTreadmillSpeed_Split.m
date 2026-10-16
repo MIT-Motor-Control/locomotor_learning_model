@@ -3,12 +3,7 @@ function beltSpeedsImposed = makeTreadmillSpeed_Split(paramFixed)
 L = 0.95; g = 9.81;
 timeScaling = sqrt(L/g);
 
-% v1 % default that works
-% vNormal = -0.40;
-% vFast = -0.50;
-% vSlow = -0.30;
 
-% +5 delta
 delta = 0.0328; % half of normal delta
 vNormal = -0.3276;
 vFast = vNormal - 5*delta;
@@ -18,7 +13,7 @@ vSlow = vNormal + 5*delta;
 switch paramFixed.speedProtocol
     case 'single speed'
 
-        %% transitioning from one speed to next takes 10 seconds, say
+        %% transition duration in nondimensional time
         tDurationTransition = paramFixed.transitionTime/timeScaling;
 
         %% phase 1: warmup
@@ -32,7 +27,7 @@ switch paramFixed.speedProtocol
         footSpeed2_phase2 = vNormal;
 
         %% phase 3: adaptation
-        tDuration3 = 1*60/timeScaling; % default is 20
+        tDuration3 = 1*60/timeScaling;
         footSpeed1_phase3 = vNormal;
         footSpeed2_phase3 = vNormal;
 
@@ -53,12 +48,11 @@ switch paramFixed.speedProtocol
    
     case 'classic split belt'
 
-        %% transitioning from one speed to next takes 10 seconds, say
+        %% transition duration in nondimensional time
         tDurationTransition = paramFixed.transitionTime/timeScaling;
 
         %% phase 1: warmup (tied)
         tDuration1 = 1*60/timeScaling;
-        % tDuration1 = 9*60/timeScaling;
         footSpeed1_phase1 = vNormal;
         footSpeed2_phase1 = vNormal;
 
@@ -68,12 +62,12 @@ switch paramFixed.speedProtocol
         footSpeed2_phase2 = vNormal;
 
         %% phase 3: split adaptation
-        tDuration3 = 45*60/timeScaling; % default is 20
+        tDuration3 = 45*60/timeScaling;
         footSpeed1_phase3 = vFast;
         footSpeed2_phase3 = vSlow;
 
         %% phase 4: second adaptation (back to tied)
-        tDuration4 = 5*60/timeScaling; % default is 20
+        tDuration4 = 5*60/timeScaling;
         footSpeed1_phase4 = vNormal;
         footSpeed2_phase4 = vNormal;
 

@@ -1,6 +1,6 @@
 # Manuscript simulation engine
 
-This is the supplied fall-detecting MATLAB engine from Inseung's October 2026 handoff, with explicit seeds and portable saved trials. It is separate from the original public MATLAB/Python baseline implementations. Scientific defaults have not been reconciled to the manuscript text; see the [reproducibility guide](../../docs/reproducibility.md).
+This is the supplied fall-detecting MATLAB manuscript engine, with explicit seeds and portable saved trials. It is separate from the MATLAB/Python baseline implementations. Scientific defaults have not been reconciled to the manuscript text; see the [reproducibility guide](../../docs/reproducibility.md).
 
 From the repository root in MATLAB:
 

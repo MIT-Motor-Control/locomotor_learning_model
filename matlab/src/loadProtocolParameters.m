@@ -9,12 +9,8 @@ paramFixed.speedProtocol = 'classic split belt';
 paramFixed.transitionTime = 15; % in seconds. 
 paramFixed.imposedFootSpeeds = makeTreadmillSpeed_Split(paramFixed);
 
-%% what speed protocol to use: tied belt changes
-% more familiar task of walking on a regular treadmill with speed changes
-% paramFixed.transitionTime = 3; % in seconds. 
-% paramFixed.SplitOrTied = 'tied';
-% paramFixed.speedProtocol = 'four speed changes';
-% paramFixed.imposedFootSpeeds = makeTreadmillSpeed_Tied(paramFixed);
+% For tied walking, use SplitOrTied = 'tied', speedProtocol =
+% 'four speed changes', a 3-second transition and makeTreadmillSpeed_Tied.
 
 drawnow;
 
@@ -22,9 +18,8 @@ drawnow;
 paramFixed.angleSlope = 0;  
 % do not change: the code has not been tested for non-zero values
 
-%% We get the simulation duration from the protocol, but you can override 
-% this by changing the values in loadHowLongParameters.m function and
-% uncommenting that function in the root program
+% Duration follows the protocol. Call loadHowLongParameters afterward
+% to use its step-count override.
 
 %% How many steps to simulate
 nominalStepTime = 1.7; 
@@ -32,11 +27,10 @@ paramFixed.numStepsToLearn = paramFixed.imposedFootSpeeds.tList(end)/nominalStep
 paramFixed.numStepsToLearn = round(paramFixed.numStepsToLearn/100)*100; % round to the nearest hundred
 
 %% optimization iterations
+% Balance both legs before converting the physical-step budget to iterations.
+if mod(paramFixed.Learner.numStepsPerIteration,2)~=0
+    paramFixed.Learner.numStepsPerIteration = paramFixed.Learner.numStepsPerIteration + 1;
+end
 paramFixed.numIterations = floor(paramFixed.numStepsToLearn/paramFixed.Learner.numStepsPerIteration);
 
-if mod(paramFixed.Learner.numStepsPerIteration,2)~=0 
-    paramFixed.Learner.numStepsPerIteration = paramFixed.numStepsPerIteration + 1;
 end
-
-
-end  % checked and essential

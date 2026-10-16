@@ -4,11 +4,11 @@ function [AdynamicsNew,errorOldModel,errorNewModel] = ...
 % computes a linear model that predicts energy this stride from input state
 % and control parameters
 
-beta = 0.5; % not used and can be set to 
+beta = 0.5; % unused compatibility argument
 
 Aold = AdynamicsNow;
 
-muMeasurement = 0; % dummy variable and not used
+muMeasurement = 0; % unused compatibility argument
 
 InputNowStore = [stateVarNowStore; pInputControllerNowStore];
 OutputNextStore = EdotStore;

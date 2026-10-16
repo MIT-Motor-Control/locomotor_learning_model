@@ -1,31 +1,15 @@
-"""Fall-risk penalty terms for the reward.
+"""Optional local stability penalties for the baseline Python objective.
 
-This module supplies the optional explicit fall-risk term of the objective:
-a penalty added to the per-stride reward the RL learner descends. A zero
-weight (``fallPenaltyWeight == 0``) reproduces the baseline model exactly.
-
-The **primary** term is a *local center-of-mass (COM) margin* penalty
-(``com_margin``). During each simulated step the vertical COM height is
-``leglength * cos(theta)`` (nondimensional units, ``leglength == 1`` in this
-model). The penalty measures how far the *lowest* COM height in each step
-falls below a documented "safe" height, normalized to the range between that
-safe height and a ground reference, so the value is dimensionless and bounded
-to ``[0, 1]``:
+The default ``com_margin`` mode uses the minimum center-of-mass height in
+each step, ``h = leglength * cos(theta)`` in nondimensional units:
 
     margin_i = clip((h_safe - min_i(h)) / (h_safe - h_ground), 0, 1)
     penalty  = mean_i( margin_i ** power )
 
-Rationale / consistency with the paper: the manuscript detects a fall when the
-COM height drops below a near-ground threshold. This penalty uses the *same*
-COM-height quantity, but as a graded, bounded margin so it can enter the
-reward the learner descends (a per-stride signal) rather than a terminal
-event. It is deterministic (no RNG), so logging it never perturbs the noise
-stream and ``fallPenaltyWeight == 0`` reproduces the baseline model exactly.
-
-A ``capture_point`` alternative (bounded XCoM excess) is kept for robustness
-checks. A global *probability of falling* term is not a per-stride quantity —
-it requires uncapped rollouts and a fall-termination event (a physics
-change) — and is therefore not implemented here.
+``capture_point`` instead measures bounded extrapolated-COM excess. These
+deterministic per-stride penalties do not estimate the manuscript's fall
+probabilities or add fall termination. A zero ``fallPenaltyWeight`` preserves
+the baseline energy/symmetry objective and random-number stream.
 """
 
 from __future__ import annotations
@@ -91,8 +75,7 @@ def compute_com_margin_penalty(
     power = float(param_fixed.get("fallPenaltyPower", 2.0))
     eps = float(param_fixed.get("fallPenaltyEpsilon", 1e-6))
     safe_height = float(param_fixed.get("fallSafeComHeight", 0.95))
-    # Fallback matches the pre-registered loaded constant (load_biped_model_parameters)
-    # so the function's isolated default is self-consistent with every actual run.
+    # Defaults match load_biped_model_parameters.
     ground_height = float(param_fixed.get("fallGroundComHeight", 0.90))
     span = max(safe_height - ground_height, eps)
 

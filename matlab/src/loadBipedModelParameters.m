@@ -23,12 +23,8 @@ paramFixed.swingCost.alpha = 1.0;
 paramFixed.lambdaEnergyVsPeriodicity = 1; % 1 = energy, 0 = periodicity
 
 %% energy vs symmetry
-% paramFixed.lambdaEnergyVsSymmetry = 1; % 1 = energy, 0 = symmetry
 paramFixed.lambdaEnergyVsSymmetry = 0.75; % 1 = energy, 0 = symmetry 
-% paramFixed.lambdaEnergyVsSymmetry = 0.5; % 1 = energy, 0 = symmetry 
-% paramFixed.lambdaEnergyVsSymmetry = 0; % 1 = energy, 0 = symmetry
-% paramFixed.lambdaEnergyVsSymmetry = 0.25; % 1 = energy, 0 = symmetry
 paramFixed.symmetryMultiplier = 10; % just multiplies the symmetry objective, 
 % so that its gradients are comparable to the energy cost gradients
 
-end % checked and essential
+end

@@ -19,6 +19,24 @@ from locomotor_learning_model import (
 )
 from locomotor_learning_model.artifacts import load_archive, save_archive
 from locomotor_learning_model.cli import main
+from locomotor_learning_model.parameter_loading.load_protocol_parameters import (
+    load_protocol_parameters,
+)
+
+
+@pytest.mark.parametrize("condition,physical_steps", [("split", 6400), ("tied", 2000)])
+@pytest.mark.parametrize("requested_steps,effective_steps", [(2, 2), (3, 4), (4, 4)])
+def test_protocol_iteration_budget_after_even_step_normalization(
+    condition, physical_steps, requested_steps, effective_steps
+):
+    parameters = load_protocol_parameters(
+        {"Learner": {"numStepsPerIteration": requested_steps}},
+        split_or_tied=condition,
+    )
+    assert parameters["Learner"]["numStepsPerIteration"] == effective_steps
+    assert parameters["numStepsToLearn"] == physical_steps
+    assert parameters["num_iterations"] == parameters["numIterations"]
+    assert parameters["num_iterations"] * effective_steps == physical_steps
 
 
 def assert_numerically_identical(first, second):

@@ -16,7 +16,6 @@ end
 paramFixed.storedmemory.nominalContext = [-0.35; -0.35];
 
 %% how memory changes with context: slope
-% learningParameterListLength = length(paramFixed.storedmemory.nominalControl);
 
 paramFixed.storedmemory.controlSlopeVsContext = ...
     zeros(8,2); % start with a blank slate for memory accumulation

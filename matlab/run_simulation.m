@@ -1,5 +1,5 @@
 function run_simulation()
-%RUN_SIMULATION Add the MATLAB sources to the path and execute the manuscript pipeline.
+%RUN_SIMULATION Run the baseline MATLAB model and its summary plots.
 
 repoDir = fileparts(mfilename('fullpath'));
 addpath(fullfile(repoDir, 'src'));

@@ -16,7 +16,7 @@ else
     paramController.PushoffAccelerationNowList = paramFixed.imposedFootSpeeds.footAcc1List;
 end
 
-%% some fake variables 
+%% integration horizon and requested output grid
 numPointsPerInterval = 300;
 tStance = 30; tEnd = tStart+tStance;
 tspan = linspace(tStart,tEnd,numPointsPerInterval)';
@@ -27,8 +27,8 @@ angleThetaDot0 = pInput0(2);
 yFoot0 = pInput0(3);
 SUMy0 = pInput0(4);
 
-%% additional stuff for new swing cost
-vSwing_Initial_LabFrame = pInput0(5); % new addition
+%% initial swing and body velocities for the swing-cost model
+vSwing_Initial_LabFrame = pInput0(5); % initial swing-foot velocity
 paramController.PushoffFootSpeedNow = interp1(paramController.tList_BeltSpeed, ...
     paramController.PushoffFootSpeedNowList,tStart,'linear','extrap');
 vBody_Initial_LabFrame = angleThetaDot0+paramController.PushoffFootSpeedNow;
@@ -52,7 +52,7 @@ delta_SUMy = SUMy0-paramController.SUMy_atMidstance_nominal_slopeframe;
 
 %% doing the delta ydot in lab frame
 ydot_atMidstance_LabFrame = ydot_atMidstance+paramController.PushoffFootSpeedNow;
-vFootNominal = -0.35; % ideally get this from some file rather than hard code here
+vFootNominal = -0.35; % fixed nominal belt speed for lab-frame feedback
 paramController.ydot_atMidstance_nominal_labframe = ...
     paramController.ydot_atMidstance_nominal_beltframe+vFootNominal;
 delta_ydot_atMidstance_labframe = ydot_atMidstance_LabFrame-paramController.ydot_atMidstance_nominal_labframe;
@@ -192,7 +192,7 @@ Ework_pushoff = abs(deltaE_pushoff);
 Ework_heelstrike = abs(deltaE_heelstrike);
 Emet_step2step = paramFixed.bPos*Ework_pushoff + paramFixed.bNeg*Ework_heelstrike;
 
-%% swing cost: NEW
+%% swing cost
 Thalfstance1 = range(tlistTillEndstance);
 Thalfstance2 = range(tlistTillMidstance);
 
@@ -223,4 +223,4 @@ tTotal = (tStance1+tStance2);
 %%
 pInput0_out = [pInput0_out; vSwing_BtoD];
 
-end % essential
+end

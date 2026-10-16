@@ -6,7 +6,6 @@ function [stateVar0,tStore,stateStore,EmetTotalStore, ...
 % angleTheta0, dAngleTheta0, ...
 % yFoot (lab frame), INTy (lab frame)
 
-% tStart = 0;
 
 tStore = cell(paramFixed.numSteps+1,1);
 stateStore = cell(paramFixed.numSteps+1,1);
@@ -80,4 +79,4 @@ for iStep = 1:paramFixed.numSteps
 
 end
 
-end % essential
+end

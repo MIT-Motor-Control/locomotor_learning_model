@@ -70,14 +70,15 @@ def load_protocol_parameters(
     param_fixed["numStepsToLearn"] = round(param_fixed["numStepsToLearn"] / 100) * 100
 
     learner = param_fixed.get("Learner", {})
+    # Balance both legs before converting the physical-step budget to iterations.
+    if learner.get("numStepsPerIteration", 1) % 2 != 0:
+        learner["numStepsPerIteration"] = learner.get("numStepsPerIteration", 1) + 1
+        param_fixed["Learner"] = learner
+
     num_iterations = int(
         np.floor(param_fixed["numStepsToLearn"] / learner.get("numStepsPerIteration", 1))
     )
     param_fixed["num_iterations"] = num_iterations
     param_fixed["numIterations"] = num_iterations
-
-    if learner.get("numStepsPerIteration", 1) % 2 != 0:
-        learner["numStepsPerIteration"] = learner.get("numStepsPerIteration", 1) + 1
-        param_fixed["Learner"] = learner
 
     return param_fixed

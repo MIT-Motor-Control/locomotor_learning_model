@@ -25,8 +25,7 @@ paramController.Even.y_atMidstance_nominal_slopeframe = ...
 paramController.Even.SUMy_atMidstance_nominal_slopeframe = ...
     pInputControllerNominal(10);
 
-%% simulate 4 steps, so that we have some reasonable average to go off of,
-% just to be safe
+%% simulate the configured number of steps per learning iteration
 paramFixed.numSteps = paramFixed.Learner.numStepsPerIteration; 
 [stateVar0,tStore,stateStore,EmetTotalStore, EmetPerTimeStore, ...
     tStepStore] = ...
@@ -35,9 +34,9 @@ paramFixed.numSteps = paramFixed.Learner.numStepsPerIteration;
 f_energy = sum(EmetTotalStore)/sum(tStepStore);
 tEnd = tStore{end}(end);
 
-f_constraint = (norm(stateVar0_Model(2:3)-stateVar0(2:3)))^2; % just thetaDot and yFoot is targeted to be zeroed
+f_constraint = (norm(stateVar0_Model(2:3)-stateVar0(2:3)))^2; % penalize changes in angular velocity and foot position
 
-% trading off energy and periodicity: seems not essential
+% trade off energy and periodicity
 lambdaEnergyVsPeriodicity = paramFixed.lambdaEnergyVsPeriodicity;
 f_objective = lambdaEnergyVsPeriodicity*f_energy+(1-lambdaEnergyVsPeriodicity)*f_constraint;
 
@@ -48,4 +47,4 @@ f_symmetry = (angleThetaEnd_1-angleThetaEnd_2)^2;
 f_objective = paramFixed.lambdaEnergyVsSymmetry*f_objective + ...
     (1-paramFixed.lambdaEnergyVsSymmetry)*f_symmetry*paramFixed.symmetryMultiplier;
 
-end  % checked and essential
+end

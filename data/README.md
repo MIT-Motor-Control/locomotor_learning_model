@@ -1,96 +1,74 @@
-# Publication data
+# Data setup
 
-From the repository root, download and install the matching [Zenodo DATA release](https://doi.org/10.5281/zenodo.23402153):
+Use the CODE and DATA archives from the same [Zenodo release](https://doi.org/10.5281/zenodo.23402153). The DATA folder has its own README with file formats, units, participant groups, missing values and Python/MATLAB examples.
+
+## Download and prepare
+
+With the repository's Conda environment active, run:
 
 ```sh
 python scripts/download_data.py
+loco-publication prepare
+loco-publication verify-data
+loco-publication reproduce --strict
 ```
 
-The downloader accepts either the original 13,335,231,738-byte `locomotor_learning_model-DATA.zip` or the split version on the same Zenodo record. It prefers the complete ZIP. Only a “file not found” response selects the split version; connection failures and checksum mismatches stop or retry the download instead. Both routes verify the same pinned complete SHA-256 before safely extracting `data/locomotor_learning_model-DATA/`. No extra download package is needed.
+The downloader uses public Zenodo files. It prefers the complete `locomotor_learning_model-DATA.zip`; if that file is absent, it uses the matching split files and manifest. It verifies the pinned archive checksum before extracting into `data/locomotor_learning_model-DATA/`. The DATA release is about 13.34 GB; allow **42 GB free** to cover downloading, joining pieces and extraction. The extracted folder occupies about 14.88 GB before analysis preparation.
 
-The split version consists of 54 pieces and a pinned manifest: the first 53 pieces are 250,000,000 bytes each and the final piece is 85,231,738 bytes. Every piece is checked before joining the original ZIP.
+If you download the ZIP manually, extract its DATA folder into this repository's `data/` directory. Keep the inner `publication-data.zip` compressed. Then start with `loco-publication prepare` above.
 
-Allow about **42 GB free** to cover either installation method; a fresh complete-ZIP download needs about 29 GB while downloading and extracting. The installed DATA folder occupies about 14.88 GB before publication preparation. Downloads are cached in `outputs/data-download/23402153/`. Rerun the same command after an interruption: the complete ZIP resumes from its cached byte offset if the server supports HTTP Range requests, otherwise it restarts safely. For split downloads, completed pieces are reused and an incomplete piece restarts. Cache files created by the command are removed after a successful installation; use `--keep-downloads` to retain them. Existing datasets and unrelated cache files are never overwritten or removed.
-
-If you downloaded the pieces manually, place all 54 `locomotor_learning_model-DATA.zip.part001` through `.part054` files and `locomotor_learning_model-DATA.manifest.json` in one directory, then run:
+If the DATA folder is beside the repository, no copy is needed:
 
 ```sh
-python scripts/download_data.py --parts-dir /path/to/downloaded-pieces
+loco-publication prepare --source ../locomotor_learning_model-DATA
+loco-publication verify-data
+loco-publication reproduce --strict
 ```
 
-This mode makes no network requests and preserves the supplied pieces. The downloader refuses an existing installation folder. Use the existing dataset with `prepare`, or install separately and supply that location:
+Preparation creates `data/publication/`, verifies the companion archive and checks its agreement with the experimental CSVs. All 5,166 prepared scientific inputs are recorded in `data/publication/manifest.json`. Raw recordings stay in the DATA folder and are not duplicated. Repeating preparation with the same inputs is safe; conflicting inputs are rejected.
+
+## What is in the DATA folder?
+
+| Path | Format and use |
+|---|---|
+| `processed_csv/` | Six CSV tables with one row per participant and columns for condition and time/stride samples; the experimental figure inputs |
+| `processed_mat/` | Per-participant MATLAB measurements for additional analysis |
+| `raw_mocap_c3d/` | Original motion-capture recordings; a C3D reader is needed for new raw-data analysis |
+| `subject_information/` | Participant characteristics and condition assignments |
+| `publication-data.zip` | Original and regenerated model fits, saved trials, cross-validation tables, comparison data and supplementary results |
+| `checkpoints/` | Seeded model examples and metadata; these are separate from the fitted manuscript models |
+| `validation/fall_fit_comparison.csv` | Independent MATLAB/SciPy comparison of the fall-adaptation fit |
+| `SHA256SUMS` | Checksums for every other file in the DATA folder |
+
+The standard Python figure workflow needs the six CSVs and embedded publication archive. It does not require MATLAB, a C3D reader or a network connection after downloading the data. MATLAB is needed only for the explicit MATLAB simulation and S1 recomputation commands.
+
+## Interrupted downloads and other locations
+
+Rerun `python scripts/download_data.py` after an interruption. Complete ZIP downloads resume when the server supports HTTP Range requests; otherwise they restart safely. Completed split pieces are reused. Connection errors and checksum mismatches do not silently select a different dataset.
+
+Downloads are cached in `outputs/data-download/23402153/` and removed after a successful installation. Add `--keep-downloads` to retain them. The downloader never overwrites an existing DATA folder. To install separately:
 
 ```sh
 python scripts/download_data.py --destination data/another-release
 loco-publication prepare --source data/another-release
 ```
 
-The original ZIP's SHA-256 is `14e9e46710afffd3998d0f5a5f33933c42d5599f2856eb743e1f025f5ac17cea`. The manifest and archive identity are pinned in the script; use code and data from the same release. Keep the extracted README and metadata with the data.
-
-The matching release includes `publication-data.zip` inside the extracted DATA folder. Leave that embedded archive compressed; preparation finds it automatically. The original experimental-only download can still be used with a separately supplied companion ZIP. Run these commands from the repository root with the Conda environment active:
+For manually downloaded split files, put all 54 `locomotor_learning_model-DATA.zip.part001` through `.part054` files and `locomotor_learning_model-DATA.manifest.json` in one directory:
 
 ```sh
-loco-publication prepare
-loco-publication verify-data
-loco-publication reproduce
+python scripts/download_data.py --parts-dir /path/to/downloaded-pieces
 ```
 
-`prepare` creates `data/publication/`. It validates participant identities, conditions, time-series dimensions and numerical values before importing the six experimental CSVs. When the embedded or separately supplied companion ZIP is present, it checks its manifest and compatibility with the experimental download before installing the full prepared dataset. It refuses conflicting inputs. Repeating preparation with the same inputs is safe.
+This makes no network requests and preserves the supplied pieces. Use a complete set from one release; files from different archive versions cannot be mixed.
 
-For another location, provide it explicitly:
+## Precision and coverage
 
-```sh
-loco-publication prepare --source /path/to/locomotor_learning_model-DATA \
-  --model-inputs /path/to/publication-data.zip
-```
+The experimental CSVs are rounded to six decimals. The publication archive retains the full-precision arrays; preparation checks agreement within the CSV rounding tolerance. Eight double-support-asymmetry records lack a final sample. Those endpoints remain missing and are recorded in the import manifest. Energy and step-length-asymmetry inputs used by the available figure analyses are complete.
 
-No private directories, author handoff, MATLAB installation or network connection are needed after downloading the inputs. `data/publication/manifest.json` lists prepared inputs, checksums and transformations. The original downloads stay unchanged. After successful preparation, the companion ZIP may be removed locally to save space; keep the Zenodo version and checksum with your results.
+Figures 2B, S1 and S3B use the regenerated simulation realization. Other main analyses retain the original published fits. Their provenance is recorded separately. A fresh stochastic sweep need not produce the same trajectories.
 
-## What each download supports
+The release contains all inputs used by the available saved-data workflows. It does not reconstruct raw C3D/COSMED processing, the complete original stochastic sweeps or the original OpenSim optimization. Some manuscript numbers and descriptions remain unresolved; see [coverage and limits](../docs/reproducibility.md#coverage-and-limits).
 
-| Download | Contents | Reproduction coverage |
-|---|---|---|
-| `locomotor_learning_model-DATA.zip` | Experimental CSVs, processed MAT files, raw C3D recordings, metadata, checkpoints and the embedded model-input ZIP | All available saved-data analyses, with known gaps explicitly reported |
-| `locomotor_learning_model-DATA.zip.part001`–`.part054` and the download manifest | Reassemble the unchanged DATA ZIP: experimental CSVs, processed MAT files, raw C3D recordings, metadata, checkpoints and the embedded model-input ZIP | All available saved-data analyses, with known gaps explicitly reported |
-| Embedded `publication-data.zip` | Original and regenerated fits, cross-validation and grid-sensitivity tables, fall trials, Sánchez data, OpenSim outputs and supplementary model caches | Adds the model figures and analyses, including regenerated Figure 2B and S3B |
+Older experimental-only DATA releases lack `publication-data.zip` and support only part of Figures 1 and S3. Preparation reports missing model inputs rather than substituting new results. If you have a separate matching publication archive, use `loco-publication prepare --source /path/to/DATA --model-inputs /path/to/publication-data.zip`.
 
-The experimental CSVs contain values rounded to six decimals. Their reconstructed arrays preserve that precision. The companion includes the original full-precision arrays; preparation checks their agreement with the CSVs within the rounding tolerance and retains the original arrays. Small last-decimal differences between experimental-only and full-input runs are expected. Neither route reruns raw C3D processing, COSMED preprocessing or the full stochastic simulation sweeps.
-
-The raw C3D and per-participant MAT files remain available for reuse, but the figure pipeline reads the group-level CSVs. It does not need a C3D reader. `prepare` does not duplicate the large raw recordings. Experimental-only preparation reports the missing model inputs rather than substituting new simulations or invented values.
-
-Eight double-support-asymmetry records have a missing final sample. These endpoints are preserved and listed in the import manifest; the importer does not fill or interpolate them. The energy and step-length-asymmetry inputs used for Figures 1 and S3 are complete.
-
-## Access and versions
-
-Use the CODE and DATA archives from the same Zenodo release. Earlier experimental-only DATA downloads do not contain the model fits or simulation caches; they support only the available experimental panels. The new DATA package includes those additional inputs and their checksum manifest.
-
-Download availability is controlled by the [Zenodo record](https://doi.org/10.5281/zenodo.23402153). The downloader uses public file URLs and does not handle restricted-record credentials. The repository's MIT license covers code; the experimental data retain their CC BY 4.0 license. Retain the downloaded metadata and provenance when redistributing the data.
-
-Release 0.3.0 adds the supplementary source package dated October 15, 2026. Figure 2B, S1 and S3B use the regenerated realization; other main analyses retain the original published fits. The manifest records these sources separately. Fresh stochastic sweeps are expected to agree statistically, not trajectory by trajectory.
-
-## Maintainers
-
-To package the verified model inputs already in `data/publication/`:
-
-```sh
-loco-publication package-data
-```
-
-This writes `dist/publication-data.zip` and `dist/publication-data.zip.sha256`. Include both files inside `locomotor_learning_model-DATA/` before creating the DATA release ZIP. The model-input ZIP preserves the complete per-file manifest. To assemble a dataset from an original handoff, the older maintainer import remains available:
-
-```sh
-loco-publication prepare --bundle /path/to/InvLocAd_PLOSBio_figure_code \
-  --fall-archive "/path/to/earlier/original_data/data/fall probability" \
-  --private-archive /path/to/locomotor_learning_model_private
-```
-
-These maintainer sources are not dependencies for readers using the released archives. The prepared dataset keeps original and regenerated results distinct and retains additional archived trials for reuse. See the [reproduction guide](../docs/reproducibility.md#coverage-and-limits) for coverage and limits.
-
-For maintainers extending an existing prepared dataset with the supplementary source package:
-
-```sh
-loco-publication import-addendum --source /path/to/kanishka_addendum_2026-10-15 \
-  --previous-bundle /path/to/InvLocAd_PLOSBio_figure_code
-```
-
-The importer verifies existing hashes and rejects conflicting numerical inputs. MATLAB grid-sensitivity tables may be added with `--generated-s1 /path/to/recomputed/tables` and `--generated-s1-script /path/to/publication_s1_grid_sensitivity.m`; their input and source hashes are preserved in the manifest. This is a release-preparation step, not a reader installation step.
+Experimental data are CC BY 4.0; code is MIT licensed. Retain the dataset README, checksums and source provenance, and cite the paper and the Zenodo version used.

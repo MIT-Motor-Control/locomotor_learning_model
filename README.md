@@ -1,14 +1,27 @@
 # Locomotor learning model
 
-Code for **Safety prioritization shapes locomotor adaptation and performance**, by Inseung Kang, Kanishka Mitra and Nidhi Seethapathi.
+Code and analysis for **Safety prioritization shapes locomotor adaptation and performance**, by Inseung Kang, Kanishka Mitra and Nidhi Seethapathi.
 
-[Read the bioRxiv preprint](https://www.biorxiv.org/content/10.64898/2026.03.02.709033v1) · [Data on Zenodo](https://doi.org/10.5281/zenodo.23402153)
+[Paper preprint](https://www.biorxiv.org/content/10.64898/2026.03.02.709033v1) · [Zenodo archive (all versions)](https://doi.org/10.5281/zenodo.19547419) · [Model guide](docs/model.md) · [Figure and data guide](docs/reproducibility.md)
 
-Use this repository to run the locomotor learning model, resume a saved learner, or reproduce the available manuscript figures from saved data.
+| I want to… | Start here |
+|---|---|
+| Try the model without downloading data | [Get started](#get-started) |
+| Run a longer simulation or resume one | [Run a simulation](#run-a-simulation) |
+| Recreate the paper's available numerical figures | [Reproduce the paper figures](#reproduce-the-paper-figures) |
+| Understand the data files | [Data setup](data/README.md) and the README inside the DATA download |
+| Find a file or function | [Repository map](#repository-map) |
 
 ## Get started
 
-Install [Miniforge](https://github.com/conda-forge/miniforge#install) if you do not already have Conda. Open a terminal in this repository—the folder containing this README—and run:
+Install [Miniforge](https://github.com/conda-forge/miniforge#install) to get Conda. Download this repository using GitHub's **Code → Download ZIP** button and extract it, or clone it with Git:
+
+```sh
+git clone https://github.com/MIT-Motor-Control/locomotor_learning_model.git
+cd locomotor_learning_model
+```
+
+Open a terminal in the repository folder—the one containing `environment.yml`—and run:
 
 ```sh
 conda env create -f environment.yml
@@ -16,138 +29,118 @@ conda activate loco-ada
 loco-simulate demo
 ```
 
-The demo runs 40 learning iterations with seed 42 and saves its results in `outputs/demo/`. Open `split_belt_summary.png` to see the result. This is a short installation check; it may finish before the treadmill reaches split-belt walking. No publication dataset or MATLAB installation is needed for the Python demo.
+The environment installs the package and its dependencies. The demo runs 40 learning iterations and writes `outputs/demo/split_belt_summary.png`. It needs no DATA download or MATLAB. This is a short installation check and may finish before the treadmill reaches split-belt walking.
 
-The environment installs the package, testing tools and pinned scientific dependencies automatically. Keep this terminal's `loco-ada` environment active for the commands below.
+Run the commands below from this same repository folder. In each new terminal, activate the environment with `conda activate loco-ada` first.
 
 ## Run a simulation
 
-Start a longer run:
+Run 1,000 learning iterations with a repeatable random seed:
 
 ```sh
-loco-simulate run --seed 42 --iterations 1000
+loco-simulate run --seed 42 --iterations 1000 --output-dir outputs/my-run
 ```
 
-Results go to `outputs/run/`. A run saves:
-
-| File | Contents |
+| Output | What it contains |
 |---|---|
-| `split_belt_summary.png` | Overview of the simulation (`tied_belt_summary.png` for tied walking) |
-| `run.npz` | Numerical results for later analysis or plotting |
-| `metadata.json` | Parameters, seed, runtime versions and completed iterations |
-| `checkpoint.npz` | Learner state for continuing the simulation |
-| `checkpoint.metadata.json` | Readable description of the saved learner state |
+| `split_belt_summary.png` | Simulation overview; tied walking produces `tied_belt_summary.png` |
+| `run.npz` | Numerical results that can be loaded and replotted |
+| `metadata.json` | Settings, seed, runtime versions and completed iterations |
+| `checkpoint.npz` and `checkpoint.metadata.json` | Saved learner state and its description |
 
-To create a checkpoint and continue it, pause a short run halfway through:
-
-```sh
-loco-simulate run --seed 42 --iterations 20 --stop-after 10 --output-dir outputs/example
-loco-simulate resume outputs/example/checkpoint.npz
-```
-
-The second command continues from iteration 10 to the saved target of 20 and writes to `outputs/resumed/`, preserving the input checkpoint. These commands need only the code. Optional example checkpoints are included in the DATA release; they demonstrate the interface and are separate from the published fitted parameters.
-
-Use `--output-dir outputs/my-run` to keep a separate run; repeating a simulation command writes to the same default output folder. Add `--show-plots` to open interactive figures. For all options:
+Use a different output folder to keep separate runs. To pause a short example halfway through and then continue it:
 
 ```sh
-loco-simulate run --help
-loco-simulate resume --help
+loco-simulate run --seed 42 --iterations 20 --stop-after 10 --output-dir outputs/paused
+loco-simulate resume outputs/paused/checkpoint.npz --output-dir outputs/resumed
 ```
 
-The [model guide](docs/model.md) covers pausing, extending runs, tied-belt protocols, the Python API and numerical reproducibility. The [manuscript MATLAB engine](matlab/manuscript/README.md) has a separate guide because its scientific settings differ from the Python baseline.
+The resumed run finishes the original target of 20 iterations and preserves the input checkpoint. These examples need only the code. [The model guide](docs/model.md) explains simulation settings, checkpoint compatibility, the Python API and the separate manuscript MATLAB engine. Use `loco-simulate run --help` for all options.
 
 ## Reproduce the paper figures
 
-Download and install the matching DATA release from [Zenodo](https://doi.org/10.5281/zenodo.23402153) with one command:
+The figure workflow needs the matching CODE and DATA release. GitHub contains code; the measurements, fitted models and saved simulation trials are distributed on [Zenodo](https://doi.org/10.5281/zenodo.23402153).
+
+**1. Get the data.** Once the matching Zenodo files are public, run:
 
 ```sh
 python scripts/download_data.py
 ```
 
-The command prefers the complete DATA ZIP when available; otherwise it downloads and joins the 54 smaller pieces. It verifies the original archive's checksum before extracting it into `data/locomotor_learning_model-DATA/`. The download is 13.34 GB; allow about **42 GB of free space** to cover either installation method. If interrupted, run the same command again: the complete ZIP resumes when the server supports it, and verified split pieces are reused. Temporary downloads are removed after successful installation. An existing DATA folder is never overwritten.
+The command downloads the complete DATA ZIP or its smaller pieces, checks the file hashes and extracts `data/locomotor_learning_model-DATA/`. Allow about **42 GB of free space** for download and installation. Rerun the command after an interruption to reuse downloaded data. An existing DATA folder is never overwritten.
 
-The DATA release includes the experimental measurements, example checkpoints, and a nested `publication-data.zip` containing fitted models and saved simulation trials. Keep that inner ZIP compressed; preparation handles it automatically. GitHub contains the code, documentation and tests. The data download uses only Python's standard library.
-
-Your folders should look like this:
+If you already downloaded the DATA ZIP, extract its `locomotor_learning_model-DATA` folder into this repository's `data/` folder. Keep the nested `publication-data.zip` compressed. Your layout should be:
 
 ```text
-data/
-└── locomotor_learning_model-DATA/
-    ├── processed_csv/
-    ├── processed_mat/
-    ├── raw_mocap_c3d/
-    ├── subject_information/
-    ├── checkpoints/                  Optional saved simulation examples
-    ├── publication-data.zip          Fitted models and saved simulation trials
-    └── README.md
+locomotor_learning_model/
+├── environment.yml
+├── data/
+│   └── locomotor_learning_model-DATA/
+│       ├── README.md
+│       ├── processed_csv/
+│       ├── processed_mat/
+│       ├── raw_mocap_c3d/
+│       ├── subject_information/
+│       ├── checkpoints/
+│       └── publication-data.zip
+└── …
 ```
 
-An older experimental-only DATA download supports the available experimental panels in Figures 1 and S3 but lacks model fits and simulation sweeps. Use the matching DATA release for the model analyses. [Data setup](data/README.md) explains both cases.
-
-The downloader is pinned to the matching **code release 0.3.0** dataset. It includes the additional inputs for Figures 1C/D, 2B, S1 and S3B. [Data setup](data/README.md) also covers pieces downloaded manually and alternative destinations.
+**2. Prepare the inputs and make the figures.**
 
 ```sh
 loco-publication prepare
 loco-publication verify-data
-loco-publication reproduce
+loco-publication reproduce --strict
 ```
 
-Preparation creates `data/publication/`, checks the downloaded inputs, and records their provenance. It uses only the folders above. Without the companion archive, model-dependent analyses are reported as blocked; nothing is silently fetched from an author's computer.
-
-Open `outputs/publication/report.md`. Figures are in `outputs/publication/figures/`; numerical source tables are in `outputs/publication/tables/`. This saved-data workflow needs only the Conda environment, not MATLAB or Node. To repeat an existing run, add `--overwrite`. To generate only selected figures:
+If the DATA folder is beside this repository instead, use this first command to avoid copying the large recordings:
 
 ```sh
-loco-publication reproduce --figures figure3 s1 s5 --output outputs/selected
+loco-publication prepare --source ../locomotor_learning_model-DATA
 ```
 
-**Figures 2B, S1 and S3B use the regenerated simulation realization.** The other main analyses use the original published fits. S3B combines the published fitted parameters with 50 regenerated trials at each selected parameter cell. These sources are kept separate in the dataset. A new stochastic sweep will give statistically comparable results rather than identical trajectories.
+Then run the same `verify-data` and `reproduce` commands. Preparation creates `data/publication/` and verifies all 5,166 scientific inputs. The standard figure workflow runs in Conda; MATLAB is only needed to rerun the optional MATLAB calculations.
 
-The commands reproduce the available numerical panels and export their source values, including the Sánchez comparison, S1 grid checks and all 1,150 S3B rollouts. Conceptual illustrations and final page assembly remain separate artwork. Some manuscript wording, model settings and the original OpenSim optimization still require clarification; a successful run does not certify every statement in the paper. See [reproduction details](docs/reproducibility.md) for coverage and limitations.
+**3. Open the results.**
+
+| Location | Contents |
+|---|---|
+| `outputs/publication/report.md` | What ran, input coverage and scientific limitations |
+| `outputs/publication/figures/` | Figures in PNG, PDF and SVG formats |
+| `outputs/publication/tables/` | Numerical CSV source tables |
+
+To repeat a run, use `loco-publication reproduce --strict --overwrite`. To select figures, use `loco-publication reproduce --figures figure3 s1 s5 --output outputs/selected`.
+
+These commands reconstruct the **available numerical panels from saved measurements and simulations**. Figures 2B, S1 and S3B use the regenerated realization; other main analyses retain the original published fits. Fresh stochastic simulations need not produce identical trajectories. Original OpenSim optimization, full original sweeps, raw-recording preprocessing and manual figure artwork are outside this workflow. Remaining manuscript discrepancies are documented in the [reproduction guide](docs/reproducibility.md#coverage-and-limits).
+
+See [data setup](data/README.md) for file formats, manual downloads and older experimental-only datasets.
 
 ## Repository map
 
 ```text
 locomotor_learning_model/
-├── README.md                         Start here
-├── environment.yml                   Conda setup
-├── requirements-lock.txt             Exact scientific dependency versions
-├── pyproject.toml                    Package metadata and command definitions
-├── MANIFEST.in                       Files included in a source release
-├── CITATION.cff                      Software citation metadata
-├── LICENSE                           Code license
+├── README.md                 Installation and common commands
+├── environment.yml           Conda environment
+├── requirements-lock.txt     Pinned scientific dependencies
+├── pyproject.toml            Package configuration and command definitions
+├── CITATION.cff, LICENSE     Citation metadata and code license
 ├── src/locomotor_learning_model/
-│   ├── cli.py, __main__.py            Simulation commands
-│   ├── workflow.py, artifacts.py      Run orchestration and checkpoints
-│   ├── initializing/                 Initial physical/controller states
-│   ├── parameter_loading/            Model and treadmill settings
-│   ├── learning/                     Dynamics, learning and objectives
-│   ├── post_processing/              Results and plots
-│   └── publication/                  Figure analyses, data preparation and audits
-├── matlab/
-│   ├── run_simulation.m, src/         MATLAB baseline for Python comparisons
-│   ├── manuscript/                   Separate manuscript engine and seeded runs
-│   └── validation/                   Numerical comparisons
-├── data/
-│   ├── README.md                     Dataset setup and provenance
-│   ├── locomotor_learning_model-DATA/  Extracted DATA release, including model inputs and checkpoints
-│   └── publication/                  Prepared inputs; created by prepare
-├── docs/
-│   ├── model.md                      Simulation guide
-│   └── reproducibility.md            Figure workflow and source-data guide
-├── scripts/
-│   ├── download_data.py              Download, verify and install the DATA release
-│   ├── validate_matlab_python_parity.py  Compare the two baseline implementations
-│   ├── build_source_workbook.py       Export the editor source workbook
-│   └── check_source_workbook.py       Check workbook values against source CSVs
-├── tests/                            Numerical, checkpoint and integrity tests
-├── reproducibility/
-│   ├── fresh-install.md, fresh-install.json  Clean Conda installation test
-│   └── final-manuscript-protocol-check.json  Cached treadmill-protocol check
-├── .github/workflows/                Automated software tests
-└── outputs/                          Generated runs and figures; excluded from Git
+│   ├── learning/             Dynamics, controller learning and objectives
+│   ├── initializing/         Initial conditions and treadmill state
+│   ├── parameter_loading/    Model, learner and protocol settings
+│   ├── post_processing/      Simulation results and plots
+│   ├── publication/          Figure analyses and data verification
+│   └── cli.py, workflow.py, artifacts.py  Commands, runs and checkpoints
+├── matlab/                   MATLAB baseline, manuscript engine and validation
+├── data/                     Downloaded DATA and prepared inputs; see its README
+├── docs/                     Detailed model and reproduction guides
+├── scripts/                  DATA downloader and source-workbook tools
+├── tests/                    Numerical, checkpoint and data-integrity tests
+├── reproducibility/          Recorded installation and scientific checks
+├── .github/workflows/        Automated tests
+└── outputs/                  Generated results; excluded from Git
 ```
-
-Each run belongs in `outputs/`, not among the source files. `dist/` is created only when packaging a release. The complete scientific dataset retains additional archived trials and original source formats for provenance and reuse; it is kept separate from the code.
 
 ## Check the installation
 
@@ -155,8 +148,6 @@ Each run belongs in `outputs/`, not among the source files. `dist/` is created o
 python -m pytest -q
 ```
 
-Data-dependent tests skip if the publication dataset is absent. For a shell without activation, prefix commands with `conda run --no-capture-output -n loco-ada`. If another Python manager overrides Conda, check that `python -c "import sys; print(sys.executable)"` points inside `envs/loco-ada`; deactivate stacked environments and activate `loco-ada` again if needed.
+Tests needing the publication data skip when it is absent. The [installation record](reproducibility/fresh-install.md) describes the tested environment and scope. Generated results belong in `outputs/`; data, checkpoints and release archives are excluded from Git.
 
-The clean-install test and its limits are recorded in [fresh-install validation](reproducibility/fresh-install.md).
-
-Please cite the preprint and the archived version you use. Code is MIT licensed; data retain their own license and provenance. Questions: Kanishka Mitra, mitra819@mit.edu.
+Please cite the paper and the Zenodo version you use. Code is MIT licensed; experimental data are CC BY 4.0 and retain their source provenance. Questions: Kanishka Mitra, mitra819@mit.edu.

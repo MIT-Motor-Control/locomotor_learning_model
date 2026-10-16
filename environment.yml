@@ -6,9 +6,7 @@ dependencies:
   - python=3.12.13
   - pip=26.0.1
   - setuptools=82.0.1
-  # Keep one exact scientific stack for figures and reusable checkpoints.
-  # Install these packages with pip inside Conda: the equivalent all-Conda
-  # solve imposes a newer Matplotlib through pandas' optional constraints.
+  # Pip pins avoid conflicting optional constraints in the all-Conda solve.
   - pip:
       - -r requirements-lock.txt
       - pytest==9.1.1

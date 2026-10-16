@@ -1,8 +1,7 @@
 function [Anew, errorOldLinear_MostRecentStep, errorNewLinear_MostRecentStep] = RLSupdate(Aold,beta,InputNowStore,...
     OutputNextStore,muMeasurement,numStepsToUse)
-% this program does 'rolling least squares', that is least squares with
-% finitely many past steps to build a linear model between the inputs and
-% outputs.
+% Fit a linear model to a finite window of recent steps.
+% beta and muMeasurement are unused compatibility arguments.
 
 numInputDimensions = size(InputNowStore,1);
 numOutputDimensions = size(OutputNextStore,1);
@@ -18,23 +17,8 @@ OutputNextStore = OutputNextStore';
 % adding a column of ones for the constant term
 InputNowStore = [InputNowStore ones(size(InputNowStore,1),1)]; % each row is a new step
 
-% just doing full least squares here for simplicity. easy to implement this
-% rolling regression without remembering all the recent strides, that is,
-% using a recursive update. this would be a finite memory recursive least
-% squares (not to be confused with the common 'infinite
-% memory recursive least squares'). we don't do this recursive version, as
-% it is not scientifically necessary, as it is mathematically identical for
-% behavioral predictions.
+% Refit the rolling window directly, without exponential forgetting.
 Anew = InputNowStore\OutputNextStore; 
-
-%% least squares with exponential forgetting % we do not use this version. 
-% lower weights for older data
-% alphaForgetting = paramFixed.Learner.alphaForgettingForEstimator;
-% for iCol = 1:numInputDimensions
-%     InputNowStore(:,numInputDimensions+1-iCol) = ...
-%         InputNowStore(:,numInputDimensions+1-iCol)*alphaForgetting^iCol;
-% end
-% Anew = InputNowStore\OutputNextStore;
 
 %% find the error on all steps and then the most recent step using the pre-change 
 Aold = Aold';
@@ -48,4 +32,4 @@ errorNewLinear_MostRecentStep = errorNewLinear_AllSteps(end,:)'; % rows are step
 %% transpose it anyway, so steps are columns instead of rows
 Anew = Anew';
 
-end % checked and essential
+end

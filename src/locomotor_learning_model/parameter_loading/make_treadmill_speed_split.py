@@ -2,18 +2,15 @@ import numpy as np
 
 
 def make_treadmill_speed_split(paramFixed):
-    """Build the split-belt treadmill profile used in the manuscript."""
-    # ------------------------------------------------------------------
+    """Build the baseline split-belt treadmill profile."""
     # Model constants used to nondimensionalize treadmill timings.
     L = 0.95
     g = 9.81
     timeScaling = np.sqrt(L / g)
     paramFixed['timeScaling'] = timeScaling
 
-    # The original manuscript simulations used a 1.0 m/s split-belt
-    # difference. Keep those exact nondimensional constants as the default so
-    # existing runs and MATLAB parity are unchanged. When splitSpeedDiffMS is
-    # provided, scale the half-difference around the same average belt speed.
+    # Retain the baseline's rounded speed constants for MATLAB parity.
+    # splitSpeedDiffMS scales the half-difference about the same average speed.
     delta = 0.0328  # half of normal delta
     vNormal = -0.3276
     if 'splitSpeedDiffMS' in paramFixed:
@@ -28,11 +25,8 @@ def make_treadmill_speed_split(paramFixed):
     vSlow = vNormal + half_delta
     paramFixed['splitSpeedDiffMS'] = speed_diff_ms
 
-    # ------------------------------------------------------------------
-    # branch on protocol
     speedProtocol = paramFixed['speedProtocol']
     if speedProtocol == 'single speed':
-        # transitioning from one speed to next takes
         tDurationTransition = paramFixed['transitionTime'] / timeScaling
 
         # phase durations (non-dimensionalized)
@@ -68,8 +62,7 @@ def make_treadmill_speed_split(paramFixed):
     footSpeed1Store = np.array([f1_p1, f1_p1, f1_p2, f1_p3, f1_p4])
     footSpeed2Store = np.array([f2_p1, f2_p1, f2_p2, f2_p3, f2_p4])
 
-    # ------------------------------------------------------------------
-    # insert transition segments
+    # Insert finite-duration transitions between phases.
     tStore_new       = [tStore[0]]
     foot1_new        = [footSpeed1Store[0]]
     foot2_new        = [footSpeed2Store[0]]
@@ -90,32 +83,16 @@ def make_treadmill_speed_split(paramFixed):
             foot1_new.append(footSpeed1Store[i])
             foot2_new.append(footSpeed2Store[i])
 
-    # convert lists back to arrays
     tList            = np.array(tStore_new)
     footSpeed1List   = np.array(foot1_new)
     footSpeed2List   = np.array(foot2_new)
 
-    # ------------------------------------------------------------------
-    # compute accelerations
     a1List = np.diff(footSpeed1List) / np.diff(tList)
     a2List = np.diff(footSpeed2List) / np.diff(tList)
     # pad with zero at end to match lengths
     a1List = np.append(a1List, 0.0)
     a2List = np.append(a2List, 0.0)
 
-    # Optional diagnostic plot disabled to avoid blocking scripted runs.
-    # plt.figure(2555)
-    # plt.plot(tList, np.abs(footSpeed1List), linewidth=2, label='(abs) fast belt')
-    # plt.plot(tList, np.abs(footSpeed2List), linewidth=2, label='(abs) slow belt')
-    # plt.xlabel('t')
-    # plt.ylabel('treadmill speeds (non-dimensional)')
-    # plt.ylim([0, abs(vFast) * 1.25])
-    # plt.title('Split belt speed change protocol')
-    # plt.legend()
-    # plt.show()
-
-    # ------------------------------------------------------------------
-    # Pack the protocol arrays into a dictionary for downstream simulation.
     beltSpeedsImposed = {
         'tList':            tList,
         'footSpeed1List':   footSpeed1List,

@@ -23,4 +23,4 @@ for iCount = 1:size(slopeJControllerVsContext,1)
     end
 end
 
-end % essential to updating memory
+end

@@ -42,21 +42,19 @@ def rlsupdate(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Update a rolling linear model from recent input/output histories.
 
-    The optional parameters ``beta`` and ``mu_measurement`` are accepted for
-    compatibility with callers that pass estimator configuration values.
+    ``beta`` and ``mu_measurement`` are unused compatibility arguments from
+    the MATLAB signature. This estimator fits a finite window without
+    exponential forgetting.
     """
 
     # Pick only the most recent ``num_steps_to_use`` strides. Each column is a
     # single step.
     input_now_store = input_now_store[:, -num_steps_to_use:]
     
-    # Handle both 1D and 2D output arrays
     if output_next_store.ndim == 1:
-        # For 1D arrays, convert to row vector and slice
         output_next_store = output_next_store[-num_steps_to_use:]
         output_next_store = output_next_store.reshape(1, -1)
     else:
-        # For 2D arrays, slice columns normally
         output_next_store = output_next_store[:, -num_steps_to_use:]
 
     # Transpose so that each row represents one step.

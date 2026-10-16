@@ -4,11 +4,11 @@ function [AdynamicsNew,errorOldModel,errorNewModel] = ...
 % computes a linear dynamic model by computing the gradient of state with
 % respect to state and action (internal model)
 
-beta = 0.5; % not used at all, so can be anything
+beta = 0.5; % unused compatibility argument
 
 Aold = AdynamicsNow; 
 
-muMeasurement = 0; % dummy variable and not used
+muMeasurement = 0; % unused compatibility argument
 
 InputNowStore = [stateVarNowStore; pInputControllerNowStore];
 OutputNextStore = stateVarNextStore;
@@ -21,6 +21,5 @@ OutputNextStore = OutputNextStore(2:end,:);
     RLSupdate(Aold,beta,InputNowStore,...
     OutputNextStore,muMeasurement,numStepsToUse);
 
-% AdynamicsNew = Adynamics
 
 end

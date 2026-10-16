@@ -25,7 +25,6 @@ alphaEnergyLearningRate = paramFixed.Learner.LearningRate;
 pInputNow = pInputControllerAsymmetricNominal;
 
 % state initial condition
-% stateVar0_Model = stateVar0_Model;
 
 % initial time
 tStart = 0; % re-setting this doesn't matter here
@@ -75,12 +74,6 @@ for iStride = 1:numIterations % 1 stride = 1 iteration
     %% exploratory noise
     delta_pInputNow1_Noise = noiseSTD*randn(numLearningDimensions,1);
     
-%     for iDim = 1:numLearningDimensions % making sure that the noise is not too small or too large
-%         a = 0.2*noiseSTD; b = 2*noiseSTD;
-%         if abs(delta_pInputNow1_Noise(iDim))>a||abs(delta_pInputNow1_Noise(iDim))<b
-%             delta_pInputNow1_Noise(iDim) = sign(delta_pInputNow1_Noise(iDim))*(a+(b-a)*rand); % some uniform between a and b
-%         end
-%     end
     
     %% compute the gradient step
     delta_pInputNow2_Gradient = alphaEnergyLearningRate*(-gEnergyGradientNow);
@@ -94,7 +87,6 @@ for iStride = 1:numIterations % 1 stride = 1 iteration
     end
 
     %% use the linear memory model to get a memory to move toward
-    % could be nonlinear, with a piecewise relu kind of network
     pInputMemoryNow = paramFixed.storedmemory.nominalControl + ...
         paramFixed.storedmemory.controlSlopeVsContext*(contextNow-paramFixed.storedmemory.nominalContext); 
     pInputMemoryNowStore = [pInputMemoryNowStore pInputMemoryNow];
@@ -179,10 +171,7 @@ for iStride = 1:numIterations % 1 stride = 1 iteration
     %% implements prediction error thresholding. 
     if paramFixed.Learner.shouldWeThresholdPredictionError
         if iStride>numStridesToUse
-            %         predictionErrorListNow = ...
-            %             [errorOldDynamicsModel; errorNewDynamicsModel; ...
-            %             errorOldEnergyModel; errorNewEnergyModel]; % error control on both old and new
-            predictionErrorListNow = ... % just with the new model
+            predictionErrorListNow = ... % energy errors before and after the model update
                 [errorOldEnergyModel; errorNewEnergyModel];
             if any(abs(predictionErrorListNow)>paramFixed.Learner.predictionErrorThreshold)
                 gEnergyGradientNow = 0*gEnergyGradientNow;
@@ -249,5 +238,4 @@ for iStride = 1:numIterations % 1 stride = 1 iteration
 end
 
 
-end % essential and checked.
-% unnecessary plots removed
+end

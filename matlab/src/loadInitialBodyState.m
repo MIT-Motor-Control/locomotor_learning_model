@@ -10,4 +10,4 @@ stateVar0_Model = [0                        % angleTheta0 = stance leg angle
     0                                       % sum of yFoot in lab frame (integral feedback for station keeping)
     vSwingInitial];                         % vSwing 
 
-end  % checked and essential
+end

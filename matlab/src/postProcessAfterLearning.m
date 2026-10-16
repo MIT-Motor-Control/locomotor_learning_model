@@ -2,8 +2,6 @@ function postProcessAfterLearning(pInputStore,stateVar0_Model, ...
     paramController,paramFixed,doAnimate)
 
 numIterations = size(pInputStore,2);
-% fObjective_AsymmetricNominal(,stateVar0_Model, ...
-%     paramController,paramFixed)
 
 %%
 tStore = [];
@@ -98,9 +96,6 @@ for iStride = 1:numIterations
     end
     
 end
-
-%% save if you wish to not run the whole simulation 
-% save(['EverythingNeededForJustThePlots_' paramFixed.speedProtocol num2str(round(rand*10000)) '.mat']);
 
 %%
 postProcessHelper_JustThePlots(stateVar0_Model,tStore,stateStore, ...

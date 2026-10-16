@@ -11,9 +11,9 @@ timeConstant = timeConstant/timeScaling;
 params.k = 1/timeConstant;
 
 %% 
-% to get the IC, we average over 30 steps at least, so the IC is not noise
+% Initialize from the first 30 iteration-averaged energy rates.
 EmetS_0 = mean(params.EmetRateList(1:30)); 
-tSpan = params.tList; % we could refine this further if necessary. 
+tSpan = params.tList;
 options = odeset('reltol',1e-8,'abstol',1e-8);
 [tSpan,EmetVO2List] = ode45(@odeMetToVO2MET,tSpan,EmetS_0,options,params);
 
@@ -26,4 +26,4 @@ EmetNow = interp1(params.tList,params.EmetRateList,t,'linear','extrap');
 
 dEmetVO2dt = params.k*(EmetNow-EmetS);
 
-end % checked and essential
+end

@@ -8,8 +8,6 @@ clear; close all; clc; % clearing everything so you start with a clean slate
 % for how these parameters are obtained or fixed.
 % -------------------------------------------------------------------------
 
-% warning('Learning and memory has been turned off right now')
-
 %% initialize empty parameter values
 paramFixed = [];
 
@@ -25,10 +23,6 @@ paramFixed = loadSensoryNoiseParameters(paramFixed);
 %% controller parameters
 paramControllerGains = loadControllerGainParameters(paramFixed);
        
-%% set the integral controller to zero?
-% paramController.pushoff_gain_SUMy =  0;
-% paramController.legAngle_gain_SUMy =  0;
-
 %% learner parameters
 paramFixed = loadLearnerParameters(paramFixed);
 
@@ -38,11 +32,8 @@ paramFixed = loadProtocolParameters(paramFixed);
 %% initial stored memory, default control
 paramFixed = loadStoredMemoryParameters_ControlVsSpeed(paramFixed);
 
-%% how long to simulate parameters
-% paramFixed = loadHowLongParameters(paramFixed);
-% We get the simulation duration from the protocol, but you can override 
-% this by uncommenting loadHowLongParameters.m function above and changing 
-% the values in loadHowLongParameters
+% Duration comes from the protocol. Call loadHowLongParameters here to
+% override it with the settings in that function.
 
 %% load current learnable parameters
 % look inside the function to what controller parameters are tuned by the learning algorithm
@@ -55,13 +46,7 @@ tStart = 0;
 % storing initial state for later use
 stateVar0_Model_BeforeLearning = stateVar0_Model;
 
-%% performance or objective function calculation. Just a demo, not necessary to do here.
-% f = fObjective_AsymmetricNominal(pInputControllerAsymmetricNominal,stateVar0_Model, ...
-%     paramControllerGains,paramFixed,tStart); % function computes the
-%     objective or performance function for one stride
-
 %% context for the gait
-% TO DO: get this from 
 [vA,vB] = getTreadmillSpeed(0,paramFixed.imposedFootSpeeds);
 contextNow = [vA; vB];
 contextLength = length(contextNow);
