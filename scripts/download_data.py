@@ -1,7 +1,7 @@
 """Download, verify and install the DATA release using Python's standard library.
 
 Run from the repository root: python scripts/download_data.py
-For downloaded pieces: python scripts/download_data.py --parts-dir /path/to/pieces
+Downloads the complete, checksum-pinned ZIP and resumes interrupted transfers.
 """
 
 from __future__ import annotations
@@ -27,9 +27,12 @@ MANIFEST_NAME = "locomotor_learning_model-DATA.manifest.json"
 DATA_ROOT = "locomotor_learning_model-DATA"
 ARCHIVE_NAME = f"{DATA_ROOT}.zip"
 MANIFEST_URL = RECORD_URL + MANIFEST_NAME
+# Explicit legacy split downloads retain their original manifest and archive pins.
 MANIFEST_SHA256 = "1040a607ffb7418436804ad63ebd79e834d5f988afd9006a3301d3e723bbbb4e"
-ARCHIVE_SHA256 = "7fcd2f925102bb8a2231932ab79d3bebaee9b92e32c3917150d52d09294424d6"
-ARCHIVE_BYTES = 13_335_229_428
+LEGACY_ARCHIVE_SHA256 = "7fcd2f925102bb8a2231932ab79d3bebaee9b92e32c3917150d52d09294424d6"
+LEGACY_ARCHIVE_BYTES = 13_335_229_428
+ARCHIVE_SHA256 = "7fe389e9125e56338a5e99bd1448474ef20447930fc1aaaf3c3becb02679c945"
+ARCHIVE_BYTES = 13_269_924_017
 CHUNK_SIZE = 4 * 1024 * 1024
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 
@@ -102,8 +105,11 @@ def load_manifest(location: str) -> dict:
     if hashlib.sha256(payload).hexdigest() != MANIFEST_SHA256:
         raise ValueError("Manifest checksum differs from the pinned DATA release")
     value = validate_manifest(json.loads(payload))
-    if value["archive"]["sha256"] != ARCHIVE_SHA256 or value["archive"]["bytes"] != ARCHIVE_BYTES:
-        raise ValueError("Manifest does not identify the pinned DATA release archive")
+    if (
+        value["archive"]["sha256"] != LEGACY_ARCHIVE_SHA256
+        or value["archive"]["bytes"] != LEGACY_ARCHIVE_BYTES
+    ):
+        raise ValueError("Manifest does not identify the pinned legacy DATA release archive")
     return value
 
 
@@ -228,6 +234,7 @@ def zip_members(
 ) -> tuple[list[tuple[zipfile.ZipInfo, tuple[str, ...]]], int]:
     """Validate the entire ZIP before creating any extracted files."""
     result, nodes, spelling, explicit = [], {}, {}, set()
+    metadata_targets = []
     total = 0
     for info in archive.infolist():
         name = info.orig_filename
@@ -236,7 +243,7 @@ def zip_members(
         pieces = tuple(name.rstrip("/").split("/"))
         if (
             not pieces
-            or pieces[0] != DATA_ROOT
+            or pieces[0] not in (DATA_ROOT, "__MACOSX")
             or any(part in ("", ".", "..") or part.endswith((".", " ")) for part in pieces)
         ):
             raise ValueError(f"ZIP entry is outside the expected DATA folder: {name!r}")
@@ -262,9 +269,31 @@ def zip_members(
             if folded in nodes and nodes[folded] != kind:
                 raise ValueError(f"ZIP file/directory collision: {name!r}")
             nodes[folded] = kind
-        if not is_dir:
+        if pieces[0] == "__MACOSX":
+            if is_dir:
+                target = pieces[1:]
+            elif pieces[-1].startswith("._"):
+                target = (*pieces[1:-1], pieces[-1][2:])
+            else:
+                raise ValueError(f"Unrecognized Finder metadata path: {name!r}")
+            if target:
+                if target[0] != DATA_ROOT or any(part in ("", ".", "..") for part in target):
+                    raise ValueError(f"Finder metadata is outside the DATA folder: {name!r}")
+                metadata_targets.append((name, target, is_dir))
+            elif not is_dir:
+                raise ValueError(f"Unrecognized Finder metadata path: {name!r}")
+        elif pieces[-1] == ".DS_Store":
+            if is_dir:
+                raise ValueError(f"Finder metadata must be a regular file: {name!r}")
+        elif not is_dir:
             total += info.file_size
             result.append((info, pieces))
+    for name, target, is_dir in metadata_targets:
+        key = "/".join(target)
+        if spelling.get(key.casefold()) != key or (
+            is_dir and nodes.get(key.casefold()) != "directory"
+        ):
+            raise ValueError(f"Finder metadata has no matching DATA entry: {name!r}")
     if not result:
         raise ValueError("DATA archive contains no regular files")
     return result, total
@@ -365,23 +394,20 @@ def install(
 
 
 def install_release(destination: Path, cache: Path, *, keep_downloads: bool = False) -> dict:
-    """Prefer the complete pinned ZIP; only an HTTP404 selects the split route."""
+    """Install the current single-ZIP release without selecting older split files."""
     destination, cache = installation_paths(destination, cache)
     item = {"name": ARCHIVE_NAME, "bytes": ARCHIVE_BYTES, "sha256": ARCHIVE_SHA256}
-    archive = download_file(item, cache, resume=True, missing_ok=True)
-    if archive is not None:
-        return finish_install(archive, item, destination, cache, [archive], keep_downloads)
-    print("Complete DATA ZIP is absent; using the verified split release", flush=True)
-    return install(load_manifest(MANIFEST_URL), destination, cache, keep_downloads=keep_downloads)
+    archive = download_file(item, cache, resume=True)
+    return finish_install(archive, item, destination, cache, [archive], keep_downloads)
 
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--manifest", help="Use the split route with this local or pinned release manifest"
+        "--manifest", help="Legacy split release only: use its checksum-pinned manifest"
     )
     parser.add_argument(
-        "--parts-dir", type=Path, help="Use pieces and manifest already downloaded here"
+        "--parts-dir", type=Path, help="Legacy split release only: use downloaded pieces here"
     )
     parser.add_argument("--destination", type=Path, default=Path("data") / DATA_ROOT)
     parser.add_argument("--cache-dir", type=Path, default=Path("outputs/data-download/23402153"))

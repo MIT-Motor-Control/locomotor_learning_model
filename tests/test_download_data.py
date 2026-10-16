@@ -91,7 +91,7 @@ def test_default_command_prefers_complete_zip(tmp_path, monkeypatch):
     assert (destination / "README.md").read_text() == "Dataset provenance\n"
 
 
-def test_whole_zip_404_selects_verified_split_route(tmp_path, monkeypatch):
+def test_whole_zip_404_does_not_select_older_split_release(tmp_path, monkeypatch):
     manifest, parts, _ = release(tmp_path)
     pin_release(monkeypatch, manifest, parts)
     calls = []
@@ -101,13 +101,15 @@ def test_whole_zip_404_selects_verified_split_route(tmp_path, monkeypatch):
         calls.append(name)
         if name == download.ARCHIVE_NAME:
             raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
-        return Response((parts / name).read_bytes())
+        pytest.fail("Current release must not request the historical split files")
 
     monkeypatch.setattr(download, "request", request)
-    result = download.install_release(tmp_path / "data", tmp_path / "cache")
-    assert result["files"] == 2
-    assert calls[:2] == [download.ARCHIVE_NAME, download.MANIFEST_NAME]
-    assert calls[2:] == [item["name"] for item in manifest["parts"]]
+    monkeypatch.setattr(download.time, "sleep", lambda _: None)
+    with pytest.raises(urllib.error.HTTPError) as error:
+        download.install_release(tmp_path / "data", tmp_path / "cache")
+    assert error.value.code == 404
+    assert calls == [download.ARCHIVE_NAME] * 3
+    assert not (tmp_path / "data").exists()
 
 
 @pytest.mark.parametrize("error_code", [403, 429, 500, None])
@@ -462,8 +464,16 @@ def test_duplicate_and_prefix_collisions_are_rejected(tmp_path, paths):
         download.install(manifest, tmp_path / "installed", tmp_path / "cache", parts)
 
 
-def test_zip_symlink_is_rejected(tmp_path):
-    link = zipfile.ZipInfo(f"{download.DATA_ROOT}/link")
+@pytest.mark.parametrize(
+    "name",
+    [
+        f"{download.DATA_ROOT}/link",
+        f"{download.DATA_ROOT}/.DS_Store",
+        f"__MACOSX/{download.DATA_ROOT}/._README.md",
+    ],
+)
+def test_zip_symlink_is_rejected(tmp_path, name):
+    link = zipfile.ZipInfo(name)
     link.create_system = 3
     link.external_attr = (stat.S_IFLNK | 0o777) << 16
     manifest, parts, _ = release(tmp_path, [(link, b"../../outside")])
@@ -512,10 +522,11 @@ def test_manifest_is_pinned_and_arbitrary_remote_urls_are_rejected(tmp_path, mon
     with pytest.raises(ValueError, match="pinned Zenodo"):
         download.load_manifest("https://example.org/manifest.json")
     monkeypatch.setattr(download, "MANIFEST_SHA256", digest(path.read_bytes()))
-    with pytest.raises(ValueError, match="pinned DATA release archive"):
+    with pytest.raises(ValueError, match="pinned legacy DATA release archive"):
         download.load_manifest(str(path))
-    monkeypatch.setattr(download, "ARCHIVE_BYTES", manifest["archive"]["bytes"])
-    monkeypatch.setattr(download, "ARCHIVE_SHA256", manifest["archive"]["sha256"])
+    monkeypatch.setattr(download, "LEGACY_ARCHIVE_BYTES", manifest["archive"]["bytes"])
+    monkeypatch.setattr(download, "LEGACY_ARCHIVE_SHA256", manifest["archive"]["sha256"])
+    assert download.ARCHIVE_SHA256 != manifest["archive"]["sha256"]
     assert download.load_manifest(str(path)) == manifest
 
 
@@ -524,8 +535,8 @@ def test_offline_cli_uses_manifest_beside_parts(tmp_path, monkeypatch):
     monkeypatch.setattr(
         download, "MANIFEST_SHA256", digest((parts / download.MANIFEST_NAME).read_bytes())
     )
-    monkeypatch.setattr(download, "ARCHIVE_BYTES", manifest["archive"]["bytes"])
-    monkeypatch.setattr(download, "ARCHIVE_SHA256", manifest["archive"]["sha256"])
+    monkeypatch.setattr(download, "LEGACY_ARCHIVE_BYTES", manifest["archive"]["bytes"])
+    monkeypatch.setattr(download, "LEGACY_ARCHIVE_SHA256", manifest["archive"]["sha256"])
     monkeypatch.setattr(
         download, "request", lambda _: pytest.fail("Offline installation used network")
     )
@@ -544,3 +555,69 @@ def test_offline_cli_uses_manifest_beside_parts(tmp_path, monkeypatch):
         == 0
     )
     assert (destination / "README.md").exists()
+
+
+def test_finder_metadata_is_validated_but_not_extracted(tmp_path):
+    root = download.DATA_ROOT
+    manifest, parts, _ = release(
+        tmp_path,
+        [
+            (f"{root}/", b""),
+            (f"{root}/processed_csv/example.csv", b"time,value\n0,1\n"),
+            (f"{root}/README.md", b"Dataset provenance\n"),
+            (f"{root}/.DS_Store", b"Finder view preferences"),
+            ("__MACOSX/", b""),
+            (f"__MACOSX/._{root}", b"directory attributes"),
+            (f"__MACOSX/{root}/processed_csv/", b""),
+            (f"__MACOSX/{root}/._processed_csv", b"directory attributes"),
+            (f"__MACOSX/{root}/._README.md", b"file attributes"),
+            (f"__MACOSX/{root}/processed_csv/._example.csv", b"file attributes"),
+            (f"__MACOSX/{root}/._.DS_Store", b"Finder attributes"),
+        ],
+    )
+    destination = tmp_path / "installed"
+    result = download.install(manifest, destination, tmp_path / "cache", parts)
+    assert result["files"] == 2
+    assert sorted(str(p.relative_to(destination)) for p in destination.rglob("*")) == [
+        "README.md", "processed_csv", "processed_csv/example.csv"
+    ]
+    assert (destination / "README.md").read_bytes() == b"Dataset provenance\n"
+    assert not (tmp_path / "__MACOSX").exists()
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "__MACOSX/../escape.txt",
+        f"__MACOSX/{download.DATA_ROOT}/../._escape.txt",
+        f"__MACOSX/{download.DATA_ROOT}/sub\\._file.txt",
+        f"__MACOSX/{download.DATA_ROOT}/._missing.txt",
+        "__MACOSX/._unrelated",
+        f"__MACOSX/{download.DATA_ROOT}/plain.txt",
+        f"__MACOSX/{download.DATA_ROOT}/processed_csv/._..",
+    ],
+)
+def test_unsafe_or_unmatched_finder_metadata_leaves_no_destination(tmp_path, name):
+    manifest, parts, _ = release(
+        tmp_path, [(f"{download.DATA_ROOT}/README.md", b"valid"), (name, b"invalid")]
+    )
+    destination = tmp_path / "installed"
+    with pytest.raises(ValueError, match="ZIP|metadata"):
+        download.install(manifest, destination, tmp_path / "cache", parts)
+    assert not destination.exists()
+    assert not list(tmp_path.glob("data-extract-*"))
+
+
+def test_finder_metadata_case_collision_is_rejected(tmp_path):
+    root = download.DATA_ROOT
+    manifest, parts, _ = release(
+        tmp_path,
+        [
+            (f"{root}/folder/a", b"a"),
+            (f"{root}/folder/b", b"b"),
+            (f"__MACOSX/{root}/folder/._a", b"attributes"),
+            (f"__MACOSX/{root}/Folder/._b", b"attributes"),
+        ],
+    )
+    with pytest.raises(ValueError, match="Case-colliding"):
+        download.install(manifest, tmp_path / "installed", tmp_path / "cache", parts)

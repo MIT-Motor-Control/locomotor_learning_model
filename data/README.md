@@ -13,7 +13,7 @@ loco-publication verify-data
 loco-publication reproduce --strict
 ```
 
-The downloader uses public Zenodo files. It prefers the complete `locomotor_learning_model-DATA.zip`; if that file is absent, it uses the matching split files and manifest. It verifies the pinned archive checksum before extracting into `data/locomotor_learning_model-DATA/`. The DATA release is about 13.34 GB; allow **42 GB free** to cover downloading, joining pieces and extraction. The extracted folder occupies about 14.88 GB before analysis preparation.
+The downloader retrieves the single `locomotor_learning_model-DATA.zip` from Zenodo and verifies its pinned checksum before extracting into `data/locomotor_learning_model-DATA/`. The ZIP is about 13.27 GB; allow **30 GB free** for download and extraction. The extracted folder occupies about 14.88 GB before analysis preparation.
 
 If you download the ZIP manually, extract its DATA folder into this repository's `data/` directory. Keep the inner `publication-data.zip` compressed. Then start with `loco-publication prepare` above.
 
@@ -44,7 +44,7 @@ The standard Python figure workflow needs the six CSVs and embedded publication 
 
 ## Interrupted downloads and other locations
 
-Rerun `python scripts/download_data.py` after an interruption. Complete ZIP downloads resume when the server supports HTTP Range requests; otherwise they restart safely. Completed split pieces are reused. Connection errors and checksum mismatches do not silently select a different dataset.
+Rerun `python scripts/download_data.py` after an interruption. Downloads resume when the server supports HTTP Range requests; otherwise they restart safely. Connection errors and checksum mismatches do not silently select a different dataset.
 
 Downloads are cached in `outputs/data-download/23402153/` and removed after a successful installation. Add `--keep-downloads` to retain them. The downloader never overwrites an existing DATA folder. To install separately:
 
@@ -52,14 +52,6 @@ Downloads are cached in `outputs/data-download/23402153/` and removed after a su
 python scripts/download_data.py --destination data/another-release
 loco-publication prepare --source data/another-release
 ```
-
-For manually downloaded split files, put all 54 `locomotor_learning_model-DATA.zip.part001` through `.part054` files and `locomotor_learning_model-DATA.manifest.json` in one directory:
-
-```sh
-python scripts/download_data.py --parts-dir /path/to/downloaded-pieces
-```
-
-This makes no network requests and preserves the supplied pieces. Use a complete set from one release; files from different archive versions cannot be mixed.
 
 ## Precision and coverage
 

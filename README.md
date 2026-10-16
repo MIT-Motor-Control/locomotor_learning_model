@@ -67,7 +67,7 @@ The figure workflow needs the matching CODE and DATA release. GitHub contains co
 python scripts/download_data.py
 ```
 
-The command downloads the complete DATA ZIP or its smaller pieces, checks the file hashes and extracts `data/locomotor_learning_model-DATA/`. Allow about **42 GB of free space** for download and installation. Rerun the command after an interruption to reuse downloaded data. An existing DATA folder is never overwritten.
+The command downloads the single DATA ZIP, verifies its checksum and extracts `data/locomotor_learning_model-DATA/`. Allow about **30 GB of free space** for download and installation. Rerun the command after an interruption to reuse downloaded data. An existing DATA folder is never overwritten.
 
 If you already downloaded the DATA ZIP, extract its `locomotor_learning_model-DATA` folder into this repository's `data/` folder. Keep the nested `publication-data.zip` compressed. Your layout should be:
 

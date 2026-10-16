@@ -1,6 +1,6 @@
 # Reproducing the paper
 
-The publication workflow reads saved experimental measurements, fitted parameters and simulation results. It writes every output to a separate directory and checks input hashes before analysis. Start with `python scripts/download_data.py`, which prefers the complete Zenodo DATA ZIP and also supports the split version. It verifies and installs the matching DATA folder, including its embedded model-input ZIP, inside `data/`. Allow about 42 GB free to cover either installation method; [data setup](../data/README.md) covers resume behavior and offline pieces. Author source directories are not required by this workflow.
+The publication workflow reads saved experimental measurements, fitted parameters and simulation results. It writes every output to a separate directory and checks input hashes before analysis. Start with `python scripts/download_data.py`, which downloads the single Zenodo DATA ZIP. It verifies and installs the matching DATA folder, including its embedded model-input ZIP, inside `data/`. Allow about 30 GB free for installation; [data setup](../data/README.md) covers interrupted transfers and manual downloads. Author source directories are not required by this workflow.
 
 ## Commands
 
