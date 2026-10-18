@@ -105,10 +105,9 @@ def test_whole_zip_404_does_not_select_older_split_release(tmp_path, monkeypatch
 
     monkeypatch.setattr(download, "request", request)
     monkeypatch.setattr(download.time, "sleep", lambda _: None)
-    with pytest.raises(urllib.error.HTTPError) as error:
+    with pytest.raises(FileNotFoundError, match="unpublished|access-restricted"):
         download.install_release(tmp_path / "data", tmp_path / "cache")
-    assert error.value.code == 404
-    assert calls == [download.ARCHIVE_NAME] * 3
+    assert calls == [download.ARCHIVE_NAME]
     assert not (tmp_path / "data").exists()
 
 
@@ -127,8 +126,117 @@ def test_network_errors_never_select_split_route(tmp_path, monkeypatch, error_co
     monkeypatch.setattr(download.time, "sleep", lambda _: None)
     with pytest.raises(OSError):
         download.install_release(tmp_path / "data", tmp_path / "cache")
-    assert len(calls) == 3
+    assert len(calls) == (1 if error_code == 403 else 3)
     assert not (tmp_path / "data").exists()
+
+
+@pytest.mark.parametrize("error_code", [403, 404])
+def test_unavailable_public_release_has_actionable_cli_error(tmp_path, monkeypatch, capsys, error_code):
+    calls = []
+
+    def request(url, **kwargs):
+        calls.append(url)
+        raise urllib.error.HTTPError(url, error_code, "unavailable", {}, None)
+
+    monkeypatch.setattr(download, "request", request)
+    monkeypatch.setattr(download.time, "sleep", lambda _: pytest.fail("Unavailable files must not retry"))
+    with pytest.raises(SystemExit) as error:
+        download.main(["--destination", str(tmp_path / "data"), "--cache-dir", str(tmp_path / "cache")])
+    assert error.value.code == 1
+    output = capsys.readouterr()
+    assert f"HTTP {error_code}" in output.err
+    assert "unpublished or access-restricted" in output.err
+    assert "--archive" in output.err
+    assert "Connection interrupted" not in output.out
+    assert len(calls) == 1
+    assert not (tmp_path / "data").exists()
+
+
+@pytest.mark.parametrize("archive_in_cache", [False, True])
+def test_local_archive_cli_verifies_installs_and_preserves_source(tmp_path, monkeypatch, archive_in_cache):
+    manifest, parts, payload = release(tmp_path)
+    pin_release(monkeypatch, manifest, parts)
+    cache = tmp_path / "cache"
+    if archive_in_cache:
+        cache.mkdir()
+    archive = (cache if archive_in_cache else tmp_path) / "my DATA download.zip"
+    archive.write_bytes(payload)
+    before = archive.stat()
+    destination = tmp_path / "installed"
+    monkeypatch.setattr(download, "request", lambda *a, **k: pytest.fail("Local install used network"))
+    assert download.main([
+        "--archive", str(archive), "--destination", str(destination), "--cache-dir", str(cache)
+    ]) == 0
+    assert (destination / "README.md").read_text() == "Dataset provenance\n"
+    assert archive.read_bytes() == payload
+    assert archive.stat().st_mtime_ns == before.st_mtime_ns
+    assert archive.stat().st_ino == before.st_ino
+    assert cache.is_dir() if archive_in_cache else not cache.exists()
+
+
+@pytest.mark.parametrize("corruption", ["size", "checksum"])
+def test_local_archive_corruption_never_extracts_or_changes_source(tmp_path, monkeypatch, corruption):
+    manifest, parts, payload = release(tmp_path)
+    pin_release(monkeypatch, manifest, parts)
+    archive = tmp_path / "data.zip"
+    invalid = payload[:-1] if corruption == "size" else b"!" + payload[1:]
+    archive.write_bytes(invalid)
+    before = archive.stat().st_mtime_ns
+    monkeypatch.setattr(download, "extract", lambda *a: pytest.fail("Invalid ZIP reached extraction"))
+    with pytest.raises(ValueError, match="size/checksum"):
+        download.install_local_archive(archive, tmp_path / "installed")
+    assert archive.read_bytes() == invalid
+    assert archive.stat().st_mtime_ns == before
+    assert not (tmp_path / "installed").exists()
+
+
+@pytest.mark.parametrize("kind", ["missing", "directory", "symlink"])
+def test_local_archive_requires_existing_regular_file(tmp_path, kind):
+    archive = tmp_path / "data.zip"
+    if kind == "directory":
+        archive.mkdir()
+    elif kind == "symlink":
+        target = tmp_path / "target"
+        target.write_bytes(b"preserve")
+        archive.symlink_to(target)
+    with pytest.raises((ValueError, FileNotFoundError)):
+        download.install_local_archive(archive, tmp_path / "installed")
+    assert not (tmp_path / "installed").exists()
+    if kind == "symlink":
+        assert archive.is_symlink()
+        assert target.read_bytes() == b"preserve"
+
+
+def test_local_archive_refuses_existing_destination_before_hashing(tmp_path, monkeypatch):
+    destination = tmp_path / "installed"
+    destination.mkdir()
+    (destination / "user.txt").write_text("preserve")
+    monkeypatch.setattr(download, "sha256", lambda *a: pytest.fail("Existing destination must stop first"))
+    with pytest.raises(FileExistsError, match="unchanged"):
+        download.install_local_archive(tmp_path / "unused.zip", destination)
+    assert (destination / "user.txt").read_text() == "preserve"
+
+
+def test_local_archive_uses_safe_extraction(tmp_path, monkeypatch):
+    manifest, parts, payload = release(tmp_path, [
+        (f"{download.DATA_ROOT}/valid.txt", b"valid"), ("../escape.txt", b"unsafe")
+    ])
+    pin_release(monkeypatch, manifest, parts)
+    archive = tmp_path / "data.zip"
+    archive.write_bytes(payload)
+    with pytest.raises(ValueError, match="ZIP"):
+        download.install_local_archive(archive, tmp_path / "installed")
+    assert not (tmp_path / "installed").exists()
+    assert not (tmp_path / "escape.txt").exists()
+    assert archive.read_bytes() == payload
+
+
+@pytest.mark.parametrize("legacy_flag", ["--parts-dir", "--manifest"])
+def test_local_archive_cannot_mix_with_legacy_sources(tmp_path, monkeypatch, legacy_flag):
+    monkeypatch.setattr(download, "install_local_archive", lambda *a: pytest.fail("Conflicting arguments reached installer"))
+    with pytest.raises(SystemExit) as error:
+        download.main(["--archive", str(tmp_path / "data.zip"), legacy_flag, "unused"])
+    assert error.value.code == 2
 
 
 @pytest.mark.parametrize("corruption", ["length", "checksum"])

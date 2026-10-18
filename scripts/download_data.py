@@ -194,6 +194,13 @@ def download_file(
         except (OSError, urllib.error.URLError, http.client.HTTPException) as error:
             if missing_ok and isinstance(error, urllib.error.HTTPError) and error.code == 404:
                 return None
+            if isinstance(error, urllib.error.HTTPError) and error.code in {403, 404}:
+                raise FileNotFoundError(
+                    f"Zenodo DATA is unavailable for public download (HTTP {error.code}). "
+                    "The matching release may be unpublished or access-restricted. "
+                    "Check https://zenodo.org/records/23402153, or install an existing ZIP "
+                    "with python scripts/download_data.py --archive /path/to/locomotor_learning_model-DATA.zip."
+                ) from None
             if attempt == 3:
                 raise
             print(
@@ -401,8 +408,35 @@ def install_release(destination: Path, cache: Path, *, keep_downloads: bool = Fa
     return finish_install(archive, item, destination, cache, [archive], keep_downloads)
 
 
+def install_local_archive(archive: Path, destination: Path) -> dict:
+    """Verify and safely extract the pinned local ZIP without modifying its source."""
+    archive, destination = Path(archive).expanduser().absolute(), Path(destination).absolute()
+    if destination.exists() or destination.is_symlink():
+        raise FileExistsError(
+            f"Destination already exists and is unchanged: {destination}. "
+            "Run loco-publication prepare, or choose another --destination."
+        )
+    if not regular(archive):
+        raise FileNotFoundError(f"Local DATA ZIP not found: {archive}")
+    before = archive.stat()
+    item = {"name": ARCHIVE_NAME, "bytes": ARCHIVE_BYTES, "sha256": ARCHIVE_SHA256}
+    print(f"Verifying local DATA archive: {archive}", flush=True)
+    if not verified(archive, item):
+        raise ValueError("Local DATA archive failed its pinned size/checksum check; nothing was extracted")
+    after = archive.stat()
+    if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
+        after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns
+    ):
+        raise ValueError("Local DATA archive changed during verification; nothing was extracted")
+    count = extract(archive, destination)
+    return {"destination": str(destination), "files": count, "archive_sha256": item["sha256"]}
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--archive", type=Path, help="Verify and install an existing DATA ZIP without downloading or changing it"
+    )
     parser.add_argument(
         "--manifest", help="Legacy split release only: use its checksum-pinned manifest"
     )
@@ -415,6 +449,8 @@ def main(argv=None) -> int:
         "--keep-downloads", action="store_true", help="Retain verified cached ZIP and any pieces"
     )
     args = parser.parse_args(argv)
+    if args.archive is not None and (args.manifest is not None or args.parts_dir is not None):
+        parser.error("--archive cannot be combined with --manifest or --parts-dir")
     try:
         # Refuse an existing dataset before requesting even the remote manifest.
         if args.destination.exists() or args.destination.is_symlink():
@@ -422,7 +458,9 @@ def main(argv=None) -> int:
                 f"Destination already exists and is unchanged: {args.destination}. "
                 "Run loco-publication prepare, or choose another --destination."
             )
-        if args.parts_dir is not None or args.manifest is not None:
+        if args.archive is not None:
+            result = install_local_archive(args.archive, args.destination)
+        elif args.parts_dir is not None or args.manifest is not None:
             location = args.manifest or str(args.parts_dir / MANIFEST_NAME)
             result = install(
                 load_manifest(location),
@@ -436,11 +474,16 @@ def main(argv=None) -> int:
                 args.destination, args.cache_dir, keep_downloads=args.keep_downloads
             )
     except KeyboardInterrupt:
-        print("\nInterrupted. Cached downloads are retained; run the same command to continue.")
+        print(
+            "\nInterrupted. The local archive is unchanged; run the same command again."
+            if args.archive is not None
+            else "\nInterrupted. Cached downloads are retained; run the same command to continue."
+        )
         return 130
     except (OSError, ValueError, zipfile.BadZipFile, http.client.HTTPException) as error:
+        retained = "The local archive was not modified." if args.archive is not None else "Cached downloads are retained."
         parser.exit(
-            1, f"DATA installation stopped: {error}\nCached downloads are retained for retry.\n"
+            1, f"DATA installation stopped: {error}\n{retained}\n"
         )
     print(f"DATA installed in {result['destination']} ({result['files']} files).")
     print(f"Verified archive SHA-256: {result['archive_sha256']}")

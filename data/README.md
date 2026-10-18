@@ -4,7 +4,7 @@ Use the CODE and DATA archives from the same [Zenodo release](https://doi.org/10
 
 ## Download and prepare
 
-With the repository's Conda environment active, run:
+Once the matching Zenodo files are public, run with the repository's Conda environment active:
 
 ```sh
 python scripts/download_data.py
@@ -15,7 +15,15 @@ loco-publication reproduce --strict
 
 The downloader retrieves the single `locomotor_learning_model-DATA.zip` from Zenodo and verifies its pinned checksum before extracting into `data/locomotor_learning_model-DATA/`. The ZIP is about 13.27 GB; allow **30 GB free** for download and extraction. The extracted folder occupies about 14.88 GB before analysis preparation.
 
-If you download the ZIP manually, extract its DATA folder into this repository's `data/` directory. Keep the inner `publication-data.zip` compressed. Then start with `loco-publication prepare` above.
+If you already have the DATA ZIP, install it without another download:
+
+```sh
+python scripts/download_data.py --archive /path/to/locomotor_learning_model-DATA.zip
+```
+
+This verifies the same pinned size and checksum, safely extracts the DATA folder into `data/`, and leaves your ZIP unchanged. It works without network access, including before the Zenodo draft is published. Replace the example path with your ZIP's location, then start with `loco-publication prepare` above. Keep the inner `publication-data.zip` compressed.
+
+Manual extraction into `data/` also works; using `--archive` adds the full-archive checksum and safe-path checks. A public-download HTTP 403 or 404 means the matching file is unavailable or access-restricted; check the release page or use a local ZIP rather than downloading an older dataset.
 
 If the DATA folder is beside the repository, no copy is needed:
 
@@ -59,7 +67,7 @@ The experimental CSVs are rounded to six decimals. The publication archive retai
 
 Figures 2B, S1 and S3B use the regenerated simulation realization. Other main analyses retain the original published fits. Their provenance is recorded separately. A fresh stochastic sweep need not produce the same trajectories.
 
-The release contains all inputs used by the available saved-data workflows. It does not reconstruct raw C3D/COSMED processing, the complete original stochastic sweeps or the original OpenSim optimization. Some manuscript numbers and descriptions remain unresolved; see [coverage and limits](../docs/reproducibility.md#coverage-and-limits).
+The release contains all inputs used by the available saved-data workflows. It does not reconstruct raw C3D/COSMED processing, the complete original stochastic sweeps or the original OpenSim optimization. Some manuscript descriptions and original-pipeline steps remain unresolved; see [coverage and limits](../docs/reproducibility.md#coverage-and-limits).
 
 Older experimental-only DATA releases lack `publication-data.zip` and support only part of Figures 1 and S3. Preparation reports missing model inputs rather than substituting new results. If you have a separate matching publication archive, use `loco-publication prepare --source /path/to/DATA --model-inputs /path/to/publication-data.zip`.
 

@@ -1,6 +1,6 @@
 # Reproducing the paper
 
-The publication workflow reads saved experimental measurements, fitted parameters and simulation results. It writes every output to a separate directory and checks input hashes before analysis. Start with `python scripts/download_data.py`, which downloads the single Zenodo DATA ZIP. It verifies and installs the matching DATA folder, including its embedded model-input ZIP, inside `data/`. Allow about 30 GB free for installation; [data setup](../data/README.md) covers interrupted transfers and manual downloads. Author source directories are not required by this workflow.
+The publication workflow reads saved experimental measurements, fitted parameters and simulation results. It writes every output to a separate directory and checks input hashes before analysis. Once the matching Zenodo release is public, start with `python scripts/download_data.py`, which downloads the single DATA ZIP. It verifies and installs the matching DATA folder, including its embedded model-input ZIP, inside `data/`. Allow about 30 GB free for installation; [data setup](../data/README.md) covers interrupted transfers and manual downloads. Author source directories are not required by this workflow.
 
 ## Commands
 
@@ -47,7 +47,7 @@ Figure 2B follows the supplied regenerated-trajectory analysis at Δv = 0.7 m/s:
 
 S3B reads exactly 50 regenerated trials at each of the 23 unique original best-fit parameter cells. It excludes falls, takes each participant's median energy change across surviving trials, and averages those medians by condition. Shared parameter cells are reused for their corresponding participants. The source table has 1,150 unique trials; participant-weighted counts in the condition summary are larger. The full 60,000-trial sweep is not needed to reconstruct this panel.
 
-The `validate-manuscript` command checks freshly generated results against the numerical claims in the reviewed manuscript revision. It verifies the PDF, inputs, analysis code and output hashes before comparison:
+The `validate-manuscript` command checks freshly generated results against a historical manuscript snapshot, identified by PDF SHA-256 `6c73972316e0044884175e7399696c66621bd15f0f8b7d83e39776ef572784ae`. It verifies that exact PDF, inputs, analysis code and output hashes before comparison and rejects a different PDF:
 
 ```sh
 loco-publication validate-manuscript \
@@ -56,7 +56,7 @@ loco-publication validate-manuscript \
   --output outputs/manuscript-validation
 ```
 
-Use an empty comparison-output directory. Exit code **2** means agreement is incomplete; **1** indicates an integrity or execution error. The generated report records the comparison and its limits. S1 annotates the manuscript's MATLAB p-value; the alternative SciPy value remains exported separately.
+Use an empty comparison-output directory. Exit code **2** means agreement is incomplete; **1** indicates an integrity or execution error. The generated report records the comparison and its limits. This snapshot predates the RMSE correction described below; the command does not validate later manuscript revisions. S1 annotates the manuscript's MATLAB p-value; the alternative SciPy value remains exported separately.
 
 Figures have editable text and consistent rendering; manually composed schematics, arrows and the exact submitted page layout remain separate artwork. Newly generated stochastic simulations are not substitutes for the published saved results.
 
@@ -66,7 +66,8 @@ Figures have editable text and consistent rendering; manually composed schematic
 - **Figure 2B:** the regenerated group-trajectory panel and its correlation are reconstructed. The caption's participant description remains unresolved.
 - **Figures 3–4 and S1–S5:** the supplied saved-data analyses, Figure 4 parameter tests, S1 relaxed-grid checks and S3B rollouts are available. The Figure 4 parameter test is not a test of the separate fall-probability claim in the text.
 - **S3A/OpenSim:** the five supplied optimization values are plotted. An independent calculation from the available muscle-output files is exported separately; those files do not establish all five published values. Running the original optimization from scratch is not supported by the supplied inputs.
-- **Numerical agreement:** the original 0.4 m/s cohort has mean inverse-fit RMSE 0.3715 across eight participants, whereas the manuscript reports 0.33. The code retains the eight valid observations. The supplied simulation engine also uses a 25-second transition and belt-speed division by 2; Methods state 20 seconds and division by √(g × leg length).
+- **RMSE correction:** the original 0.4 m/s cohort has mean inverse-fit RMSE 0.3715 across eight participants. The manuscript source reviewed on October 18, 2026 reports 0.37 ± 0.32, resolving the earlier 0.33 mean discrepancy at the reported precision. The historical PDF check retains its original target and result; no participant values or simulation parameters were changed.
+- **Simulation protocol:** the supplied engine uses a 25-second transition and belt-speed division by 2; Methods state 20 seconds and division by √(g × leg length). These differences remain unresolved.
 - **Simulation scope:** seeded examples and saved-result analyses are supported. Full original stochastic sweeps and raw COSMED/C3D processing are not reconstructed by this workflow. Saved-reference agreement does not establish agreement of every Methods statement.
 
 Inspect each generated report for incomplete inputs and numerical comparisons before using its outputs.

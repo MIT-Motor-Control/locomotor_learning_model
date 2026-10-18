@@ -69,7 +69,13 @@ python scripts/download_data.py
 
 The command downloads the single DATA ZIP, verifies its checksum and extracts `data/locomotor_learning_model-DATA/`. Allow about **30 GB of free space** for download and installation. Rerun the command after an interruption to reuse downloaded data. An existing DATA folder is never overwritten.
 
-If you already downloaded the DATA ZIP, extract its `locomotor_learning_model-DATA` folder into this repository's `data/` folder. Keep the nested `publication-data.zip` compressed. Your layout should be:
+If you already downloaded the DATA ZIP, install that file instead. Replace the path below with its location:
+
+```sh
+python scripts/download_data.py --archive ../locomotor_learning_model-DATA.zip
+```
+
+This checks the same release checksum and extracts the data without downloading it again. You can also extract the `locomotor_learning_model-DATA` folder manually into this repository's `data/` folder. Keep the nested `publication-data.zip` compressed. Your layout should be:
 
 ```text
 locomotor_learning_model/
