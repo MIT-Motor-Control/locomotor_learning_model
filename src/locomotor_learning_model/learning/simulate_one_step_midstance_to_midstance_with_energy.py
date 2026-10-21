@@ -29,7 +29,7 @@ def simulate_one_step_midstance_to_midstance_with_energy(
     float,
     float,
 ]:
-    """Python port of ``simulateOneStep_MidstanceToMidstance_WithEnergy.m``."""
+    """Return trajectories, duration, and energy costs for a midstance-to-midstance step."""
 
     if i_step % 2 == 0:
         param_controller['tList_BeltSpeed'] = param_fixed['imposedFootSpeeds']['tList']
@@ -115,14 +115,10 @@ def simulate_one_step_midstance_to_midstance_with_energy(
         + param_controller['legAngle_gain_BeltSpeed'] * delta_vFoot_labFrame
     )
 
-    # Step-angle cap. Default reproduces the shipped model exactly. The global
-    # fall-risk track raises the cap via `uncapStepAngle`
-    # so the walker can reach postures with a low COM height and thus "fall";
-    # a hard limit below pi/2 is kept so the COM cannot pass the ground.
+    # Uncapped rollouts use a larger angle limit to permit lower COM heights.
     _cap = 0.95 * np.pi / 4
     if param_fixed.get("uncapStepAngle", False):
         _cap = param_fixed.get("stepAngleHardLimit", 0.49 * np.pi)
-    # Retain the explicit comparison used in the MATLAB transcription.
     if param_controller['theta_end_thisStep'] > _cap:  # noqa: PLR1730
         param_controller['theta_end_thisStep'] = _cap
 

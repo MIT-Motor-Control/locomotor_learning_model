@@ -1,15 +1,9 @@
-"""Optional local stability penalties for the baseline Python objective.
+"""Per-step stability costs based on COM height or extrapolated COM position.
 
-The default ``com_margin`` mode uses the minimum center-of-mass height in
-each step, ``h = leglength * cos(theta)`` in nondimensional units:
-
-    margin_i = clip((h_safe - min_i(h)) / (h_safe - h_ground), 0, 1)
-    penalty  = mean_i( margin_i ** power )
-
-``capture_point`` instead measures bounded extrapolated-COM excess. These
-deterministic per-stride penalties do not estimate the manuscript's fall
-probabilities or add fall termination. A zero ``fallPenaltyWeight`` preserves
-the baseline energy/symmetry objective and random-number stream.
+The ``com_margin`` mode uses ``h = leglength * cos(theta)`` and computes
+``mean(clip((h_safe - min_step(h)) / (h_safe - h_ground), 0, 1) ** power)``.
+The height bounds specify where the penalty starts and saturates.
+``capture_point`` measures bounded excess beyond a specified XCoM limit.
 """
 
 from __future__ import annotations
@@ -71,11 +65,10 @@ def compute_com_margin_penalty(
     state_store: Iterable[np.ndarray],
     param_fixed: dict,
 ) -> float:
-    """Primary local penalty: bounded per-step COM-height margin (see module docstring)."""
+    """Return the mean bounded COM-height penalty across steps."""
     power = float(param_fixed.get("fallPenaltyPower", 2.0))
     eps = float(param_fixed.get("fallPenaltyEpsilon", 1e-6))
     safe_height = float(param_fixed.get("fallSafeComHeight", 0.95))
-    # Defaults match load_biped_model_parameters.
     ground_height = float(param_fixed.get("fallGroundComHeight", 0.90))
     span = max(safe_height - ground_height, eps)
 
@@ -90,7 +83,7 @@ def compute_capture_point_penalty(
     state_store: Iterable[np.ndarray],
     param_fixed: dict,
 ) -> float:
-    """Robustness alternative: bounded XCoM excess beyond a stability limit."""
+    """Return the mean bounded XCoM excess beyond the specified limit."""
     power = float(param_fixed.get("fallPenaltyPower", 2.0))
     eps = float(param_fixed.get("fallPenaltyEpsilon", 1e-6))
     capture_points = compute_step_max_abs_capture_points(state_store, param_fixed)
@@ -107,11 +100,7 @@ def compute_fall_margin_penalty(
     state_store: Iterable[np.ndarray],
     param_fixed: dict,
 ) -> float:
-    """Dispatch on ``fallPenaltyMode``.
-
-    - ``com_margin``      : primary bounded COM-height margin (default).
-    - ``capture_point``   : robustness XCoM-excess alternative.
-    """
+    """Evaluate the selected stability cost: ``com_margin`` or ``capture_point``."""
     mode = str(param_fixed.get("fallPenaltyMode", "com_margin"))
     if mode == "com_margin":
         return compute_com_margin_penalty(state_store, param_fixed)

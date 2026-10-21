@@ -67,7 +67,7 @@ Figures have editable text and consistent rendering; manually composed schematic
 - **Figures 3–4 and S1–S5:** the supplied saved-data analyses, Figure 4 parameter tests, S1 relaxed-grid checks and S3B rollouts are available. The Figure 4 parameter test is not a test of the separate fall-probability claim in the text.
 - **S3A/OpenSim:** the five supplied optimization values are plotted. An independent calculation from the available muscle-output files is exported separately; those files do not establish all five published values. Running the original optimization from scratch is not supported by the supplied inputs.
 - **RMSE correction:** the original 0.4 m/s cohort has mean inverse-fit RMSE 0.3715 across eight participants. The manuscript source reviewed on October 18, 2026 reports 0.37 ± 0.32, resolving the earlier 0.33 mean discrepancy at the reported precision. The historical PDF check retains its original target and result; no participant values or simulation parameters were changed.
-- **Simulation protocol:** the supplied engine uses a 25-second transition and belt-speed division by 2; Methods state 20 seconds and division by √(g × leg length). These differences remain unresolved.
+- **Simulation protocol:** the manuscript engine uses a 25-second transition and multiplies experimental belt speeds by 0.5. Model time is converted to seconds using √(leg length / g). The manuscript Methods reviewed on October 19, 2026 match these settings.
 - **Simulation scope:** seeded examples and saved-result analyses are supported. Full original stochastic sweeps and raw COSMED/C3D processing are not reconstructed by this workflow. Saved-reference agreement does not establish agreement of every Methods statement.
 
 Inspect each generated report for incomplete inputs and numerical comparisons before using its outputs.
@@ -98,4 +98,4 @@ python scripts/build_source_workbook.py outputs/publication outputs/source-data.
 python scripts/check_source_workbook.py outputs/publication outputs/source-data.xlsx
 ```
 
-The builder preserves the CSV values, records their hashes, and labels data sources and units. The checker compares workbook cells with the CSVs. Both use `openpyxl`, already included in the locked Conda environment; no extra runtime or private formatting package is needed.
+The builder preserves the CSV values, records their hashes, and labels data sources and units. The checker compares workbook cells with the CSVs. Both use `openpyxl`, included in the Conda environment.

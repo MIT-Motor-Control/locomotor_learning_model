@@ -1,6 +1,6 @@
 function paramFixed = loadStoredMemoryParameters_ControlVsSpeed(paramFixed)
+% Initialize the context-dependent controller memory.
 
-%% memory stored based on nominal
 switch paramFixed.swingCost.Coeff
     case 0.9
         paramFixed.storedmemory.nominalControl = [0.328221262798818
@@ -15,11 +15,7 @@ end
 
 paramFixed.storedmemory.nominalContext = [-0.35; -0.35];
 
-%% how memory changes with context: slope
-% learningParameterListLength = length(paramFixed.storedmemory.nominalControl);
-
 paramFixed.storedmemory.controlSlopeVsContext = ...
-    zeros(8,2); % start with a blank slate for memory accumulation
-
+    zeros(8,2);
 
 end

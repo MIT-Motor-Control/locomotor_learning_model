@@ -9,12 +9,7 @@ def error_from_memory_compute(
     param_fixed,
     context_gait_now: np.ndarray,
 ) -> float:
-    """Compute squared prediction error between memory and controller state.
-
-    The memory model predicts controller parameters from the current gait
-    context. This returns the squared distance between that prediction and the
-    controller parameters currently considered successful.
-    """
+    """Return squared error between context-predicted and successful controller parameters."""
 
     p_input_memory_now = (
         param_fixed['storedmemory']['nominalControl']
@@ -24,10 +19,8 @@ def error_from_memory_compute(
 
     diff = p_input_now_considered_good - p_input_memory_now
     
-    # Ensure diff is 1D for proper dot product
     diff_flat = np.asarray(diff).flatten()
     
-    # Compute scalar dot product (sum of squared differences)
     f = float(np.sum(diff_flat * diff_flat))
 
     return f

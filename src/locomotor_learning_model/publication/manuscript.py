@@ -1,4 +1,4 @@
-"""Compare reproducible numerical claims with the audited final manuscript."""
+"""Compare numerical results with a pinned manuscript snapshot."""
 
 from __future__ import annotations
 
@@ -248,13 +248,13 @@ AUDITED_LIMITATIONS = [
         "claim": "Simulation transition duration",
         "page": 9,
         "status": "mismatch",
-        "reason": "Final Methods: 20 seconds. Handoff generator and sampled cached belt-speed arrays: 25 seconds.",
+        "reason": "Pinned PDF Methods: 20 seconds. Handoff generator and sampled cached belt-speed arrays: 25 seconds.",
     },
     {
         "claim": "Belt-speed normalization",
         "page": 9,
         "status": "mismatch",
-        "reason": "Final Methods: divide by sqrt(g×leg length). Handoff generator and cached arrays: divide by 2.",
+        "reason": "Pinned PDF Methods: divide by sqrt(g×leg length). Handoff generator and cached arrays: divide by 2.",
     },
     {
         "claim": "Inverse-fitting estimator and original sweep regeneration",

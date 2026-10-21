@@ -27,7 +27,7 @@ def _interp_extrap(t: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
 def get_treadmill_speed(
     t: Sequence[float] | float,
     belt_speeds_imposed: Mapping[str, np.ndarray],
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[float, float] | tuple[np.ndarray, np.ndarray]:
     """Return the belt speeds corresponding to time ``t``.
 
     Scalar and vector time inputs are supported. Values outside the supplied

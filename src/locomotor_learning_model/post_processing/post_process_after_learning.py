@@ -14,35 +14,28 @@ def post_process_after_learning(
     param_controller,
     param_fixed,
     do_animate: bool = False,
-) -> tuple[np.ndarray, list, list, np.ndarray, np.ndarray]:
-    """Post-process learned controller history into trajectories and energies.
-    
-    This function takes the stored controller parameters from the learning
-    process and runs the full simulation to generate detailed trajectories
-    and energy consumption data.
-    
-    Parameters
-    ----------
-    p_input_store : np.ndarray
-        Array of controller parameters over learning iterations (10 x num_iterations)
-    state_var0_model : np.ndarray
-        Initial state for the simulation
-    param_controller : dict
-        Controller parameters structure
-    param_fixed : dict
-        Fixed parameters structure
-    do_animate : bool, optional
-        Whether to create animations (default: False)
-        
-    Returns
-    -------
-    tuple
-        Contains processed trajectories and energy data
+) -> tuple[
+    np.ndarray,
+    list[np.ndarray],
+    list[np.ndarray],
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+]:
+    """Replay a 10-row controller history to recover trajectories and energy costs.
+
+    Return the final state, times, states, total energies, energy rates, step
+    durations, push-off work, heel-strike work, iteration-average energy rates,
+    and iteration durations. ``do_animate`` is retained for compatibility and
+    has no effect.
     """
-    
+
     num_iterations = p_input_store.shape[1]
     
-    # Initialize storage arrays
     t_store = []
     state_store = []
     emet_total_store = []
@@ -51,7 +44,6 @@ def post_process_after_learning(
     ework_pushoff_store = []
     ework_heelstrike_store = []
     
-    # Iteration-level storage
     edot_store_iteration_average = np.zeros(num_iterations)
     t_total_iteration_store = np.zeros(num_iterations)
     
@@ -64,10 +56,8 @@ def post_process_after_learning(
         if (i_stride + 1) % 50 == 0:
             print(f'  iStride = {i_stride + 1}')
         
-        # Get the stored current learned controller parameters
         p_input_controller_asymmetric_nominal = p_input_store[:, i_stride]
         
-        # Unpack controller parameters for odd and even steps
         param_controller['Odd']['theta_end_nominal'] = float(p_input_controller_asymmetric_nominal[0])
         param_controller['Odd']['ydot_at_midstance_nominal_beltframe'] = float(p_input_controller_asymmetric_nominal[1])
         param_controller['Odd']['pushoff_impulse_magnitude_nominal'] = float(p_input_controller_asymmetric_nominal[2])
@@ -80,7 +70,6 @@ def post_process_after_learning(
         param_controller['Even']['y_at_midstance_nominal_slopeframe'] = float(p_input_controller_asymmetric_nominal[8])
         param_controller['Even']['sumy_at_midstance_nominal_slopeframe'] = float(p_input_controller_asymmetric_nominal[9])
         
-        # Simulate the steps for this iteration
         param_fixed['num_steps'] = param_fixed['Learner']['numStepsPerIteration']
         (
             state_var0_model,
@@ -95,14 +84,11 @@ def post_process_after_learning(
             state_var0_model, param_controller, param_fixed, t_start
         )
         
-        # Reset time
         t_start = float(np.asarray(t_store_now[-1]).flatten()[-1])
         
-        # Compute iteration averages
         edot_store_iteration_average[i_stride] = np.sum(emet_total_store_now) / np.sum(t_step_store_now)
         t_total_iteration_store[i_stride] = np.sum(t_step_store_now)
         
-        # Assemble all the Store variables
         if i_stride == 0:
             t_store = t_store_now.copy()
             state_store = state_store_now.copy()
@@ -112,15 +98,13 @@ def post_process_after_learning(
             ework_pushoff_store = ework_pushoff_store_now.copy()
             ework_heelstrike_store = ework_heelstrike_store_now.copy()
         else:
-            # Merge the half steps at the end and beginning
+            # Adjacent iterations share a partial stance trajectory.
             t_store[-1] = np.concatenate([t_store[-1], t_store_now[0]])
             state_store[-1] = np.vstack([state_store[-1], state_store_now[0]])
             
-            # Add the other steps
             t_store.extend(t_store_now[1:])
             state_store.extend(state_store_now[1:])
             
-            # The rest are just arrays from midstance to midstance
             emet_total_store = np.concatenate([emet_total_store, emet_total_store_now])
             emet_per_time_store = np.concatenate([emet_per_time_store, emet_per_time_store_now])
             t_step_store = np.concatenate([t_step_store, t_step_store_now])
@@ -129,7 +113,6 @@ def post_process_after_learning(
     
     print('Post-processing complete!')
     
-    # Create a summary of results
     print(f'Total steps simulated: {len(emet_total_store)}')
     print(f'Average energy consumption: {np.mean(edot_store_iteration_average):.6f}')
     print(f'Final energy consumption: {edot_store_iteration_average[-1]:.6f}')

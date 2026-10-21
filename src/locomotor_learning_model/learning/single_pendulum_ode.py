@@ -14,21 +14,12 @@ def single_pendulum_ode(
     angle_theta = state_var[0]
     dangle_theta = state_var[1]
 
-    # Handle missing belt speed parameters gracefully (for standalone testing)
     if ('tList_BeltSpeed' not in param_controller or 
         'PushoffAccelerationNowList' not in param_controller):
-        # Use default values for standalone testing
         param_controller['PushoffAccelerationNow'] = 0.0
     else:
-        # Normal operation during simulation.
-        # ZERO-ORDER HOLD, matching MATLAB `interp1(...,'previous','extrap')`.
-        # PushoffAccelerationNowList stores the CONSTANT acceleration of each
-        # belt-schedule segment, so the value must be HELD across the segment, not
-        # interpolated. Linear interpolation smears a transition ramp's acceleration
-        # across the adjacent constant-speed segments, producing a spurious torque
-        # that drifts monotonically through the adaptation window.
-        # NOTE: the foot-SPEED lookup below is deliberately linear -- MATLAB uses
-        # 'linear' there and 'previous' only here.
+        # Hold acceleration constant within each belt-schedule segment;
+        # linear interpolation would introduce torque during constant-speed phases.
         _t_knots = param_controller['tList_BeltSpeed']
         _acc_list = param_controller['PushoffAccelerationNowList']
         _idx = int(np.searchsorted(_t_knots, t, side='right')) - 1
@@ -50,13 +41,11 @@ def single_pendulum_ode(
         + torque_due_to_acceleration
     )
 
-    # Handle missing foot speed parameters gracefully (for standalone testing)
     if ('tList_BeltSpeed' not in param_controller or 
         'PushoffFootSpeedNowList' not in param_controller):
-        # Use default value for standalone testing
-        param_controller['PushoffFootSpeedNow'] = -0.3276  # Default belt speed
+        param_controller['PushoffFootSpeedNow'] = -0.3276
     else:
-        # Normal operation during simulation
+        # Belt velocity varies linearly during each transition ramp.
         param_controller['PushoffFootSpeedNow'] = float(
             np.interp(
                 t,

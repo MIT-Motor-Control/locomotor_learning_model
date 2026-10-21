@@ -66,7 +66,7 @@ The high-level API owns a private random generator and does not reseed NumPy's g
 
 ## Scientific scope and validation
 
-The baseline model equations and learner/noise/memory defaults are preserved. The manuscript engine uses different settings: it divides belt speeds by 2, sets a 25-second transition, disables the baseline memory-learning rates, and uses another learning-rate scale. The manuscript describes Froude-like speed scaling and a 20-second transition. These source/Methods discrepancies remain unresolved. Original fitted MAT files, regenerated trial-averaged grids, and new seeded examples have distinct provenance.
+The baseline and manuscript engines use different settings. The manuscript engine divides experimental belt speeds by 2, uses a 25-second transition, disables the baseline memory-learning rates and uses another learning-rate scale. Model time is converted to seconds using √(leg length / g). The manuscript Methods reviewed on October 19, 2026 match these settings. Original fitted MAT files, regenerated trial-average grids and new seeded examples have distinct provenance.
 
 Baseline Python/MATLAB deterministic parity can be checked with:
 
@@ -78,7 +78,7 @@ export_reference_run('outputs/locad_reference.mat', 40);
 
 ```sh
 python scripts/validate_matlab_python_parity.py outputs/locad_reference.mat
-python -m pytest tests/test_checkpoints.py tests/test_detailed_function_comparison.py tests/test_matlab_python_equivalence.py
+python -m pytest tests/test_checkpoints.py tests/test_detailed_function_comparison.py tests/test_model_baseline.py
 ```
 
 The MATLAB comparison disables exploratory and energy-measurement noise; identical seeds do not establish cross-language stochastic identity. Forty iterations exercise the rolling estimator after its initial 30-iteration window. The test suite also compares uninterrupted and resumed stochastic trajectories across split/tied protocol changes, repeated seeds, safe result reload/replotting, input/configuration rejection, and atomic-write failures.

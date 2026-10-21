@@ -275,7 +275,7 @@ def test_figure1_audited_participant_values(publication_data):
 
 @pytest.mark.integration
 def test_final_manuscript_figure1e_significant_intervals(publication_data):
-    """Final PDF p3 and pp10-11 state consecutive decreases through9/18/27 min."""
+    """Figure 1E reports consecutive decreases through 9, 18 and 27 minutes."""
     tables = figure1_tables(publication_data)
     expected_p = [
         [
@@ -351,7 +351,7 @@ def test_figure3_complete_binomial_counts(publication_data):
     assert fall_filename(0.9, 0.05, 6) == (
         "model_split45_trans20_slow0.55_fast1.45_noise0.01_learning0.05_energysym1_swingcost1_trial6.mat"
     )
-    # Independently fitted with base-MATLAB fminsearch, not the SciPy implementation.
+    # Reference coefficients were fitted independently with MATLAB fminsearch.
     for rate, a, b, sse in (
         (0.02, 1069.84240207159, -1.41806478936392, 121664.239816847),
         (0.05, 2332.71803938419, -1.87067908491541, 127171.491037044),

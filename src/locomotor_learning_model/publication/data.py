@@ -1,4 +1,4 @@
-"""Import publication inputs without changing the author handoff or source archives."""
+"""Prepare publication inputs and record their source hashes."""
 
 from __future__ import annotations
 
@@ -21,14 +21,7 @@ def prepare_data(
     *,
     private_archive: Path | None = None,
 ) -> dict:
-    """Copy curated inputs, recover embedded energy, and record portable provenance.
-
-    ``fall_archive`` is the older directory containing individual fall-probability
-    MAT files; ``private_archive`` is the research repository containing
-    ``reviewer_comments``. Neither source is modified. Conflicting copies fail
-    before any inputs are copied. Existing destination inputs are never replaced
-    with different content.
-    """
+    """Collect experimental, model and optional supplementary inputs into a verified dataset."""
     bundle, destination = Path(bundle).resolve(), Path(destination).resolve()
     if not (bundle / "code/original_data").is_dir():
         raise FileNotFoundError(f"Author handoff not found: {bundle / 'code/original_data'}")
@@ -370,12 +363,7 @@ def integrate_addendum(
     generated_s1: Path | None = None,
     generated_s1_script: Path | None = None,
 ) -> dict:
-    """Add verified scientific inputs transactionally, preserving every existing input.
-
-    Only the aggregate original energy MAT may differ in byte representation, and
-    only when all three structs match exactly. Its existing bytes are retained.
-    Optional S1 grid-check CSVs require the generating MATLAB script for provenance.
-    """
+    """Merge supplementary inputs after checking them against the prepared dataset."""
     if Path(destination).is_symlink():
         raise ValueError("The prepared dataset must not be a symlink")
     destination = Path(destination).resolve()

@@ -114,7 +114,6 @@ def load_archive(path: str | Path, kind: str) -> dict[str, Any]:
                 raise ValueError(f"Expected a {kind} archive")
             result = _decode(header["payload"], archive)
             if not isinstance(result, dict):
-                # Invalid archive contents consistently raise ValueError.
                 raise ValueError("Archive payload must be a dictionary")  # noqa: TRY004
             return result
     except (KeyError, TypeError, AttributeError, OSError, EOFError) as error:

@@ -1,4 +1,4 @@
-"""Public measurement imports must be portable, complete and non-destructive."""
+"""Portable imports of experimental measurements."""
 
 import csv
 import hashlib

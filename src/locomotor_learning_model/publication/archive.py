@@ -1,4 +1,4 @@
-"""Install a portable publication cache without replacing unrelated local data."""
+"""Validate and install publication input archives."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ def _fingerprints(root: Path, manifest: dict) -> dict[str, str]:
 
 
 def _entries(archive: zipfile.ZipFile) -> list[tuple[zipfile.ZipInfo, Path]]:
-    """Validate every member before writing; do not interpret ZIP link metadata."""
+    """Validate archive paths, file types and extraction-path collisions."""
     result, seen = [], {}
     for entry in archive.infolist():
         name = entry.orig_filename
@@ -89,13 +89,7 @@ def _extract(archive_path: Path, destination: Path) -> None:
 
 
 def install_publication_archive(archive: Path, destination: Path, source: Path) -> dict:
-    """Verify, cross-check and atomically install a ``publication/`` ZIP.
-
-    Only this project's verified eight-file experimental-only dataset may be
-    upgraded. A full cache is retained unchanged when every archived file,
-    including its manifest, matches; a different cache is never replaced.
-    ``source`` is the separately downloaded public experimental dataset.
-    """
+    """Install a verified input ZIP, cross-checking its measurements against ``source``."""
     archive, destination, source = Path(archive), Path(destination), Path(source)
     if destination.is_symlink():
         raise ValueError("The publication destination must not be a symbolic link.")
@@ -126,7 +120,7 @@ def install_publication_archive(archive: Path, destination: Path, source: Path) 
         manifest = _verified_manifest(staging)
         prepare_zenodo_data(source, staging)
         if previous is not None:
-            # A caller might have edited its dataset while the archive was unpacked.
+            # Recheck the destination before committing the staged installation.
             current = _verified_manifest(destination)
             if _fingerprints(destination, current) != previous_fingerprints:
                 raise ValueError(

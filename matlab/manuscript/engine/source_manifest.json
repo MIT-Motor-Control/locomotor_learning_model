@@ -143,7 +143,10 @@
     }
   ],
   "modified": [
-    "run_sim.m: explicit seed, iteration limit, protocol options; original defaults retained",
-    "convertMetToVO2.m: bound initial smoothing window and handle single-iteration demonstration runs; full-length behavior unchanged"
+    "run_sim.m: explicit seed, iteration limit and protocol options; corrected nested learner field in odd-step guard",
+    "convertMetToVO2.m: bound the initial smoothing window for short trials",
+    "loadProtocolParameters.m and loadHowLongParameters.m: use the nested learner field and round to complete step pairs before deriving the iteration budget",
+    "loadLearnerParameters.m: removed an overwritten assignment; effective memory-learning rate is 0.03",
+    "Comments simplified throughout the engine; original_sha256 values identify the original source files"
   ]
 }

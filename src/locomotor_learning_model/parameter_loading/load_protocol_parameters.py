@@ -70,7 +70,7 @@ def load_protocol_parameters(
     param_fixed["numStepsToLearn"] = round(param_fixed["numStepsToLearn"] / 100) * 100
 
     learner = param_fixed.get("Learner", {})
-    # Balance both legs before converting the physical-step budget to iterations.
+    # Each learning iteration includes an equal number of steps on both legs.
     if learner.get("numStepsPerIteration", 1) % 2 != 0:
         learner["numStepsPerIteration"] = learner.get("numStepsPerIteration", 1) + 1
         param_fixed["Learner"] = learner

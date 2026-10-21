@@ -1,6 +1,5 @@
 function C = swingCostDoke(tDurationOfChange,vInitial,vFinal,vBody,paramFixed)
-% this approximates the leg swing cost in Doke and Kuo 2005, which posits a
-% cost related to force rate
+% Approximate swing cost with a smoothed force-rate power law.
 
 vInitialRelative = vInitial-vBody;
 vFinalRelative = vFinal-vBody;

@@ -15,7 +15,6 @@ def f_objective_asymmetric_nominal_8d_to_10d(
     t_start: float,
 ) -> tuple[float, np.ndarray, float, float, float]:
     """Expand an 8D learned controller vector into the 10D controller state."""
-    # Ensure input is 1D (flatten if needed)
     p_input_flat = np.asarray(p_input_controller_nominal).flatten()
     
     temp = np.zeros(10)

@@ -18,9 +18,8 @@ def f_objective_asymmetric_nominal(
     param_fixed,
     t_start: float,
 ) -> tuple[float, np.ndarray, float, float, float]:
-    """Python port of ``fObjective_AsymmetricNominal.m``."""
+    """Evaluate energy, periodicity, symmetry, and optional stability costs."""
 
-    # unwrap controller parameters for odd and even steps
     param_controller['Odd']['theta_end_nominal'] = float(p_input_controller_nominal[0])
     param_controller['Odd']['ydot_at_midstance_nominal_beltframe'] = float(p_input_controller_nominal[1])
     param_controller['Odd']['pushoff_impulse_magnitude_nominal'] = float(p_input_controller_nominal[2])
@@ -33,7 +32,6 @@ def f_objective_asymmetric_nominal(
     param_controller['Even']['y_at_midstance_nominal_slopeframe'] = float(p_input_controller_nominal[8])
     param_controller['Even']['sumy_at_midstance_nominal_slopeframe'] = float(p_input_controller_nominal[9])
 
-    # simulate a handful of steps to compute steady-state energy
     param_fixed['num_steps'] = param_fixed['Learner']['numStepsPerIteration']
     (
         state_var0,
@@ -56,7 +54,6 @@ def f_objective_asymmetric_nominal(
         np.linalg.norm(state_var0_model[1:3] - state_var0[1:3]) ** 2
     )
 
-    # trade off energy and periodicity
     lambda_energy_vs_periodicity = param_fixed['lambdaEnergyVsPeriodicity']
     f_objective = (
         lambda_energy_vs_periodicity * f_energy
@@ -81,13 +78,11 @@ def f_objective_asymmetric_nominal(
         if param_fixed.get("fallPenaltyScaleToEnergy", False):
             f_fall_margin = f_fall_margin * f_energy
         param_fixed["_lastFallPenalty"] = f_fall_margin
-        param_fixed["_lastFallPenaltyMode"] = param_fixed.get("fallPenaltyMode", "hinge")
-        # Deterministic (no RNG) diagnostic used by the global fall-risk track to
-        # detect falls in uncapped rollouts. Does not affect the objective.
+        param_fixed["_lastFallPenaltyMode"] = param_fixed.get("fallPenaltyMode", "com_margin")
         param_fixed["_lastMinCom"] = compute_trial_min_com_height(state_store, param_fixed)
     else:
         param_fixed["_lastFallPenalty"] = np.nan
-        param_fixed["_lastFallPenaltyMode"] = param_fixed.get("fallPenaltyMode", "hinge")
+        param_fixed["_lastFallPenaltyMode"] = param_fixed.get("fallPenaltyMode", "com_margin")
         param_fixed["_lastMinCom"] = np.nan
 
     if fall_penalty_weight != 0.0:

@@ -38,7 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
     addendum.add_argument("--generated-s1", type=Path, help="Directory containing freshly recomputed MATLAB grid-sensitivity CSVs.")
     addendum.add_argument("--generated-s1-script", type=Path, help="MATLAB source used for those grid-sensitivity CSVs; required with --generated-s1.")
     addendum.add_argument("--data", default=Path("data/publication"), type=Path)
-    reproduce = commands.add_parser("reproduce", help="Write figures, source tables and an honest completion report.")
+    reproduce = commands.add_parser("reproduce", help="Write figures, source tables and a completion report.")
     reproduce.add_argument("--data", default=Path("data/publication"), type=Path)
     reproduce.add_argument("--output", default=Path("outputs/publication"), type=Path)
     reproduce.add_argument("--figures", nargs="+", choices=FIGURES, default=list(FIGURES))
@@ -126,7 +126,7 @@ def reproduce(args) -> int:
                          "See data/README.md for the companion publication-data.zip."),
                     ],
                 })
-            except Exception as error:  # noqa: BLE001 -- retain a report when one independent figure fails
+            except Exception as error:  # noqa: BLE001
                 logs = staging / "logs"
                 logs.mkdir(exist_ok=True)
                 (logs / f"{figure}.txt").write_text(traceback.format_exc())

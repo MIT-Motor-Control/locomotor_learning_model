@@ -10,7 +10,7 @@ from .workflow import run_simulation
 
 
 def _add_options(parser: argparse.ArgumentParser, command: str | None = None) -> None:
-    """Share scientific options while retaining the historical flag-only defaults."""
+    """Add simulation options and command-specific output defaults."""
     output = (
         Path("outputs") / {"demo": "demo", "run": "run", "resume": "resumed"}[command]
         if command
@@ -118,7 +118,7 @@ def _add_options(parser: argparse.ArgumentParser, command: str | None = None) ->
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Build the command-oriented interface; flag-only calls remain supported."""
+    """Build the demo, run and resume commands."""
     parser = argparse.ArgumentParser(
         prog="loco-simulate",
         description="Run and resume baseline model examples. These are not published participant fits.",
@@ -138,7 +138,7 @@ def build_parser() -> argparse.ArgumentParser:
             "This example may finish before split-belt adaptation begins."
         ),
         "run": (
-            "Run a new simulation with the original scientific defaults unless overridden. "
+            "Run a new simulation with the configured model settings. "
             "Save results and checkpoints to outputs/run; no interactive windows by default."
         ),
         "resume": (

@@ -42,13 +42,11 @@ def rlsupdate(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Update a rolling linear model from recent input/output histories.
 
-    ``beta`` and ``mu_measurement`` are unused compatibility arguments from
-    the MATLAB signature. This estimator fits a finite window without
-    exponential forgetting.
+    ``beta`` and ``mu_measurement`` are retained for API compatibility; the
+    estimate uses a finite window without exponential forgetting.
     """
 
-    # Pick only the most recent ``num_steps_to_use`` strides. Each column is a
-    # single step.
+    # History columns correspond to successive strides.
     input_now_store = input_now_store[:, -num_steps_to_use:]
     
     if output_next_store.ndim == 1:
@@ -57,28 +55,22 @@ def rlsupdate(
     else:
         output_next_store = output_next_store[:, -num_steps_to_use:]
 
-    # Transpose so that each row represents one step.
     input_now_store = input_now_store.T
     output_next_store = output_next_store.T
 
-    # Add the column of ones for the constant term.
     input_now_store = np.hstack(
         [input_now_store, np.ones((input_now_store.shape[0], 1))]
     )
 
-    # Use pivoted QR so rank-deficient windows choose a consistent solution.
     anew = _pivoted_basic_lstsq(input_now_store, output_next_store)
 
-    # Compute errors using the old model.
     aold_t = aold.T
     error_old_all_steps = output_next_store - input_now_store @ aold_t
     error_old_most_recent_step = error_old_all_steps[-1, :].reshape(-1, 1)
 
-    # Compute errors using the new model.
     error_new_all_steps = output_next_store - input_now_store @ anew
     error_new_most_recent_step = error_new_all_steps[-1, :].reshape(-1, 1)
 
-    # Transpose back so that rows correspond to outputs.
     anew = anew.T
 
     return anew, error_old_most_recent_step, error_new_most_recent_step

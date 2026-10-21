@@ -9,9 +9,8 @@ def make_treadmill_speed_split(paramFixed):
     timeScaling = np.sqrt(L / g)
     paramFixed['timeScaling'] = timeScaling
 
-    # Retain the baseline's rounded speed constants for MATLAB parity.
-    # splitSpeedDiffMS scales the half-difference about the same average speed.
-    delta = 0.0328  # half of normal delta
+    # Scale the speed difference about the fixed mean belt speed.
+    delta = 0.0328
     vNormal = -0.3276
     if 'splitSpeedDiffMS' in paramFixed:
         speed_diff_ms = float(paramFixed['splitSpeedDiffMS'])
@@ -29,13 +28,11 @@ def make_treadmill_speed_split(paramFixed):
     if speedProtocol == 'single speed':
         tDurationTransition = paramFixed['transitionTime'] / timeScaling
 
-        # phase durations (non-dimensionalized)
         tDuration1 = 9 * 60 / timeScaling
         tDuration2 = 1 * 60 / timeScaling
         tDuration3 = 1 * 60 / timeScaling
         tDuration4 = 1 * 60 / timeScaling
 
-        # tied‐belt speeds
         f1_p1 = f2_p1 = vNormal
         f1_p2 = f2_p2 = vNormal
         f1_p3 = f2_p3 = vNormal
@@ -57,7 +54,6 @@ def make_treadmill_speed_split(paramFixed):
     else:
         raise ValueError(f"Unknown speedProtocol: {speedProtocol}")
 
-    # Build phase breakpoints and belt-speed stores.
     tStore = np.cumsum([0, tDuration1, tDuration2, tDuration3, tDuration4])
     footSpeed1Store = np.array([f1_p1, f1_p1, f1_p2, f1_p3, f1_p4])
     footSpeed2Store = np.array([f2_p1, f2_p1, f2_p2, f2_p3, f2_p4])
@@ -69,16 +65,13 @@ def make_treadmill_speed_split(paramFixed):
 
     for i in range(1, len(tStore)):
         if i < len(tStore) - 1:
-            # start of phase i
             tStore_new.append(tStore[i])
             foot1_new.append(footSpeed1Store[i])
             foot2_new.append(footSpeed2Store[i])
-            # end of transition into phase i+1
             tStore_new.append(tStore[i] + tDurationTransition)
             foot1_new.append(footSpeed1Store[i+1])
             foot2_new.append(footSpeed2Store[i+1])
         else:
-            # last phase just append once
             tStore_new.append(tStore[i])
             foot1_new.append(footSpeed1Store[i])
             foot2_new.append(footSpeed2Store[i])
@@ -89,7 +82,6 @@ def make_treadmill_speed_split(paramFixed):
 
     a1List = np.diff(footSpeed1List) / np.diff(tList)
     a2List = np.diff(footSpeed2List) / np.diff(tList)
-    # pad with zero at end to match lengths
     a1List = np.append(a1List, 0.0)
     a2List = np.append(a2List, 0.0)
 

@@ -1,7 +1,5 @@
 function publication_s1_grid_sensitivity(grid_path, output_dir)
-% Exact scientific loops from revision/comment1_grid_sensitivity.m (2026-10-15).
-% Only config/console output is replaced by explicit paths and source CSVs.
-% RNG is seeded once before all three thresholds, preserving randperm order.
+% Compare leave-one-subject-out fits across finite-grid coverage thresholds.
 rng(0);
 R = 200;
 S = load(grid_path, 'rmse_matrix', 'exp_subj_num');

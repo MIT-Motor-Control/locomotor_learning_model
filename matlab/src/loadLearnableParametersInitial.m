@@ -1,10 +1,7 @@
 function pInputControllerAsymmetricNominal = ...
     loadLearnableParametersInitial(paramFixed)
+% Initialize the nominal controller for alternating steps.
 
-% Odd-step parameters followed by even-step parameters: endstance angle,
-% midstance belt-frame speed, push-off impulse, position and position integral.
-% Odd-step position and integral define the origin and are fixed at zero.
-% Odd and even nominal controllers may differ.
 switch paramFixed.swingCost.Coeff
     case 0.9
         pInputControllerAsymmetricNominal = [0.328221262798818

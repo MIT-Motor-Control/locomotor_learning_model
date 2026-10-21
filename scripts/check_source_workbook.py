@@ -1,9 +1,6 @@
-"""Read-only numerical validation of the publication source workbook.
+"""Check workbook cells, source hashes and coverage against publication results.
 
 Usage: python scripts/check_source_workbook.py REPRODUCTION_DIR OUTPUT.xlsx
-Requires openpyxl only for reading the saved workbook. This script never authors
-or modifies a workbook. It verifies every imported cell, source checksum, table
-header, coverage guide and source index against the numerical CSVs and report.
 """
 
 from __future__ import annotations
@@ -119,8 +116,7 @@ def check(input_root: Path, output: Path) -> dict:
     )
     if [list(row) for row in actual_index] != metadata["sourceIndexRows"]:
         raise ValueError("Source index differs from the imported CSV records")
-    # Coverage is derived independently from the numerical tables, not fixed
-    # labels asserting that Sanchez or S3 inputs are always missing.
+    # Cross-check coverage labels against the imported numerical tables.
     coverage = {row["values"][0]: row["values"][1] for row in metadata["guide"]}
     for panel, filename in (
         ("S3B", "s3b_model_trials.csv"),

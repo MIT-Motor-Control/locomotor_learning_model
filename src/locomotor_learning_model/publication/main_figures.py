@@ -130,7 +130,7 @@ def _boxes(axis, groups, positions, widths=0.5) -> list[dict]:
 
 
 def figure1_tables(data_root: Path) -> dict[str, list[dict]]:
-    """Preserve the handoff's windows and condition-local participant ordering."""
+    """Summarize experimental energy and symmetry by condition and exposure."""
     original = Path(data_root) / "original"
     energy = _mat(original / "data/cosmed/processed/processedEnergyData.mat")
     sla = _mat(original / "processedSLAData_23Subj.mat")
@@ -448,7 +448,7 @@ def fall_filename(speed: float, rate: float, trial: int) -> str:
 
 
 def fall_tables(data_root: Path) -> tuple[list[dict], list[dict]]:
-    """Require every submitted trial; never change the denominator by skipping files."""
+    """Load the complete set of fall-probability trials."""
     folder = Path(data_root) / "fall_probability"
     speeds, rates = (0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0), (0.01, 0.02, 0.03, 0.04, 0.05)
     expected = [
@@ -617,10 +617,8 @@ def _figure3(data_root: Path, output_root: Path) -> dict:
     caveats = [
         "Cached trial reconstruction; not a fresh stochastic rerun.",
         (
-            "The final manuscript states a 20-second transition, but the handoff generator and audited "
-            "cached speed profiles encode 25 seconds despite trans20 filenames. The generator and cached "
-            "profiles also divide physical belt speeds by 2, whereas the manuscript describes division "
-            "by sqrt(g*leg_length). These provenance discrepancies require author clarification."
+            "Cached belt-speed profiles use a 25-second transition and physical belt speeds divided "
+            "by 2. Their trans20 filenames are retained as source identifiers."
         ),
         (
             "The representative fall trace appends a terminal zero, following the original plotting script; "
@@ -769,11 +767,7 @@ def _rank_sum_probability(x, y, alternative: str) -> tuple[float, float, str]:
 
 
 def parameter_statistics(data_root: Path) -> dict[str, list[dict]]:
-    """Reproduce the addendum's independent-cohort parameter comparisons.
-
-    These tests concern alpha and psi, not the landscape's fall probabilities.
-    Both stored realizations are labeled; Figure 4 uses the original fit.
-    """
+    """Compare fitted alpha and psi across independent participant cohorts."""
     summaries, tests = [], []
     for source in ("original", "regenerated"):
         path = Path(data_root) / source / "2d_sweep_trial50_param_result.mat"

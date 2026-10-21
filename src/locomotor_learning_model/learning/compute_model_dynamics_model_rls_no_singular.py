@@ -14,13 +14,12 @@ def compute_model_dynamics_model_rls_no_singular(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Update the internal linear dynamics model using recent stride data."""
 
-    beta = 0.5  # Unused but kept for API compatibility
+    beta = 0.5
 
     aold = adynamics_now
 
-    mu_measurement = 0.0  # Dummy variable, not used
+    mu_measurement = 0.0
 
-    # Ensure both arrays have the same number of columns by taking the minimum
     min_cols = min(state_var_now_store.shape[1], p_input_controller_now_store.shape[1], 
                    state_var_next_store.shape[1])
     
@@ -31,7 +30,7 @@ def compute_model_dynamics_model_rls_no_singular(
     input_now_store = np.vstack((state_var_trimmed, p_input_trimmed))
     output_next_store = state_next_trimmed
 
-    # Remove the first row of zeros to avoid singularity
+    # Midstance fixes the first state component at zero.
     input_now_store = input_now_store[1:, :]
     output_next_store = output_next_store[1:, :]
 

@@ -1,4 +1,4 @@
-"""Safe ZIP installation, idempotency and preservation of existing datasets."""
+"""ZIP installation, idempotency and dataset preservation."""
 
 import hashlib
 import json
@@ -51,8 +51,7 @@ def public_source(tmp_path, monkeypatch):
     source = tmp_path / "experimental"
     source.mkdir()
 
-    # Numerical public-data compatibility is tested in the Zenodo import tests.
-    # These tests exercise the install transaction with its validation boundary.
+    # Isolate archive installation from experimental-data parsing.
     def validate(actual_source, destination):
         assert actual_source == source
         return installer._verified_manifest(destination)

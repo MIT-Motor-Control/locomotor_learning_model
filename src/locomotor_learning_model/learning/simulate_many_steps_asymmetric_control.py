@@ -22,24 +22,14 @@ def simulate_many_steps_asymmetric_control(
     np.ndarray,
     np.ndarray,
 ]:
-    """Simulate repeated asymmetric walking steps from an initial state.
+    """Simulate asymmetric walking and return trajectories and step-wise energies.
 
-    Parameters
-    ----------
-    state_var0
-        Reduced state at mid-stance: ``[theta, theta_dot, y_foot, INTy]``.
-    param_controller
-        Controller structure with ``Odd`` and ``Even`` sub-structures.
-    param_fixed
-        Structure with field ``num_steps`` describing how many steps to
-        simulate.
-    t_start
-        Initial time for the simulation.
+    The initial state contains stance angle, angular velocity, foot position,
+    accumulated foot position, and swing-foot velocity at midstance.
     """
 
     num_steps = int(param_fixed['num_steps'])
 
-    # Storage for time histories and state trajectories
     t_store: list[np.ndarray] = [np.empty(0) for _ in range(num_steps + 1)]
     state_store: list[np.ndarray] = [np.empty((0, 3)) for _ in range(num_steps + 1)]
 
@@ -51,7 +41,6 @@ def simulate_many_steps_asymmetric_control(
     ework_heelstrike_store = np.zeros(num_steps)
 
     for i_step in range(1, num_steps + 1):
-        # Odd or even control parameters
         if i_step % 2 == 0:
             param_controller['theta_end_nominal'] = param_controller['Even']['theta_end_nominal']
             param_controller['ydot_at_midstance_nominal_beltframe'] = (
@@ -74,7 +63,7 @@ def simulate_many_steps_asymmetric_control(
             param_controller['pushoff_impulse_magnitude_nominal'] = (
                 param_controller['Odd']['pushoff_impulse_magnitude_nominal']
             )
-            # Fixed to zero by fiat
+            # Odd-leg position targets define the reference frame.
             param_controller['y_at_midstance_nominal_slopeframe'] = 0.0
             param_controller['sumy_at_midstance_nominal_slopeframe'] = 0.0
 
@@ -97,7 +86,7 @@ def simulate_many_steps_asymmetric_control(
             param_fixed,
         )
 
-        # Store trajectories (mid-stance to mid-stance straddles two steps)
+        # Each midstance-to-midstance interval spans two stance trajectories.
         t_store[i_step - 1] = np.concatenate(
             [t_store[i_step - 1], np.asarray(tlist_till_endstance).flatten()]
         )
@@ -120,10 +109,8 @@ def simulate_many_steps_asymmetric_control(
                 [state_store[i_step], np.asarray(statevarlist_midstance)]
             )
 
-        # Reset time for next iteration
         t_start = float(np.asarray(tlist_till_midstance).flatten()[-1])
 
-        # Metabolic cost estimates
         emet_total_store[i_step - 1] = float(emet_total_now)
         emet_per_time_store[i_step - 1] = float(emet_per_time)
         t_step_store[i_step - 1] = float(t_total)

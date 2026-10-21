@@ -1,8 +1,5 @@
 function publication_s1_loso(grid_path, output_dir)
-% PUBLICATION_S1_LOSO Reproduce trial-average LOSO analysis without source writes.
-% Adapted from the author's revision/comment1_loso_cv.m. The scientific loop,
-% MATLAB random sequence, shared finite grid and tests are preserved. Inputs
-% replace historical config()/absolute paths; no simulation or curve fitting.
+% Compare condition-specific and shared fits using leave-one-subject-out validation.
 rng(0);
 S = load(grid_path, 'rmse_matrix', 'exp_subj_num');
 rm = S.rmse_matrix;

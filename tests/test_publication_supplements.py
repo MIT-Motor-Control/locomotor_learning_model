@@ -58,7 +58,7 @@ def test_figure2_addendum_normalization_preserves_matlab_trim_and_padding():
     signal = np.linspace(3, 1, 150)
     padded = np.r_[np.nan, 0, signal, np.inf, 0]
     smooth = matlab_movmean(signal, 100)
-    # n0=30; the supplied MATLAB/Python source starts at sample30 (index29).
+    # n0=30 selects the 30th sample (Python index 29).
     trimmed = smooth[29:]
     expected = (trimmed - trimmed[:120].mean()) / trimmed[:120].mean() * 100
     np.testing.assert_array_equal(normalize_raw_trajectory(padded), expected)
@@ -125,9 +125,9 @@ def test_s3_trials_use_tied_window_nonfall_medians_and_shared_cells(tmp_path):
         s3_model_tables(tmp_path)
 
 
-def test_s5_preserves_historical_symmetric_even_window_and_onset():
+def test_s5_symmetric_window_and_onset():
     raw = np.array([1.0, 2.0, 4.0, 8.0, 16.0])
-    # window=2 means i-1 through i+1 in the original reviewer-response source.
+    # S5 uses a centered three-point mean when window=2.
     smooth = np.array([1.5, 7 / 3, 14 / 3, 28 / 3, 12.0])
     expected = (smooth - smooth[:2].mean()) / smooth[:2].mean() * 100
     np.testing.assert_allclose(reviewer_energy_percent(raw, window=2, onset_window=2), expected)

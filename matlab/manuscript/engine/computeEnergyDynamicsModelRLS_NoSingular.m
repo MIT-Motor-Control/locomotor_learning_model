@@ -1,19 +1,18 @@
 function [AdynamicsNew,errorOldModel,errorNewModel] = ...
     computeEnergyDynamicsModelRLS_NoSingular(AdynamicsNow, ...
     stateVarNowStore,EdotStore,pInputControllerNowStore,numStepsToUse)
-% computes a linear model that predicts energy this stride from input state
-% and control parameters
+% Fit stride energy from recent states and controller parameters.
 
-beta = 0.5; % not used and can be set to 
+beta = 0.5;
 
 Aold = AdynamicsNow;
 
-muMeasurement = 0; % dummy variable and not used
+muMeasurement = 0;
 
 InputNowStore = [stateVarNowStore; pInputControllerNowStore];
 OutputNextStore = EdotStore;
 
-% remove 1st row of zeros to avoid singularity
+% Midstance fixes the first state coordinate at zero; omit it from the fit.
 InputNowStore = InputNowStore(2:end,:);
 
 [AdynamicsNew,errorOldModel,errorNewModel] = ...

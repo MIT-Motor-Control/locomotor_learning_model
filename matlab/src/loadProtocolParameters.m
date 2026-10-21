@@ -1,33 +1,21 @@
 function paramFixed = loadProtocolParameters(paramFixed)
-% adaptation protocol parameters: how the treadmill speed is changed, and
-% whether the adaptation protocol is on a split-belt treadmill or a tied
-% belt treadmill.
+% Set the treadmill protocol and derive the learning-iteration budget.
 
-%% what speed protocol to use: split belt changes
 paramFixed.SplitOrTied = 'split';
 paramFixed.speedProtocol = 'classic split belt';
-paramFixed.transitionTime = 15; % in seconds. 
+paramFixed.transitionTime = 15; % seconds
 paramFixed.imposedFootSpeeds = makeTreadmillSpeed_Split(paramFixed);
-
-% For tied walking, use SplitOrTied = 'tied', speedProtocol =
-% 'four speed changes', a 3-second transition and makeTreadmillSpeed_Tied.
 
 drawnow;
 
-%%
-paramFixed.angleSlope = 0;  
-% do not change: the code has not been tested for non-zero values
+% The supported protocol uses level ground.
+paramFixed.angleSlope = 0;
 
-% Duration follows the protocol. Call loadHowLongParameters afterward
-% to use its step-count override.
-
-%% How many steps to simulate
-nominalStepTime = 1.7; 
+nominalStepTime = 1.7;
 paramFixed.numStepsToLearn = paramFixed.imposedFootSpeeds.tList(end)/nominalStepTime;
-paramFixed.numStepsToLearn = round(paramFixed.numStepsToLearn/100)*100; % round to the nearest hundred
+paramFixed.numStepsToLearn = round(paramFixed.numStepsToLearn/100)*100;
 
-%% optimization iterations
-% Balance both legs before converting the physical-step budget to iterations.
+% Use complete odd/even step pairs in each learning iteration.
 if mod(paramFixed.Learner.numStepsPerIteration,2)~=0
     paramFixed.Learner.numStepsPerIteration = paramFixed.Learner.numStepsPerIteration + 1;
 end

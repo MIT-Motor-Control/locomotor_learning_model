@@ -1,10 +1,4 @@
-"""Portable numerical reproductions of Figure 2B and supplementary analyses.
-
-The published fitted curves and the original reviewer-response numerical caches
-are inputs, never digitized illustrations. Replotting a cache is explicitly
-distinguished from rerunning an analysis. Source algorithms are documented in
-each renderer; no imports from the historical handoff/private archive are needed.
-"""
+"""Reproduce Figure 2B and supplementary analyses from saved numerical inputs."""
 
 from __future__ import annotations
 
@@ -90,11 +84,7 @@ def _record(identifier, outputs, sources, mode, caveats=(), status="passed", **d
 
 
 def matlab_movmean(x: np.ndarray, window: int) -> np.ndarray:
-    """MATLAB movmean shrink endpoints, including its asymmetric even window.
-
-    This is the original manuscript transform, which differs from S5's
-    reviewer-response moving average for even window sizes.
-    """
+    """Compute a shrinking-endpoint mean with MATLAB's asymmetric even window."""
     x = np.asarray(x, dtype=float)
     if x.ndim != 1 or not x.size or not np.all(np.isfinite(x)):
         raise ValueError("movmean requires a nonempty finite one-dimensional signal")
@@ -108,10 +98,7 @@ def matlab_movmean(x: np.ndarray, window: int) -> np.ndarray:
 
 
 def stored_fit_metrics(y: np.ndarray, normalized_fit: np.ndarray) -> tuple[float, float]:
-    """Recover the least-squares scale and R² of an already stored fit shape.
-
-    No exponential coefficients or learning parameters are refitted.
-    """
+    """Estimate the least-squares scale and R² of a stored normalized curve."""
     y, g = np.asarray(y, float), np.asarray(normalized_fit, float)
     if y.ndim != 1 or y.shape != g.shape or not y.size:
         raise ValueError("Observed signal and stored fit must be equal-length vectors")
@@ -146,7 +133,7 @@ def _load_published(root: Path):
 
 
 def _figure2(root: Path, output: Path) -> dict:
-    """Addendum comment2_raw_sidebyside.py, SOURCE=verify PANEL=2 SPLIT=1."""
+    """Plot regenerated group trajectories for the 0.7 m/s condition."""
     from .regenerated import (
         REGENERATED_ENERGY,
         REGENERATED_PARAMETERS,
@@ -230,9 +217,7 @@ def _s1_from_tables(prefix: Path, output: Path, mode: str, sources: list[str]) -
     cond = np.array([int(r["condition"]) for r in rows])
     if len(rows) != 26 or not np.all(np.isfinite([cs, shared])):
         raise ValueError("S1 requires finite paired errors for all 26 participants")
-    # The final manuscript reports MATLAB signrank's default approximation for
-    # n=26. Display that value; retain the historical styled plot's exact test
-    # separately so that the two statistical methods cannot be confused.
+    # The manuscript uses MATLAB's approximate signed-rank p-value; export both methods.
     p_exact = float(stats.wilcoxon(cs, shared, method="exact").pvalue)
     p_matlab = float(saved_test["wilcoxon_p_condspec_vs_commonsize"])
     summary = [
@@ -394,11 +379,7 @@ def _attach_s1_grid(root: Path, prefix: Path, output: Path, record: dict, mode: 
 def recompute_s1_matlab(
     data_root: Path, output_root: Path, matlab_executable: str = "matlab"
 ) -> dict:
-    """Rerun original MATLAB LOSO analysis using the supplied trial-average grid.
-
-    Requires MATLAB and Statistics and Machine Learning Toolbox; Curve Fitting
-    Toolbox is unnecessary. Input MAT files and reference CSVs are never changed.
-    """
+    """Recompute S1 using MATLAB with the Statistics and Machine Learning Toolbox."""
     data_root, output_root = Path(data_root), Path(output_root)
     source = "regenerated/2d_sweep_trial50_param_result_trialavg.mat"
     grid = _require(data_root, source).resolve()
@@ -431,12 +412,7 @@ def recompute_s1_matlab(
 
 
 def _s2(root: Path, output: Path) -> dict:
-    """Original comment_2 scalar statistics and numerical trajectory caches.
-
-    Student-t intervals are recomputed from the original participant summaries.
-    Cached model means and GRF-derived trajectories are replotted without raw
-    GRF processing or new model simulations.
-    """
+    """Plot S2 trajectories and recompute t-intervals from participant summaries."""
     base = "extensions/s2"
     sources = [
         f"{base}/{name}"
@@ -787,11 +763,9 @@ def _s3(root: Path, output: Path) -> dict:
 def reviewer_energy_percent(
     raw: np.ndarray, window: int = 180, onset_window: int = 30
 ) -> np.ndarray:
-    """Original S5 NaN-aware smoothing and 30-s smoothed-onset normalization.
+    """Normalize a NaN-aware centered mean to its first ``onset_window`` samples.
 
-    With window=180 the historical centered implementation includes 181 points
-    in the interior (i-90 through i+90). Preserve this rather than silently using
-    MATLAB's 180-point manuscript convention.
+    Even windows include both endpoints: ``window=180`` averages 181 interior samples.
     """
     raw = np.asarray(raw, float)
     if raw.ndim != 1 or not raw.size or window < 1 or onset_window < 1:
@@ -966,11 +940,9 @@ def _s5(root: Path, output: Path) -> dict:
 
 
 def compare_exponential_timescales(values: np.ndarray) -> dict:
-    """Repeat the historical single/double-timescale diagnostic on one signal.
+    """Compare unbounded single- and double-exponential fits.
 
-    This is the original unbounded SciPy diagnostic, not a refit of the MATLAB
-    headline R². Preserve its initialization and nonnegative reported gain, but
-    also export the unclipped result and optimizer covariance-warning state.
+    Export raw R² and covariance warnings alongside gains clipped to zero.
     """
     y = np.asarray(values, float)
     if y.ndim != 1 or y.size < 6 or not np.all(np.isfinite(y)) or np.var(y) == 0:
@@ -1189,11 +1161,7 @@ def _r2(root: Path, output: Path) -> dict:
 def render_supplements(
     data_root: Path, output_root: Path, figures: list[str] | None = None
 ) -> list[dict]:
-    """Render selected available supplements, exporting every plotted value.
-
-    Unknown selections and missing required data fail explicitly. S3's known
-    missing panel is reported as partial rather than replaced with stale values.
-    """
+    """Render selected supplementary figures and export their numerical source tables."""
     renderers = {"figure2": _figure2, "s1": _s1, "s2": _s2, "s3": _s3, "s5": _s5, "r2": _r2}
     selected = list(renderers) if figures is None else list(dict.fromkeys(figures))
     unknown = set(selected) - renderers.keys()

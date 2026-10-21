@@ -198,7 +198,6 @@ def _read_checkpoint(path):
     if not isinstance(config["param_fixed"], dict) or not isinstance(
         config["param_controller_gains"], dict
     ):
-        # Preserve the invalid-checkpoint ValueError contract.
         raise ValueError("Checkpoint parameters must be dictionaries")  # noqa: TRY004
     for name, shape in (("initial_controller_parameters", (10,)), ("initial_state", (5,))):
         value = config[name]
@@ -251,13 +250,13 @@ def run_simulation(
     checkpoint_every: int | None = None,
     stop_after: int | None = None,
 ) -> SimulationResults:
-    """Run or resume the baseline Python model without changing scientific defaults.
+    """Run or resume the baseline Python model.
 
     ``num_iterations`` is the total target, including completed iterations on resume.
     ``stop_after`` stops at an absolute iteration boundary and requires a checkpoint
     path. Checkpoints capture learning state before post-processing; the latter is
     replayed from the initial body state after each call. Random draws use a private
-    MT19937 generator, preserving the historical seeded sequence.
+    MT19937 generator whose state is saved in the checkpoint.
     """
     if split_or_tied is not None and split_or_tied not in ("split", "tied"):
         raise ValueError("split_or_tied must be 'split' or 'tied'")
@@ -318,7 +317,7 @@ def run_simulation(
         if seed is not None and int(seed) != saved["metadata"]["seed"]:
             raise ValueError("Cannot change seed when resuming a checkpoint")
         seed = saved["metadata"]["seed"]
-        # Prevent a change to default scientific parameters from silently reusing old state.
+        # A checkpoint must agree with the current model configuration.
         current = _configuration(
             original["SplitOrTied"],
             original["speedProtocol"],

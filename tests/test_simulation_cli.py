@@ -1,4 +1,4 @@
-"""The short simulation commands save usable results without changing model defaults."""
+"""Command-line simulations and checkpoint persistence."""
 
 from types import SimpleNamespace
 

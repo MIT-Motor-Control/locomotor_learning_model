@@ -1,8 +1,8 @@
 function [f_objective,stateVar0,tEnd,f_energy,f_constraint] = ...
     fObjective_AsymmetricNominal(pInputControllerNominal,stateVar0_Model, ...
     paramController,paramFixed,tStart)
+% Evaluate the energy, periodicity and symmetry objective over successive steps.
 
-%% unwrap the controller 
 paramController.Odd.theta_end_nominal = ...
     pInputControllerNominal(1);
 paramController.Odd.ydot_atMidstance_nominal_beltframe = ...
@@ -10,9 +10,9 @@ paramController.Odd.ydot_atMidstance_nominal_beltframe = ...
 paramController.Odd.PushoffImpulseMagnitude_nominal = ...
     pInputControllerNominal(3);
 paramController.Odd.y_atMidstance_nominal_slopeframe = ...
-    pInputControllerNominal(4); % needs to be fixed to zero
+    pInputControllerNominal(4);
 paramController.Odd.SUMy_atMidstance_nominal_slopeframe = ...
-    pInputControllerNominal(5); % needs to be fixed to zero
+    pInputControllerNominal(5);
 
 paramController.Even.theta_end_nominal = ...
     pInputControllerNominal(6);
@@ -25,8 +25,7 @@ paramController.Even.y_atMidstance_nominal_slopeframe = ...
 paramController.Even.SUMy_atMidstance_nominal_slopeframe = ...
     pInputControllerNominal(10);
 
-%% simulate the configured number of steps per learning iteration
-paramFixed.numSteps = paramFixed.Learner.numStepsPerIteration; 
+paramFixed.numSteps = paramFixed.Learner.numStepsPerIteration;
 [stateVar0,tStore,stateStore,EmetTotalStore, EmetPerTimeStore, ...
     tStepStore] = ...
     simulateManySteps_AsymmetricControl(stateVar0_Model,paramController,paramFixed,tStart);
@@ -34,16 +33,14 @@ paramFixed.numSteps = paramFixed.Learner.numStepsPerIteration;
 f_energy = sum(EmetTotalStore)/sum(tStepStore);
 tEnd = tStore{end}(end);
 
-f_constraint = (norm(stateVar0_Model(2:3)-stateVar0(2:3)))^2; % penalize changes in angular velocity and foot position
+f_constraint = (norm(stateVar0_Model(2:3)-stateVar0(2:3)))^2;
 
-% trade off energy and periodicity
 lambdaEnergyVsPeriodicity = paramFixed.lambdaEnergyVsPeriodicity;
 f_objective = lambdaEnergyVsPeriodicity*f_energy+(1-lambdaEnergyVsPeriodicity)*f_constraint;
 
 angleThetaEnd_1 = stateStore{1}(end,1); angleThetaEnd_2 = stateStore{2}(end,1);
 f_symmetry = (angleThetaEnd_1-angleThetaEnd_2)^2;
 
-% trading off energy and symmetry
 f_objective = paramFixed.lambdaEnergyVsSymmetry*f_objective + ...
     (1-paramFixed.lambdaEnergyVsSymmetry)*f_symmetry*paramFixed.symmetryMultiplier;
 

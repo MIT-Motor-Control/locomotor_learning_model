@@ -6,7 +6,6 @@ def load_biped_model_parameters(param_fixed: dict | None = None) -> dict:
     if param_fixed is None:
         param_fixed = {}
 
-    # Whether to include treadmill acceleration torque in the dynamics
     param_fixed['includeAccelerationTorque'] = 1
 
     # Body parameters (nondimensionalized)
@@ -35,17 +34,13 @@ def load_biped_model_parameters(param_fixed: dict | None = None) -> dict:
     param_fixed['symmetryMultiplier'] = 10
 
     # Optional local stability penalty; disabled in the baseline objective.
-    # Definitions: learning.fall_margin_penalty.
-    param_fixed['fallPenaltyWeight'] = 0.0            # w; 0 => baseline model
-    param_fixed['fallPenaltyMode'] = 'com_margin'     # primary local penalty
+    param_fixed['fallPenaltyWeight'] = 0.0
+    param_fixed['fallPenaltyMode'] = 'com_margin'
     param_fixed['fallPenaltyPower'] = 2.0
     param_fixed['fallPenaltyEpsilon'] = 1e-6
-    # The dimensionless COM margin is zero above the safe height and saturates
-    # at one at or below the ground reference. These are extension settings,
-    # not the manuscript engine's fall-termination threshold.
-    param_fixed['fallSafeComHeight'] = 0.95           # margin starts below this COM height
-    param_fixed['fallGroundComHeight'] = 0.90         # margin saturates (=1) at/below this
-    # capture_point (robustness alternative) parameters
+    # COM-height thresholds are dimensionless; the lower bound saturates the penalty.
+    param_fixed['fallSafeComHeight'] = 0.95
+    param_fixed['fallGroundComHeight'] = 0.90
     param_fixed['fallCapturePointLimit'] = 1.0
     param_fixed['fallCapturePointScale'] = 1.0
     param_fixed['fallPenaltyScaleToEnergy'] = False

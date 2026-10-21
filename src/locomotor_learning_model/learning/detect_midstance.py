@@ -6,11 +6,7 @@ import numpy as np
 def detect_midstance(
     t: float, state_var: np.ndarray, param_fixed, param_controller
 ) -> float:
-    """Return the event value used to detect midstance.
-
-    The value crosses zero when the body passes over the stance foot, allowing
-    ``solve_ivp`` to stop integration at the midstance event.
-    """
+    """Return zero when the body passes over the stance foot."""
 
     angle_theta = state_var[0]
 

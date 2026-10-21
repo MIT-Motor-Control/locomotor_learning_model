@@ -2,28 +2,27 @@ function postProcessHelper_JustThePlots(stateVar0,tStore,stateStore, ...
     EmetStore,EmetPerTimeStore,tStepStore,paramController,paramFixed,doAnimate, ...
     EworkPushoffStore,EworkHeelstrikeStore, EdotStore_IterationAverage, ...
     tTotalIterationStore)
-% Plot baseline gait and energy summaries. The doAnimate argument is unused.
+% Compute gait asymmetries and the metabolic transient.
 paramFixed.numSteps = length(EmetStore);
 
-%% step lengths, step length asymmetry, step time, step time asymmetry
 tStanceList = zeros(paramFixed.numSteps,1);
 stepLengthList = zeros(paramFixed.numSteps,1);
 for iStep = 1:paramFixed.numSteps
     tStanceList(iStep) = range(tStore{iStep});
-    theta_end = stateStore{iStep}(end,1); % last row, first column
-    stepLengthList(iStep) = abs(2*paramFixed.leglength*sin(theta_end)); % now based on END theta of a step
+    theta_end = stateStore{iStep}(end,1);
+    stepLengthList(iStep) = abs(2*paramFixed.leglength*sin(theta_end));
 end
 
-% Note: the following assumes that the first belt is faster
-tStance_fast = tStanceList(1:2:end); % stepping on to slow belt at the end: BEING on fast belt throughout
-tStance_slow = tStanceList(2:2:end); % stepping on to fast belt at the end: BEING on slow belt throughout
+% Odd stance intervals use the fast belt and end with contact on the slow belt.
+tStance_fast = tStanceList(1:2:end);
+tStance_slow = tStanceList(2:2:end);
 
 stepTimeAsymmetryList = (tStance_slow-tStance_fast)./(tStance_slow+tStance_fast);
-stepLength_slow = stepLengthList(1:2:end); % landing on the slow belt at the end of odd steps
-stepLength_fast = stepLengthList(2:2:end); % landing on the fast belt at the end of even steps
+% Assign step lengths by the belt contacted at the end of each interval.
+stepLength_slow = stepLengthList(1:2:end);
+stepLength_fast = stepLengthList(2:2:end);
 stepLengthAsymmetryList = (stepLength_fast-stepLength_slow)./(stepLength_fast+stepLength_slow);
 
-%% metabolic VO2 transient with a 44-second time constant
 params.tList = cumsum(tTotalIterationStore);
 params.EmetRateList = EdotStore_IterationAverage;
 [tSpan_Smoothed,EmetSList_Smoothed] = convertMetToVO2(params);
@@ -31,7 +30,7 @@ params.EmetRateList = EdotStore_IterationAverage;
 skipPlot = 10;
 
 if strcmp(paramFixed.SplitOrTied,'split')
-    
+
     stepTimeAsymmetryList(1) = NaN;
     strideCountList = 1:length(stepTimeAsymmetryList);
 
@@ -84,6 +83,5 @@ if strcmp(paramFixed.SplitOrTied,'tied')
 
     sgtitle('Tied Treadmill: Step frequency changes in response to speed changes');
 end
-
 
 end

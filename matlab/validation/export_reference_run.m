@@ -1,5 +1,5 @@
 function export_reference_run(outputPath, numIterations)
-%EXPORT_REFERENCE_RUN Save a deterministic MATLAB reference run for parity checks.
+% Save a seeded baseline run for Python/MATLAB numerical comparisons.
 
 if nargin < 1 || isempty(outputPath)
     outputPath = fullfile(tempdir, 'locomotor_learning_model_reference.mat');

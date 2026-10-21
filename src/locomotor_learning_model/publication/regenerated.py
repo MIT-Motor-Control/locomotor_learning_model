@@ -1,4 +1,4 @@
-"""Numerical recipes supplied with the October 15 manuscript addendum.
+"""Analyse regenerated group trajectories and participant-specific rollouts.
 
 Figure 2B uses regenerated group trajectories. S3B applies the original
 published participant parameters to a separate regenerated rollout realization.
@@ -27,7 +27,7 @@ def _load(root: Path, relative: str) -> dict:
 
 
 def normalize_raw_trajectory(values: np.ndarray) -> np.ndarray:
-    """Exact ``norm0`` in comment2_raw_sidebyside.py, including one-based trim."""
+    """Smooth, trim startup samples and normalize energy to its onset mean."""
     values = np.asarray(values, float).ravel()
     values = values[np.isfinite(values) & (values != 0)]
     if values.size < 30:
@@ -101,11 +101,9 @@ def grid_finite_counts(root: Path) -> list[dict]:
 
 
 def s3_model_tables(root: Path) -> tuple[list[dict], list[dict], list[dict]]:
-    """Recompute trial values, participant medians and condition means for S3B.
+    """Summarize S3B trials by participant and condition.
 
-    Shared fitted cells are read once, then reused for each participant as in
-    make_supp_trajopt_comparison.py. Counts in the condition table are therefore
-    participant-weighted; the trial table contains unique input realizations.
+    Condition counts weight shared parameter cells by their number of participants.
     """
     source = _load(root, "original/2d_sweep_trial50_param_result.mat")
     parameters = source["static_params"]

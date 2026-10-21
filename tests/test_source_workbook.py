@@ -1,4 +1,4 @@
-"""The portable workbook preserves scientific values and verifies provenance."""
+"""Workbook values, layout and provenance."""
 
 import hashlib
 import importlib.util

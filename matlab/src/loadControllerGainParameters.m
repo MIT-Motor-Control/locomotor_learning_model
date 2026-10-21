@@ -1,8 +1,7 @@
 function paramController = loadControllerGainParameters(paramFixed)
-% Fixed feedback gains for the baseline controller.
+% Set fixed gains for the feedback controller.
 
-%% Controller parameters, gains, Fixed during the optimization
-switch paramFixed.swingCost.Coeff 
+switch paramFixed.swingCost.Coeff
     case 0.9
         paramController.pushoff_gain_ydot  = -0.521088310893437;
         paramController.legAngle_gain_ydot =  0.279308152405233;
@@ -14,7 +13,6 @@ switch paramFixed.swingCost.Coeff
         paramController.pushoff_gain_BeltSpeed = -1.055930819923483;
 end
 
-% Express speed feedback in the belt frame.
 paramController.ControllerBeltFrameVsLabFrame = 1;
 
 end

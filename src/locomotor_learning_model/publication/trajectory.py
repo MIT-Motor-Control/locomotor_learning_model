@@ -1,8 +1,4 @@
-"""Evaluate the supplied muscle-output subset using the original energy equations.
-
-This reads saved OpenSim outputs; it does not run trajectory optimization. The
-available conditions differ from the five rounded values plotted in the paper.
-"""
+"""Calculate muscle energy from the available saved OpenSim trajectories."""
 
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -62,7 +58,7 @@ def read_storage(path: Path) -> tuple[list[str], np.ndarray]:
 
 
 def source_energy_cost(storage: Path, model: Path, average_speed: float = 1.0) -> dict:
-    """Port computeOsimEnergy.m, retaining sample means and its muscle ordering."""
+    """Compute muscle energy using sample means in the stored muscle order."""
     if not np.isfinite(average_speed) or average_speed <= 0:
         raise ValueError("Average treadmill speed must be positive and finite")
     columns, values = read_storage(storage)
@@ -102,7 +98,7 @@ def source_energy_cost(storage: Path, model: Path, average_speed: float = 1.0) -
     a_slow, a_fast = 40 / maximum_velocity[-1], 153 / maximum_velocity[-1]
     h_am = (128 * fast_twitch + 25) * np.where(fiber_length < length, 1, 0.4 + 0.6 * multiplier)
     h_sl = 4 * a_slow * vn_long - a_slow * vn_short * SLOW_TWITCH - a_fast * vn_short * fast_twitch
-    # Preserve the original cap expression, including its subtraction of 100.
+    # The source equation subtracts 100 when shortening exceeds its threshold.
     h_sl = np.where(
         -a_slow * vn_short > 100, 4 * a_slow * vn_long - 100 - a_fast * vn_short * fast_twitch, h_sl
     )

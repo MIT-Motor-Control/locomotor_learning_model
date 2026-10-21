@@ -1,4 +1,5 @@
 function [yKneeList,zKneeList] = kneeGivenBodyFoot(yBodyList,zBodyList,yFootList,zFootList)
+% Construct knee coordinates for gait visualization.
 
 yKneeList = zeros(size(yBodyList)); zKneeList = yKneeList;
 
@@ -25,5 +26,4 @@ R = [cos(alpha) -sin(alpha); sin(alpha) cos(alpha)];
 temp = [yBody; zBody] + R*[yMid-yBody; zMid-zBody];
 yKnee = temp(1); zKnee = temp(2);
 
-end % checked and not essential. 
-% this is just for visualization purposes suppressed in this version.
+end

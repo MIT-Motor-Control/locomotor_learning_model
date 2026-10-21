@@ -1,17 +1,14 @@
 function dStateVar = singlePendulumODE(t,stateVar,paramFixed,paramController)
-% Inverted-pendulum dynamics with a massless stance leg and point body mass.
+% Evaluate stance-leg dynamics and foot motion on the moving treadmill.
 
-% unwrapping the state variables
-angleTheta = stateVar(1); % angle wrt ground
+angleTheta = stateVar(1);
 dangleTheta = stateVar(2);
 
-%% inertial force for acceleration 
-
-% interpolate to get the right acceleration
+% Acceleration is constant within each linear segment of the belt-speed ramp.
 paramController.PushoffAccelerationNow = interp1(paramController.tList_BeltSpeed, ...
-    paramController.PushoffAccelerationNowList,t,'previous','extrap'); % 'previous' because we want constant acceleration during each piecewise linear domain
+    paramController.PushoffAccelerationNowList,t,'previous','extrap');
 
-% forward 'inertial force' due to backward belt acceleration
+% Backward belt acceleration produces a forward inertial force.
 forceDueToAcceleration = -paramController.PushoffAccelerationNow*paramFixed.mbody;
 torqueDueToAcceleration = ...
     forceDueToAcceleration*cos(angleTheta)/(paramFixed.mbody*paramFixed.leglength);
@@ -20,17 +17,14 @@ if ~paramFixed.includeAccelerationTorque
     torqueDueToAcceleration = 0;
 end
 
-% angular acceleration of the stance leg
 ddAngleTheta = ...
     paramFixed.gravg/paramFixed.leglength*sin(angleTheta) + ...
-    torqueDueToAcceleration; 
+    torqueDueToAcceleration;
 
-% interpolate to get the right speed
 paramController.PushoffFootSpeedNow = interp1(paramController.tList_BeltSpeed, ...
     paramController.PushoffFootSpeedNowList,t,'linear','extrap');
 
-% integrating yFoot position so that it is easily accessible
-dyFoot = paramController.PushoffFootSpeedNow; % treadmill speed
+dyFoot = paramController.PushoffFootSpeedNow;
 
 dStateVar = [dangleTheta; ddAngleTheta; dyFoot];
 

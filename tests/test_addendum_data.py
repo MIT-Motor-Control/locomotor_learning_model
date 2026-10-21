@@ -1,4 +1,4 @@
-"""Verify additive imports preserve prior scientific inputs and complete trial sets."""
+"""Addendum imports, dataset integrity and complete trial sets."""
 
 import json
 from pathlib import Path

@@ -1,10 +1,4 @@
-"""Reanalyse the original S5 numerical grid without running simulations.
-
-This ports the C/E comparison from the reviewer-response ``fall_reward_analysis``
-sources. It preserves the bounded exponential fit, grid order/tie breaking,
-condition-specific leave-one-subject-out fitting, and fitted-curve noise floor.
-Unlike the historical code, a failed exponential fit is an explicit error.
-"""
+"""Fit S5 model grids and evaluate leave-one-subject-out predictions."""
 
 from __future__ import annotations
 
@@ -193,8 +187,7 @@ def analyze_s5_grid(data_root: Path, experimental: dict, participant_ids: dict) 
         running = max(running, min(1.0, (len(ordered) - i) * row["wilcoxon_two_sided_p"]))
         row["holm_p_within_three_conditions"] = running
     tests[-1]["holm_p_within_three_conditions"] = "not_in_family"
-    # Sweep weight at each full-data C learning-rate/symmetry pair; do not refit
-    # those two parameters during the mechanical comparison.
+    # Hold the fitted learning rate and symmetry weight fixed while varying fall weight.
     mechanical_slices = [
         row
         for selected in selections

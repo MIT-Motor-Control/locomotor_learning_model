@@ -1,9 +1,7 @@
 function paramController = loadControllerGainParameters(paramFixed)
-% These are the feedback gains in the feedback controller that keeps the
-% biped stable. They are obtained from how 
+% Set fixed gains for the feedback controller.
 
-%% Controller parameters, gains, Fixed during the optimization
-switch paramFixed.swingCost.Coeff 
+switch paramFixed.swingCost.Coeff
     case 0.9
         paramController.pushoff_gain_ydot  = -0.521088310893437;
         paramController.legAngle_gain_ydot =  0.279308152405233;
@@ -15,23 +13,6 @@ switch paramFixed.swingCost.Coeff
         paramController.pushoff_gain_BeltSpeed = -1.055930819923483;
 end
 
-%% the following doesn't matter wrt results
 paramController.ControllerBeltFrameVsLabFrame = 1;
-% paramController.ControllerBeltFrameVsLabFrame = 0.75;
 
-%%
-% temp = load('DatStoredMemoryLinearAndQuadratic.mat');
-% storedFFController = temp.storedFFController;
-% 
-% controlSlopeVsContext = ... % linear policy for tied speed walking
-%     -[storedFFController.linearModel.Bslopes([1:3 6:10]) storedFFController.linearModel.Bslopes([1:3 6:10])]/2;
-% 
-% slopeVsFootSpeed = sum(controlSlopeVsContext,2); 
-% % because we had previously broken up this into the left and right belt
-% % contributions to 
-% 
-% paramController.legAngle_gain_BeltSpeed = slopeVsFootSpeed(1)-paramController.legAngle_gain_ydot*slopeVsFootSpeed(2);
-% paramController.pushoff_gain_BeltSpeed = slopeVsFootSpeed(3)-paramController.pushoff_gain_ydot*slopeVsFootSpeed(2);
-% % 
-
-end  % code checked and essential
+end

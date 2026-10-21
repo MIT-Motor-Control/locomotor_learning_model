@@ -1,12 +1,7 @@
 function [stateVar0,tStore,stateStore,EmetTotalStore, ...
     EmetPerTimeStore,tStepStore,EworkPushoffStore,EworkHeelstrikeStore,fall_info,yPosStore] = ...
     simulateManySteps_AsymmetricControl(stateVar0,paramController,paramFixed,tStart,SwingCostCoeff,iStride)
-
-% reduced state at mid-stance is 
-% angleTheta0, dAngleTheta0, ...
-% yFoot (lab frame), INTy (lab frame)
-
-% tStart = 0;
+% Simulate alternating steps with odd- and even-leg controllers.
 
 tStore = cell(paramFixed.numSteps+1,1);
 stateStore = cell(paramFixed.numSteps+1,1);
@@ -18,10 +13,8 @@ EworkPushoffStore = zeros(paramFixed.numSteps,1);
 EworkHeelstrikeStore = zeros(paramFixed.numSteps,1);
 yPosStore = zeros(paramFixed.numSteps,1);
 
-%%
 for iStep = 1:paramFixed.numSteps
-    
-    %% odd or even control
+
     if mod(iStep,2)==0
         paramController.theta_end_nominal = ...
             paramController.Even.theta_end_nominal;
@@ -41,25 +34,21 @@ for iStep = 1:paramFixed.numSteps
         paramController.PushoffImpulseMagnitude_nominal = ...
             paramController.Odd.PushoffImpulseMagnitude_nominal;
         paramController.y_atMidstance_nominal_slopeframe = ...
-            0; % fixed to zero by fiat
+            0;
         paramController.SUMy_atMidstance_nominal_slopeframe = ...
-            0; % fixed to zero by fiat
+            0;
     end
-    
-    %% simulate the first step, belt 1
+
     [stateVar0, tlistTillEndstance, statevarlistTillEndstance, ...
        tlistTillMidstance, statevarlistMidstance, ...
        Emet_totalNow,Emet_perTime,tTotal,EworkPushoff,EworkHeelstrike,fall_info, y_pos] = ...
         simulateOneStep_MidstanceToMidstance_WithEnergy(stateVar0,iStep,tStart, ...
         paramController,paramFixed,SwingCostCoeff,iStride);
 
-    %% storing everything
-    % the following weirdness is because a midstance to midstance
-    % simulation straddles two steps
-    
+    % Join half-steps at heel strikes to obtain complete stance trajectories.
     tStore{iStep} = [tStore{iStep}; tlistTillEndstance];
     stateStore{iStep} = [stateStore{iStep}; statevarlistTillEndstance];
-    
+
     if iStep<paramFixed.numSteps
         tStore{iStep+1} = [tStore{iStep+1}; tlistTillMidstance(1:end-1)];
         stateStore{iStep+1} = [stateStore{iStep+1}; statevarlistMidstance(1:end-1,:)];
@@ -67,19 +56,17 @@ for iStep = 1:paramFixed.numSteps
         tStore{iStep+1} = [tStore{iStep+1}; tlistTillMidstance(1:end)];
         stateStore{iStep+1} = [stateStore{iStep+1}; statevarlistMidstance(1:end,:)];
     end
-    
-    %% reset time, very important do not comment!
+
     tStart = tlistTillMidstance(end);
-    
-    %% metabolic cost estimate
+
     EmetTotalStore(iStep) = Emet_totalNow;
     EmetPerTimeStore(iStep) = Emet_perTime;
     tStepStore(iStep) = tTotal;
-    
+
     EworkPushoffStore(iStep) = EworkPushoff;
     EworkHeelstrikeStore(iStep) = EworkHeelstrike;
     yPosStore(iStep) = y_pos;
 
 end
 
-end % essential
+end

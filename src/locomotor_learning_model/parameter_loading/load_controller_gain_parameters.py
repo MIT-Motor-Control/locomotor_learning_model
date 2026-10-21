@@ -18,7 +18,7 @@ def load_controller_gain_parameters(param_fixed: dict) -> dict:
             'legAngle_gain_BeltSpeed': -0.075044622818653,
             'pushoff_gain_BeltSpeed': -1.055930819923483,
         }
-        # Odd and Even start with the same values, will be overwritten in f_objective_asymmetric_nominal
+        # Controller targets are initialized before learning.
         param_controller['Odd'] = {
             'theta_end_nominal': 0.0,
             'ydot_at_midstance_nominal_beltframe': 0.0,

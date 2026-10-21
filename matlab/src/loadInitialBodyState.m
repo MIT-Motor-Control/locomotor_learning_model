@@ -1,13 +1,13 @@
 function stateVar0_Model = loadInitialBodyState(pInputControllerAsymmetricNominal)
-%% Initial conditions for the simulation
-% NOTE: these are MID-STANCE initial conditions
+% Set the initial state at midstance.
 
-vSwingInitial = 0.35; % initial swing speed - shouldn't matter much, ideally equal to the nominal velocity?
+vSwingInitial = 0.35;
 
-stateVar0_Model = [0                        % angleTheta0 = stance leg angle
-    pInputControllerAsymmetricNominal(2)    % dAngleTheta0 = stance leg angular rate
-    0                                       % yFoot0 = 0; % in lab frame
-    0                                       % sum of yFoot in lab frame (integral feedback for station keeping)
-    vSwingInitial];                         % vSwing 
+% State: leg angle, angular rate, foot position, integrated foot position, swing speed.
+stateVar0_Model = [0
+    pInputControllerAsymmetricNominal(2)
+    0
+    0
+    vSwingInitial];
 
 end

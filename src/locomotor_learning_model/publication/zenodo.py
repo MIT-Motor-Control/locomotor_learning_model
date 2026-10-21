@@ -197,13 +197,7 @@ def _compare_existing(
 
 
 def prepare_zenodo_data(source: Path, destination: Path) -> dict:
-    """Import six public measurement CSVs, or verify an existing prepared dataset.
-
-    A new destination is installed atomically and contains experimental inputs only.
-    Full-precision author arrays in an existing, checksum-verified dataset are retained
-    when equivalent to its public six-decimal CSVs (absolute tolerance 5.00001e-7).
-    No source data, existing manifest, or existing scientific input is modified.
-    """
+    """Prepare six measurement CSVs or check them against existing full-precision inputs."""
     source = Path(source).expanduser().resolve()
     destination = Path(destination).expanduser()
     if destination.is_symlink():

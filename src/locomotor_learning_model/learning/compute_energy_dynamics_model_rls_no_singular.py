@@ -14,13 +14,12 @@ def compute_energy_dynamics_model_rls_no_singular(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Update the linear energy dynamics model using recent stride data."""
 
-    beta = 0.5  # Retained in the MATLAB-compatible RLS signature.
+    beta = 0.5
 
     aold = adynamics_now
 
     mu_measurement = 0.0
 
-    # Ensure arrays have the same number of columns by taking the minimum
     min_cols = min(state_var_now_store.shape[1], p_input_controller_now_store.shape[1])
     
     state_var_trimmed = state_var_now_store[:, :min_cols]
@@ -33,10 +32,9 @@ def compute_energy_dynamics_model_rls_no_singular(
     if output_next_store.shape[0] != 1:
         output_next_store = output_next_store.T
     
-    # Trim to match the minimum columns
     output_next_store = output_next_store[:, :min_cols]
 
-    # Remove the first row of zeros to avoid singularity
+    # Midstance fixes the first state component at zero.
     input_now_store = input_now_store[1:, :]
 
     adynamics_new, error_old_model, error_new_model = rlsupdate(

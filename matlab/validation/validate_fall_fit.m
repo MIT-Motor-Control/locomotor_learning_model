@@ -1,5 +1,5 @@
 function comparison = validate_fall_fit(table_dir)
-% Independently minimize the Figure 3D objective using base MATLAB only.
+% Compare exponential fall-time fits with the reference source table.
 inputs = readtable(fullfile(table_dir, 'figure3_d_fit_inputs.csv'));
 reference = readtable(fullfile(table_dir, 'figure3_d_fit_coefficients.csv'));
 rows = zeros(height(reference), 6);
@@ -7,7 +7,6 @@ for i = 1:height(reference)
     selected = inputs.learning_rate == reference.learning_rate(i) & isfinite(inputs.mean_strides_until_fall);
     x = inputs.delta_mps(selected);
     y = inputs.mean_strides_until_fall(selected);
-    % For each exponent, the least-squares amplitude has an analytic solution.
     objective = @(b) sum((amplitude(x, y, b) .* exp(b .* x) - y).^2);
     b = fminbnd(objective, -30, 30, optimset('TolX', 1e-12, 'Display', 'off'));
     a = amplitude(x, y, b);
