@@ -1,3 +1,5 @@
+"""Gradient of the memory prediction error with respect to the memory slope."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -11,7 +13,14 @@ def gradient_of_error_from_memory_compute(
     param_fixed,
     context_gait_now: np.ndarray,
 ) -> np.ndarray:
-    """Compute the finite-difference gradient of memory prediction error."""
+    """Return the gradient of ``error_from_memory_compute`` with respect to the slope.
+
+    Forward differences with step ``1e-4`` are taken for each slope entry; the
+    arguments are as in ``error_from_memory_compute``.
+
+    Returns:
+        Gradient with the shape of ``slope_j_controller_vs_context``.
+    """
 
     f0 = error_from_memory_compute(
         slope_j_controller_vs_context,

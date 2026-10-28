@@ -1,5 +1,8 @@
 function paramController = loadControllerGainParameters(paramFixed)
-% Set fixed gains for the feedback controller.
+% Return the fixed step-to-step feedback gains for paramFixed.swingCost.Coeff.
+% legAngle_gain_* and pushoff_gain_* adjust the endstance leg angle and the
+% push-off impulse in proportion to the midstance deviations of speed (ydot),
+% foot position (y), summed foot position (SUMy) and belt speed from nominal.
 
 switch paramFixed.swingCost.Coeff
     case 0.9
@@ -13,6 +16,7 @@ switch paramFixed.swingCost.Coeff
         paramController.pushoff_gain_BeltSpeed = -1.055930819923483;
 end
 
+% Not read by the simulation.
 paramController.ControllerBeltFrameVsLabFrame = 1;
 
 end

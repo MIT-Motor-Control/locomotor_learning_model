@@ -1,15 +1,35 @@
+"""Split-belt treadmill speed protocols."""
 import numpy as np
 
 
 def make_treadmill_speed_split(paramFixed):
-    """Build the baseline split-belt treadmill profile."""
-    # Model constants used to nondimensionalize treadmill timings.
+    """Return the split-belt speed schedule with linear ramps between phases.
+
+    Speeds are in units of sqrt(g * L) and times in units of sqrt(L / g), with
+    L = 0.95 m; negative speeds move the belt backward. ``"classic split belt"`` is
+    6 min tied (1 + 5 min), 45 min split with belt 1 fast, and 5 min tied.
+
+    Args:
+        paramFixed: Parameters with ``speedProtocol`` (``"classic split belt"`` or
+            ``"single speed"``), ``transitionTime`` in seconds and optionally
+            ``splitSpeedDiffMS`` in m/s; ``timeScaling`` and ``splitSpeedDiffMS`` are
+            written back.
+
+    Returns:
+        Dictionary of breakpoint times ``tList``, belt speeds ``footSpeed1List`` and
+        ``footSpeed2List``, and the acceleration after each breakpoint, ``footAcc1List``
+        and ``footAcc2List``.
+
+    Raises:
+        ValueError: For an unknown protocol or a negative or non-finite speed difference.
+    """
     L = 0.95
     g = 9.81
     timeScaling = np.sqrt(L / g)
     paramFixed['timeScaling'] = timeScaling
 
-    # Scale the speed difference about the fixed mean belt speed.
+    # vNormal is 1.0 m/s and 10 * delta a 1.0 m/s difference (within 0.2%), so
+    # splitSpeedDiffMS is the belt-speed difference in m/s about a fixed mean.
     delta = 0.0328
     vNormal = -0.3276
     if 'splitSpeedDiffMS' in paramFixed:
@@ -58,7 +78,7 @@ def make_treadmill_speed_split(paramFixed):
     footSpeed1Store = np.array([f1_p1, f1_p1, f1_p2, f1_p3, f1_p4])
     footSpeed2Store = np.array([f2_p1, f2_p1, f2_p2, f2_p3, f2_p4])
 
-    # Insert finite-duration transitions between phases.
+    # Each ramp starts at a phase boundary and lasts tDurationTransition.
     tStore_new       = [tStore[0]]
     foot1_new        = [footSpeed1Store[0]]
     foot2_new        = [footSpeed2Store[0]]

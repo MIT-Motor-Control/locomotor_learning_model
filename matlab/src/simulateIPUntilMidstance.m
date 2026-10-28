@@ -1,6 +1,7 @@
 function [tlistTillMidstance, statevarlistTillMidstance] = ...
     simulateIPUntilMidstance(statevar0,tspan,paramFixed,paramController)
-% Integrate inverted-pendulum dynamics until midstance.
+% Integrate the inverted-pendulum stance dynamics from heel strike until midstance.
+% Inputs and outputs are as in simulateIPUntilEndstance.
 
 options = odeset('Events',@DetectMidstance,'reltol',1e-10,'abstol',1e-10);
 [tlistTillMidstance,statevarlistTillMidstance] = ...

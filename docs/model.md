@@ -1,84 +1,91 @@
-# Running and resuming the Python model
+# Model guide
 
-The Python package is the baseline locomotor adaptation implementation. Its seeded examples and checkpoints are **not participant fits or checkpoints from the paper figures**. Use the publication commands and reference-data manifests for those figures. The separate manuscript MATLAB engine preserves the supplied simulation settings.
+The model has a low-level feedback controller that sets each step from the center-of-mass state and a high-level learner that updates the controller by gradient descent on an energy–symmetry objective (Seethapathi et al., 2024; paper Figure 2A). Three implementations are included.
 
-## Run an example
+| | Python model | MATLAB baseline | MATLAB manuscript engine |
+|---|---|---|---|
+| Location | `src/locomotor_learning_model/` | `matlab/src/` | `matlab/manuscript/` |
+| Use | Run, pause and resume simulations; simulations of Supplementary Figures 2 and 4 | Reference for the Python model | Simulations of Figures 2–4 and Supplementary Figures 1 and 3 |
+| Split-belt protocol | 6 min tied, 45 min split, 5 min tied; 15 s ramps | Same as Python | 1 min tied, 45 min split; 25 s ramp |
+| Belt speeds | 1.0 m/s difference by default (`--split-speed-diff`) | 1.0 m/s difference, fixed in `makeTreadmillSpeed_Split.m` | Experimental speeds × 0.5 |
+| Falls | Not detected | Not detected | Detected; a fall ends the trial |
 
-Create `loco-ada` using the [installation instructions](../README.md#get-started). The Conda environment includes the editable package, pinned scientific dependencies and tests. Activate it before running the commands below:
+Both MATLAB folders define functions with the same names, so add only one of them to the MATLAB path. The [manuscript engine guide](../matlab/manuscript/README.md) lists every setting that differs between the engine and the baseline. Parameter values are not interchangeable between them: for example, the manuscript sweeps use learning rates of 0.005–0.05, whereas the baseline default is 1.2 × 10⁻⁴. The MATLAB baseline runs with `addpath('matlab'); run_simulation`, which uses a clock-based random seed.
+
+## Parameters
+
+| Paper | Python (`param_fixed`) | Manuscript engine (`run_manuscript_trial`) |
+|---|---|---|
+| Learning rate α | `["Learner"]["LearningRate"]` | `learning_rate` |
+| Symmetry weight ψ | `1 - lambdaEnergyVsSymmetry` | `1 - energy_weight` |
+| Symmetry scale M = 10 | `symmetryMultiplier` | fixed at 10 |
+| Fall penalty weight w | `fallPenaltyWeight` (default 0) | not available |
+| Exploration noise | `["Learner"]["noiseSTDExploratory"]` | `exploration_noise` |
+| Belt speed difference Δv | `--split-speed-diff` | `speed_difference` |
+
+The objective is J₀ = (1 − ψ) e + ψ M s (Eq. 1), where e is the metabolic power over a learning iteration and s is the squared difference between the stance-end leg angles of its two steps. With w > 0 the Python model minimizes J₀ + w Φ (Eq. 2). Φ is the mean, over the stance phases of the iteration, of min(max((h_safe − h_min) / (h_safe − h_ground), 0), 1)², where h_min is the lowest center-of-mass height in the stance phase, h_safe = 0.95 and h_ground = 0.90 leg lengths; Φ is 0 while h_min ≥ h_safe and 1 when h_min ≤ h_ground. With w = 0 the penalty is not evaluated and the objective is J₀.
+
+## Python model
 
 ```sh
-conda activate loco-ada
 loco-simulate demo
 loco-simulate run --seed 42 --iterations 1000 --output-dir outputs/example
+loco-simulate run --split-or-tied tied --seed 1 --iterations 200 --output-dir outputs/tied
 ```
 
-In a shell without Conda activation, use `conda run --no-capture-output -n loco-ada loco-simulate` with the same arguments. The scientific dependencies are pip-installed inside Conda from `requirements-lock.txt`; keep them synchronized through `conda env update -n loco-ada -f environment.yml`.
+`run` writes `run.npz` (settings and controller, body-state, energy and learner histories), `metadata.json` (seed, condition, protocol, configuration checksum, software versions and iteration counts), a checkpoint and a summary figure. The full split-belt protocol has 3,200 iterations and the tied protocol 1,000. Other options include `--transition-time` (seconds) and `--speed-protocol`, which takes a quoted name: `classic split belt` (default) or `single speed` for split runs, and `four speed changes` (default) or another protocol listed in `parameter_loading/make_treadmill_speed_tied.py` for tied runs. See `loco-simulate run --help` for all options. An omitted seed is generated and recorded.
 
-The demo runs 40 iterations with seed 42 and saves to `outputs/demo/`. `run` accepts the full scientific options and saves to `outputs/run/` unless you choose another directory. Both commands save checkpoints every 25 iterations and at the end. Figures are saved without opening windows; add `--show-plots` to open them. `python -m locomotor_learning_model` accepts the same commands as `loco-simulate`.
-
-An output directory receives `run.npz`, `metadata.json`, `checkpoint.npz`, `checkpoint.metadata.json` and `split_belt_summary.png` (or `tied_belt_summary.png`). The result archive contains controller histories, body trajectories, per-step energy/work/timing, learner diagnostics, parameters, and summary arrays. Metadata records the actual seed, numerical-library versions, scientific-configuration hash, and completed/target iteration counts. An omitted seed is generated and recorded.
-
-`--split-or-tied tied` selects tied walking. The baseline defaults remain a 1.0 m/s speed difference with a 15-second transition for split walking, or the four-speed-changes protocol with a 3-second transition for tied walking. Protocol overrides are validated. The default learner has two physical steps per learning iteration. Short examples may finish before the protocol reaches split walking; use the saved times and treadmill schedule to identify the portion simulated.
-
-## Pause and resume
+### Pause and resume
 
 ```sh
-loco-simulate run --seed 42 --iterations 100 --stop-after 40 --output-dir outputs/paused-example
-loco-simulate resume outputs/paused-example/checkpoint.npz
+loco-simulate run --seed 42 --iterations 100 --stop-after 40 --output-dir outputs/paused
+loco-simulate resume outputs/paused/checkpoint.npz --output-dir outputs/resumed
 ```
 
-`--iterations` is the **total target**, not an additional count. Omitting it on resume uses the saved target. It may be increased; it cannot be less than the completed count. `--stop-after` is also an absolute completed-iteration count. The new commands supply a checkpoint path automatically. A checkpoint is saved at each requested interval and at the last completed learning iteration. Interruption between saves loses only work since the last save.
+`--iterations` is the total number of learning iterations and `--stop-after` the iteration at which to stop; both count completed iterations. A checkpoint is saved every 25 iterations (`--checkpoint-every`) and at the end. It stores the body state, treadmill time, controller, gradient estimate, memory, estimator history, all recorded histories and the random-number-generator state, so a resumed run is identical to an uninterrupted run. `resume` checks the model version, the NumPy and SciPy versions, the settings and the seed, and refuses a checkpoint that does not match. It writes to `--output-dir` (default `outputs/resumed`) and leaves the input checkpoint unchanged unless `--checkpoint` names that file. Results and checkpoints are NumPy archives read with `allow_pickle=False`.
 
-`resume` saves a new checkpoint in `outputs/resumed/` by default and preserves the input checkpoint. Choose another `--output-dir` for subsequent branches of a run; use `--checkpoint PATH` when deliberately updating a specific checkpoint. Set `--checkpoint-every 10` to save more frequently. Existing flag-only commands remain supported.
-
-Checkpoints capture the body state, simulation time and treadmill context, current controller and gradient, learned memory, rolling estimator matrices and input histories, all diagnostic histories, controller gains, parameters, and the complete MT19937 state including the cached Gaussian value. State is saved **after a complete learning iteration**, not inside an ODE solve. Post-processing subsequently replays the learned controller sequence from the initial body state; this replay is redone on resume. A result archive can be read and plotted without replaying or training.
-
-The archive uses numeric arrays and JSON with `allow_pickle=False`; it does not execute serialized Python objects. Writes use a temporary file and atomic replacement. Schema, model version, scientific configuration, history lengths/shapes, finite state, and RNG state are checked before resuming. A changed protocol or seed is rejected. Exact resume requires the recorded NumPy and SciPy versions; results can still be loaded with other versions for inspection. Bitwise identity is tested on the same numerical runtime, not promised across different hardware/BLAS implementations.
-
-The pause/resume commands above create their own checkpoint and need no data download. Optional saved examples are distributed in the DATA release, outside the GitHub code repository. After following the [data setup instructions](../README.md#reproduce-the-paper-figures), `data/locomotor_learning_model-DATA/checkpoints/example_seed42.npz` provides a baseline split-protocol example paused after 10 iterations with a target of 20. Its adjacent metadata identifies its role. It demonstrates continuation; it is not a trained neural network or a paper result:
+The DATA download includes `checkpoints/example_seed42.npz`, a run paused after 10 of 20 iterations that resumes with NumPy 1.26.4 and SciPy 1.17.1, the versions pinned in `requirements-lock.txt`:
 
 ```sh
 loco-simulate resume data/locomotor_learning_model-DATA/checkpoints/example_seed42.npz --output-dir outputs/checkpoint-example
 ```
 
-If DATA is beside the repository, use `../locomotor_learning_model-DATA/checkpoints/example_seed42.npz` as the checkpoint path instead.
-
-The same DATA `checkpoints/` folder contains `manuscript_seed42_trial.mat` and its metadata: a completed seeded manuscript-engine trial that terminated at a detected model fall on iteration 104. This is a reusable numerical result, not a resumable Python learner or a published fitted model. The [manuscript engine guide](../matlab/manuscript/README.md) explains its API.
-
-The Conda environment file installs the NumPy/SciPy versions recorded in the Python example. If your active versions differ, update and activate `loco-ada` before resuming. With an intentionally different numerical runtime, create a fresh local checkpoint with the pause command above instead. Do not edit the recorded runtime version to bypass compatibility checks.
-
-## Python API and replotting
+### Python API
 
 ```python
-from locomotor_learning_model import (
-    run_simulation, load_simulation_results, plot_simulation_results,
-)
+from locomotor_learning_model import load_simulation_results, plot_simulation_results, run_simulation
 
-result = run_simulation(seed=42, num_iterations=100, make_plots=False,
-                        checkpoint_path="outputs/run/checkpoint.npz",
-                        checkpoint_every=25, output_dir="outputs/run")
+result = run_simulation(seed=42, num_iterations=100, make_plots=False, output_dir="outputs/run")
 saved = load_simulation_results("outputs/run/run.npz")
 print(saved.summary["average_energy_rate"])
-plot_simulation_results(saved, output_dir="outputs/replotted", show_plots=False)
+plot_simulation_results(saved, output_dir="outputs/replotted")
 ```
 
-The high-level API owns a private random generator and does not reseed NumPy's global generator. Low-level functions retain the historical global-RNG behavior for existing callers unless a runtime generator is provided internally. Do not interchange low-level diagnostic dictionaries with versioned workflow checkpoints.
+`run_simulation` uses its own random generator and leaves NumPy's global random state unchanged. It uses the default values of α, ψ and w set in `parameter_loading/load_learner_parameters.py` and `load_biped_model_parameters.py`; edit those defaults to simulate other values.
 
-## Scientific scope and validation
+## MATLAB manuscript engine
 
-The baseline and manuscript engines use different settings. The manuscript engine divides experimental belt speeds by 2, uses a 25-second transition, disables the baseline memory-learning rates and uses another learning-rate scale. Model time is converted to seconds using √(leg length / g). The manuscript Methods reviewed on October 19, 2026 match these settings. Original fitted MAT files, regenerated trial-average grids and new seeded examples have distinct provenance.
-
-Baseline Python/MATLAB deterministic parity can be checked with:
+From the repository root in MATLAB (R2021a or later):
 
 ```matlab
-addpath('matlab/validation');
-if ~isfolder('outputs'), mkdir('outputs'); end
-export_reference_run('outputs/locad_reference.mat', 40);
+addpath('matlab/manuscript')
+result = run_manuscript_trial('outputs/trial42.mat', seed=42, speed_difference=0.7, ...
+    learning_rate=0.02, energy_weight=0.5, max_iterations=40);
+```
+
+Omit `max_iterations` to run the full protocol. The [manuscript engine guide](../matlab/manuscript/README.md) describes the saved fields, parameter sweeps and validation. The DATA download includes `checkpoints/manuscript_seed42_trial.mat`, a trial with seed 42 and otherwise default options that ends with a fall at iteration 104; the guide explains how to load and regenerate it, and `tests/test_paper_values.py` checks the regeneration when MATLAB is available.
+
+## Python and MATLAB agreement
+
+With exploration and measurement noise set to zero, the Python model and the MATLAB baseline give the same objective for the initial controller, to within 6 × 10⁻¹², and the same controller history over 40 learning iterations:
+
+```matlab
+addpath('matlab/validation')
+export_reference_run('outputs/locad_reference.mat', 40)
 ```
 
 ```sh
 python scripts/validate_matlab_python_parity.py outputs/locad_reference.mat
-python -m pytest tests/test_checkpoints.py tests/test_detailed_function_comparison.py tests/test_model_baseline.py
 ```
 
-The MATLAB comparison disables exploratory and energy-measurement noise; identical seeds do not establish cross-language stochastic identity. Forty iterations exercise the rolling estimator after its initial 30-iteration window. The test suite also compares uninterrupted and resumed stochastic trajectories across split/tied protocol changes, repeated seeds, safe result reload/replotting, input/configuration rejection, and atomic-write failures.
+Without noise the learner receives no gradient, so this comparison checks the stance dynamics, energetics and objective rather than learning; `tests/test_model_regression.py` pins the results of seeded runs with learning. Random seeds do not carry across languages, so noisy runs differ between Python and MATLAB.

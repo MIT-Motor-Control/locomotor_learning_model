@@ -1,5 +1,8 @@
 function publication_s1_grid_sensitivity(grid_path, output_dir)
-% Compare leave-one-subject-out fits across finite-grid coverage thresholds.
+% Repeat the leave-one-subject-out comparison on progressively relaxed parameter grids.
+% Inputs:  grid_path  - MAT file with rmse_matrix and exp_subj_num, as in publication_s1_loso
+%          output_dir - folder for the output CSV files
+% Outputs: comment1_grid_sensitivity_summary.csv and _persubject.csv in output_dir
 rng(0);
 R = 200;
 S = load(grid_path, 'rmse_matrix', 'exp_subj_num');
@@ -15,6 +18,7 @@ fc = zeros(nA,nP);
 for i=1:Np
     fc = fc + isfinite(squeeze(rm(pairs(i,1),pairs(i,2),:,:)));
 end
+% A grid cell is admissible when at least thrs participants have a finite RMSE there.
 thrs = [26 17 8];
 summary = zeros(numel(thrs), 9);
 subject_rows = zeros(numel(thrs)*Np, 5);
@@ -41,6 +45,16 @@ writetable(array2table(subject_rows,'VariableNames', ...
 end
 
 function [heldCS, heldCMs, better, pv] = loso_relaxed(rm, nsub, pairs, gbase, R)
+% Return leave-one-subject-out RMSEs, fitting only admissible cells where the
+% held-out participant's RMSE is finite.
+% Inputs:  rm, nsub - RMSE grid and participants per condition
+%          pairs    - (condition, participant) row for each participant
+%          gbase    - admissible grid cells
+%          R        - number of random size-matched shared pools per participant
+% Outputs: heldCS, heldCMs - held-out RMSE of the condition-specific and size-matched
+%                            shared fits
+%          better         - percentage of participants with heldCS < heldCMs
+%          pv             - two-sided signrank p-value
 Np = size(pairs,1);
 heldCS = nan(Np,1); heldCMs = nan(Np,1);
 for i=1:Np
@@ -63,6 +77,7 @@ pv = signrank(heldCS, heldCMs);
 end
 
 function M = meanmasked(rm, rows, gmask)
+% Return the NaN-ignoring mean RMSE grid over (condition, participant) rows, NaN outside gmask.
 [nA,nP] = size(gmask);
 A = nan(size(rows,1), nA, nP);
 for k=1:size(rows,1), A(k,:,:) = squeeze(rm(rows(k,1), rows(k,2), :, :)); end
@@ -71,5 +86,6 @@ M(~gmask) = NaN;
 end
 
 function [bi,bj] = argmin_grid(M)
+% Return the row and column indices of the smallest value in M.
 [~,idx] = min(M(:)); [bi,bj] = ind2sub(size(M), idx);
 end

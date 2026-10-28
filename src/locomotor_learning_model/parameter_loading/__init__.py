@@ -1,1 +1,1 @@
-"""Parameter loaders for the Python locomotor learning model."""
+"""Model, controller, learner, noise and treadmill protocol parameters."""

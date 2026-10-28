@@ -13,6 +13,7 @@ from locomotor_learning_model.publication.main_figures import (
     _rank_sum_probability,
     _sanchez,
     fall_filename,
+    fall_probability_tests,
     fall_tables,
     figure1_tables,
     fit_exp1,
@@ -31,7 +32,7 @@ from locomotor_learning_model.publication.trajectory import (
 
 
 def test_prepare_exact_energy_recovery_and_idempotence(tmp_path):
-    bundle = tmp_path / "handoff"
+    bundle = tmp_path / "bundle"
     original = bundle / "code/original_data"
     original.mkdir(parents=True)
     expected = {
@@ -62,7 +63,7 @@ def test_prepare_exact_energy_recovery_and_idempotence(tmp_path):
 
 
 def test_conflicting_fall_archive_fails_before_copy(tmp_path):
-    bundle = tmp_path / "handoff"
+    bundle = tmp_path / "bundle"
     falls = bundle / "code/original_data/data/fall probability"
     falls.mkdir(parents=True)
     archive = tmp_path / "archive"
@@ -76,7 +77,7 @@ def test_conflicting_fall_archive_fails_before_copy(tmp_path):
 
 
 def test_prepare_rejects_source_and_destination_escapes(tmp_path):
-    bundle = tmp_path / "handoff"
+    bundle = tmp_path / "bundle"
     original = bundle / "code/original_data"
     original.mkdir(parents=True)
     unrelated = tmp_path / "outside.mat"
@@ -99,7 +100,7 @@ def test_prepare_rejects_source_and_destination_escapes(tmp_path):
 
 
 def test_prepare_refuses_omitted_previously_imported_archive(tmp_path):
-    bundle, private, target = tmp_path / "handoff", tmp_path / "private", tmp_path / "prepared"
+    bundle, private, target = tmp_path / "bundle", tmp_path / "private", tmp_path / "prepared"
     (bundle / "code/original_data").mkdir(parents=True)
     (private / "Data").mkdir(parents=True)
     (private / "Data/split_energy.csv").write_text("participant,energy\n1,3.1\n")
@@ -153,8 +154,8 @@ def test_sanchez_preserves_shared_energy_indices_and_signal_specific_long_window
 
 
 def test_exact_rank_sum_includes_equal_allocations_with_ties():
-    # All six allocations of four observations are equiprobable. Three give
-    # the minimum rank sum when three observations share the same value.
+    # Pooled midranks are (2, 2, 2, 4). Three of the six equiprobable allocations of the
+    # first sample give the minimum rank sum of 4, so P(W <= 4) = 0.5.
     statistic, p, method = _rank_sum_probability([1, 1], [1, 2], "less")
     assert statistic == 4
     assert p == 0.5
@@ -210,6 +211,7 @@ def test_inconsistent_data_is_not_reported_as_missing(tmp_path, monkeypatch):
     from locomotor_learning_model.publication import main_figures
 
     def inconsistent(_):
+        """Raise the error of an inconsistent input."""
         raise ValueError("Scientific shape mismatch")
 
     monkeypatch.setattr(main_figures, "figure1_tables", inconsistent)
@@ -219,6 +221,7 @@ def test_inconsistent_data_is_not_reported_as_missing(tmp_path, monkeypatch):
 
 @pytest.fixture
 def publication_data():
+    """Return the prepared publication data folder, or skip without the full dataset."""
     path = Path(__file__).resolve().parents[1] / "data/publication"
     if not (path / "manifest.json").is_file():
         pytest.skip("Prepared publication data is required for audited numerical regression")
@@ -274,8 +277,8 @@ def test_figure1_audited_participant_values(publication_data):
 
 
 @pytest.mark.integration
-def test_final_manuscript_figure1e_significant_intervals(publication_data):
-    """Figure 1E reports consecutive decreases through 9, 18 and 27 minutes."""
+def test_figure1e_significant_intervals_match_paper(publication_data):
+    """Figure 1E: significant decreases through 9, 18 and 27 min at 0.4, 0.7 and 1.0 m/s."""
     tables = figure1_tables(publication_data)
     expected_p = [
         [
@@ -310,12 +313,13 @@ def test_final_manuscript_figure1e_significant_intervals(publication_data):
 
 
 @pytest.mark.integration
-def test_final_manuscript_fall_plot_conventions(publication_data, tmp_path, monkeypatch):
+def test_fall_plot_conventions_match_paper(publication_data, tmp_path, monkeypatch):
     from locomotor_learning_model.publication import main_figures
 
     seen = {}
 
     def inspect_plot(_, name, figure):
+        """Check the axes of one Figure 3 panel instead of saving it."""
         from matplotlib import pyplot as plt
 
         if name == "figure3_c":
@@ -342,11 +346,9 @@ def test_figure3_complete_binomial_counts(publication_data):
     trials, cells = fall_tables(publication_data)
     assert len(trials) == 1750 and len(cells) == 35
     assert all(row["trials"] == 50 for row in cells)
-    formerly_incomplete = next(
-        r for r in cells if r["delta_mps"] == 0.4 and r["learning_rate"] == 0.04
-    )
-    assert formerly_incomplete["falls"] == 21
-    assert formerly_incomplete["fall_probability_pct"] == 42
+    cell = next(r for r in cells if r["delta_mps"] == 0.4 and r["learning_rate"] == 0.04)
+    assert cell["falls"] == 21
+    assert cell["fall_probability_pct"] == 42
     assert sum(row["stride_from_time_length"] for row in trials) == 50
     assert fall_filename(0.9, 0.05, 6) == (
         "model_split45_trans20_slow0.55_fast1.45_noise0.01_learning0.05_energysym1_swingcost1_trial6.mat"
@@ -382,8 +384,8 @@ def test_original_landscape_audited_ellipse_values(publication_data):
 
 @pytest.mark.integration
 def test_parameter_comparisons_match_independent_matlab_with_ties(publication_data):
-    # MATLAB R2025a kruskalwallis/anova1/fitlm/ttest2/ranksum, evaluated on
-    # the original and regenerated arrays from the supplied addendum.
+    # Reference values from MATLAB R2025a kruskalwallis, anova1, fitlm, ttest2 and ranksum,
+    # evaluated on the original and regenerated parameter fits.
     expected = {
         ("original", "learning_rate"): [
             9.1357212475633514,
@@ -447,12 +449,11 @@ def test_parameter_comparisons_match_independent_matlab_with_ties(publication_da
 
 
 @pytest.mark.integration
-def test_sanchez_addendum_matches_original_matlab_windows(publication_data):
+def test_sanchez_matches_original_matlab_windows(publication_data):
     if not (publication_data / "original/data/sanchez data/sanchez_energy.mat").is_file():
-        pytest.skip("Sánchez addendum inputs required")
+        pytest.skip("Sánchez energy and SLA inputs are required")
     rows = _sanchez(publication_data)
-    # First/last participant values independently evaluated from the original
-    # fig1_energy_sla_vs_trajopt.m section in MATLAB R2025a.
+    # P1 and P15 reference values from the authors' MATLAB R2025a analysis for Figure 1C-D.
     for participant, expected in (
         ("P1", [39.841766146199127, 34.101988532304752, -5.7686971140829719, 2.3811102200814673]),
         ("P15", [32.2157545896442, 11.812356790051719, -6.4204800056208731, 2.3510865075084189]),
@@ -472,9 +473,9 @@ def test_sanchez_addendum_matches_original_matlab_windows(publication_data):
 def test_optimization_source_subset_matches_original_energy_equations(publication_data):
     folder = publication_data / "original/data/trajectory optimization"
     if not (folder / "model_13d24m_sbt.osim").is_file():
-        pytest.skip("OpenSim addendum inputs required")
-    # Original scalar MATLAB computeOsimEnergy.m, with the 24 force/length
-    # parameters read from the supplied OSIM XML instead of the OpenSim API.
+        pytest.skip("OpenSim trajectory-optimization inputs are required")
+    # Reference values from MATLAB computeOsimEnergy.m, with the muscle parameters read
+    # from the OSIM XML rather than through the OpenSim API.
     expected = [3.5183137519303593, 3.251264129677224, 3.2334139295303213, 2.8268725674956321]
     actual = [
         source_energy_cost(folder / name, folder / "model_13d24m_sbt.osim")["net_cost_j_kg_m"]
@@ -484,3 +485,26 @@ def test_optimization_source_subset_matches_original_energy_equations(publicatio
     rows = trajectory_source_tables(publication_data)
     assert [r["delta_mps"] for r in rows] == [0, 0.4, 0.7, 1.0]
     assert rows[0]["energy_change_pct"] == 0
+
+
+def test_fall_probability_tests_pair_participants_across_landscapes():
+    alpha, psi = np.array([0.01, 0.02]), np.array([0.0, 1.0])
+    rates = np.zeros((2, 2, 3))
+    rates[:, :, 0] = [[10, 20], [30, 40]]
+    rates[:, :, 1] = [[15, 25], [35, 45]]
+    rates[:, :, 2] = [[50, 60], [70, 80]]
+    fitted = [
+        (np.array([0.01, 0.01, 0.02, 0.02, 0.01, 0.02]), np.array([0, 1, 0, 1, 1, 0.0])),
+        (np.array([0.02, 0.01, 0.02, 0.01, 0.02, 0.01]), np.array([1, 0, 0, 1, 1, 1.0])),
+        (np.array([0.01]), np.array([0.0])),
+    ]
+    rows = fall_probability_tests(alpha, psi, rates, fitted)
+    assert [(r["fitted_delta_mps"], r["landscape_delta_mps"]) for r in rows] == [
+        (0.4, 0.7), (0.4, 1.0), (0.7, 1.0)
+    ]
+    assert [r["n_increased"] for r in rows] == [6, 6, 6]
+    assert rows[0]["mean_larger_landscape_pct"] - rows[0]["mean_own_landscape_pct"] == 5
+    assert all(r["p_one_sided_greater"] == pytest.approx(1 / 64) for r in rows)
+    with pytest.raises(ValueError, match="not on the fall-risk landscape grid"):
+        fall_probability_tests(alpha, psi, rates, [(np.array([0.015]), np.array([0.0]))])
+

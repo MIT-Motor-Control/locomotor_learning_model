@@ -1,4 +1,4 @@
-"""Offline integrity, interrupted-transfer and safe-extraction checks."""
+"""DATA download script: integrity checks, interrupted transfers and safe extraction."""
 
 import hashlib
 import http.client
@@ -20,10 +20,16 @@ spec.loader.exec_module(download)
 
 
 def digest(data):
+    """Return the SHA-256 hex digest of ``data``."""
     return hashlib.sha256(data).hexdigest()
 
 
 def release(tmp_path, entries=None):
+    """Write a ZIP split into 128-byte pieces with its manifest.
+
+    Returns:
+        Tuple of the manifest, the folder holding the pieces and the full ZIP bytes.
+    """
     contents = entries or [
         (f"{download.DATA_ROOT}/README.md", b"Dataset provenance\n"),
         (f"{download.DATA_ROOT}/processed_csv/example.csv", b"time,value\n0,1\n"),
@@ -55,6 +61,8 @@ def release(tmp_path, entries=None):
 
 
 class Response(io.BytesIO):
+    """In-memory HTTP response with a status code and headers."""
+
     def __init__(self, data, *, length=True, status=200, headers=None):
         super().__init__(data)
         self.status = status
@@ -63,6 +71,7 @@ class Response(io.BytesIO):
 
 
 def pin_release(monkeypatch, manifest, parts):
+    """Pin the expected archive size and checksums to a synthetic release."""
     monkeypatch.setattr(download, "ARCHIVE_BYTES", manifest["archive"]["bytes"])
     monkeypatch.setattr(download, "ARCHIVE_SHA256", manifest["archive"]["sha256"])
     monkeypatch.setattr(
@@ -76,6 +85,7 @@ def test_default_command_prefers_complete_zip(tmp_path, monkeypatch):
     calls = []
 
     def request(url, *, headers=None):
+        """Return the complete ZIP after checking the requested URL and headers."""
         calls.append(url)
         assert headers == {"Accept-Encoding": "identity"}
         assert url == download.RECORD_URL + download.ARCHIVE_NAME
@@ -97,11 +107,12 @@ def test_whole_zip_404_does_not_select_older_split_release(tmp_path, monkeypatch
     calls = []
 
     def request(url, *, headers=None):
+        """Respond 404 to the complete ZIP and fail the test on any other request."""
         name = url.rsplit("/", 1)[-1]
         calls.append(name)
         if name == download.ARCHIVE_NAME:
             raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
-        pytest.fail("Current release must not request the historical split files")
+        pytest.fail("The whole-archive release must not request split pieces")
 
     monkeypatch.setattr(download, "request", request)
     monkeypatch.setattr(download.time, "sleep", lambda _: None)
@@ -116,6 +127,7 @@ def test_network_errors_never_select_split_route(tmp_path, monkeypatch, error_co
     calls = []
 
     def request(url, *, headers=None):
+        """Raise a timeout, or an HTTP error with ``error_code``."""
         calls.append(url)
         assert url.endswith(download.ARCHIVE_NAME)
         if error_code is None:
@@ -135,6 +147,7 @@ def test_unavailable_public_release_has_actionable_cli_error(tmp_path, monkeypat
     calls = []
 
     def request(url, **kwargs):
+        """Raise an HTTP error with ``error_code``."""
         calls.append(url)
         raise urllib.error.HTTPError(url, error_code, "unavailable", {}, None)
 
@@ -231,11 +244,11 @@ def test_local_archive_uses_safe_extraction(tmp_path, monkeypatch):
     assert archive.read_bytes() == payload
 
 
-@pytest.mark.parametrize("legacy_flag", ["--parts-dir", "--manifest"])
-def test_local_archive_cannot_mix_with_legacy_sources(tmp_path, monkeypatch, legacy_flag):
+@pytest.mark.parametrize("split_option", ["--parts-dir", "--manifest"])
+def test_local_archive_cannot_mix_with_split_release_options(tmp_path, monkeypatch, split_option):
     monkeypatch.setattr(download, "install_local_archive", lambda *a: pytest.fail("Conflicting arguments reached installer"))
     with pytest.raises(SystemExit) as error:
-        download.main(["--archive", str(tmp_path / "data.zip"), legacy_flag, "unused"])
+        download.main(["--archive", str(tmp_path / "data.zip"), split_option, "unused"])
     assert error.value.code == 2
 
 
@@ -246,6 +259,7 @@ def test_wrong_whole_zip_never_falls_back_or_extracts(tmp_path, monkeypatch, cor
     calls = []
 
     def request(url, *, headers=None):
+        """Return the ZIP without its last byte or with a corrupted first byte."""
         calls.append(url)
         assert url.endswith(download.ARCHIVE_NAME)
         invalid = payload[:-1] if corruption == "length" else b"!" + payload[1:]
@@ -270,6 +284,7 @@ def test_whole_zip_resumes_or_safely_restarts_when_range_ignored(
     partial.write_bytes(payload[:43])
 
     def request(url, *, headers=None):
+        """Return the full ZIP (Range ignored) or its bytes from offset 43 (status 206)."""
         assert headers == {"Accept-Encoding": "identity", "Range": "bytes=43-"}
         if ignores_range:
             return Response(payload)
@@ -297,12 +312,16 @@ def test_interrupted_whole_zip_retry_uses_new_offset(tmp_path, monkeypatch, init
         (cache / f"{download.ARCHIVE_NAME}.partial").write_bytes(payload[:initial_offset])
 
     class Interrupted(Response):
+        """Response that delivers 17 bytes and then fails with IncompleteRead."""
+
         def read(self, size=-1):
+            """Return the first 17 bytes; raise IncompleteRead on the next read."""
             if self.tell():
                 raise http.client.IncompleteRead(b"", len(payload) - 17)
             return super().read(17)
 
     def request(url, *, headers=None):
+        """Return an interrupted response first, then the rest of the ZIP from the new offset."""
         calls.append(headers)
         if len(calls) == 1:
             if initial_offset:
@@ -424,6 +443,7 @@ def test_cleanup_failure_reports_successful_install(tmp_path, monkeypatch, capsy
     original_unlink = Path.unlink
 
     def unlink(path, *args, **kwargs):
+        """Fail to delete the cached archive; delete other paths normally."""
         if path == cache / download.ARCHIVE_NAME:
             raise PermissionError("test cleanup failure")
         return original_unlink(path, *args, **kwargs)
@@ -446,12 +466,16 @@ def test_download_reuses_completed_piece_after_interruption(tmp_path, monkeypatc
     calls = []
 
     class Interrupted(Response):
+        """Response that delivers 9 bytes and then raises KeyboardInterrupt."""
+
         def read(self, size=-1):
+            """Return the first 9 bytes; raise KeyboardInterrupt on the next read."""
             if self.tell():
                 raise KeyboardInterrupt
             return super().read(9)
 
     def interrupted(url):
+        """Return an interrupted response for the requested piece."""
         name = url.rsplit("/", 1)[-1]
         calls.append(name)
         return Interrupted((parts / name).read_bytes())
@@ -466,6 +490,7 @@ def test_download_reuses_completed_piece_after_interruption(tmp_path, monkeypatc
     assert not (cache / second).exists()
 
     def successful(url):
+        """Return the complete requested piece."""
         name = url.rsplit("/", 1)[-1]
         calls.append(name)
         return Response((parts / name).read_bytes())
@@ -486,7 +511,10 @@ def test_incomplete_http_body_is_retried(tmp_path, monkeypatch, explicit_error):
     attempts = []
 
     class Truncated(Response):
+        """Response that ends after 9 bytes, with or without an IncompleteRead error."""
+
         def read(self, size=-1):
+            """Return the first 9 bytes, then raise IncompleteRead or return no data."""
             if self.tell():
                 if explicit_error:
                     raise http.client.IncompleteRead(b"", len(payload) - 9)
@@ -494,6 +522,7 @@ def test_incomplete_http_body_is_retried(tmp_path, monkeypatch, explicit_error):
             return super().read(9)
 
     def request(_):
+        """Return a truncated response on the first attempt and the full piece afterwards."""
         attempts.append(1)
         return Truncated(payload) if len(attempts) == 1 else Response(payload)
 

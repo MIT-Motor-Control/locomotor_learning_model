@@ -1,101 +1,81 @@
-# Reproducing the paper
+# Reproduction guide
 
-The publication workflow reads saved experimental measurements, fitted parameters and simulation results. It writes every output to a separate directory and checks input hashes before analysis. Once the matching Zenodo release is public, start with `python scripts/download_data.py`, which downloads the single DATA ZIP. It verifies and installs the matching DATA folder, including its embedded model-input ZIP, inside `data/`. Allow about 30 GB free for installation; [data setup](../data/README.md) covers interrupted transfers and manual downloads. Author source directories are not required by this workflow.
+`loco-publication` recomputes the paper's numerical figures, tables and statistics from the saved experimental measurements and simulations in the Zenodo DATA archive. It does not rerun the stochastic simulation sweeps, so its results are those of the saved simulations. The [README](../README.md#reproduce-the-paper) lists the commands and maps each figure to its analysis.
 
 ## Commands
 
-From the repository root, after installation:
+| Command | Purpose |
+|---|---|
+| `loco-publication prepare` | Check the DATA folder and write the analysis inputs to `data/publication/` |
+| `loco-publication verify-data` | Recheck every prepared input against its SHA-256 checksum |
+| `loco-publication reproduce --strict` | Write figures, CSV tables and a report to `outputs/publication/` |
+| `loco-publication validate-manuscript` | Compare the reproduced tables with the values reported in the paper |
+| `loco-publication recompute-s1 --matlab /path/to/matlab` | Rerun the Supplementary Figure 1 cross-validation in MATLAB |
 
-```sh
-loco-publication prepare
-loco-publication verify-data
-loco-publication reproduce --strict
-loco-publication reproduce --strict --figures figure3 s1 s4 --output outputs/selected
-loco-publication recompute-s1 --matlab /path/to/matlab
-```
+`reproduce` exits with 1 on an input, output-folder or analysis error and, with `--strict`, with 2 if an analysis is partial or blocked by missing inputs; otherwise it exits with 0. Options: `--figures` selects analyses, `--output` sets the directory and `--overwrite` replaces an earlier run in it. `report.json` records the checksums of the input manifest, code and outputs and the software versions; `report.md` lists the status and caveats of each analysis.
 
-`reproduce` runs the numerical workflows for Figures 1–4, S1–S5 and fit-quality summaries. With only an older experimental download, Figures 1 and S3 are partial and model-dependent analyses are blocked. Each run writes PNG/PDF/SVG figures, numerical CSV tables and `report.md`/`report.json`. Output formats depend on the figure. The report records input, source and output hashes and dependency versions. Reusing an existing managed output directory requires `--overwrite`.
+`validate-manuscript` needs a complete `reproduce` run made with the current code and inputs. It writes `report.md` to an empty directory (`--output`, default `outputs/manuscript-validation/`; choose a new directory for a second run) with each checked value, its location in the paper and the reproduced value, and exits with 2 if any value differs. `tests/test_paper_values.py` runs the same comparison.
 
-Exit codes: **0** means the requested available workflows ran without unexpected errors; **1** means an integrity or execution failure; **2**, with `--strict`, means at least one requested analysis is partial or blocked. A successful exit without `--strict` does not mean every manuscript panel is complete.
+`recompute-s1` requires MATLAB with the Statistics and Machine Learning Toolbox; `reproduce` plots the saved results of the same MATLAB analysis.
 
-## Inputs and provenance
-
-| Input directory | Contents | Used for |
-|---|---|---|
-| `original/` | Published fit summaries, experimental measurements, Sánchez comparison, OpenSim outputs and original risk landscape | Figures 1, 4, S3A/C, S4, fit quality |
-| `regenerated/` | Regenerated fits, trial-average grid, cross-validation tables, COSMED arrays and 1,150 selected simulation rollouts | Figure 2B, S1 and S3B |
-| `fall_probability/` | Complete author fall-simulation files | Figure 3 |
-| `extensions/s2/`, `extensions/s5/` | Supplementary numerical results | S2, S5 |
-
-`manifest.json` identifies each input's origin and SHA-256 hash. The experimental import converts the six-decimal CSV values to the array layouts used by the analyses and records participant ordering; it does not invent missing precision or post-adaptation data. The companion archive preserves full-precision author arrays and must agree with the experimental download within its rounding tolerance.
-
-During maintainer preparation of that companion, the missing standalone energy MAT file was reconstructed from `split_energy`, `tied1_energy` and `tied2_energy` embedded in the original fit file, without refitting. Omitted fall trials were recovered from an earlier local archive; overlapping files had to agree before merging. Those historical sources are described by provenance labels in the manifest, not runtime file dependencies.
-
-Figure 3 requires every one of its 1,750 trials. A partial dataset is rejected rather than changing the probability denominator. The saved heatmap is the complete original 20 × 20 × 3 surface, not a newly simulated replacement.
-
-## What the available inputs reproduce
-
-The report distinguishes a numerical reconstruction from a replot of a saved reference. S1 defaults to plotting verified MATLAB participant-level cross-validation and grid-sensitivity results. `recompute-s1` reruns both analyses from the regenerated trial-average grid. An independent release check found exact numerical agreement between these fresh results and the cached tables. It needs MATLAB with the Statistics and Machine Learning Toolbox; ordinary `reproduce` does not. MATLAB's approximate signed-rank p-value and the plotting script's exact SciPy p-value are distinct outputs, with their methods labeled.
-
-S2 and S5 use numerical results, not digitized images. S5 additionally refits all 750 cached cell means, reselects the models and recomputes all held-out predictions, noise-floor estimates and tests. Figure 4 and S4 use the saved original landscape. Fit-quality analyses retain the original published fit. There is no neural-network training checkpoint: this model learns controller parameters and an internal dynamics estimate. See [model.md](model.md) for reusable simulations and resumable learner checkpoints.
-
-The original inverse fit selects the lowest RMSE across parameter cells and individual stochastic trials. S1 instead scores the average normalized trajectory of nonfalling trials within each cell, requiring at least five survivors. Both the realization and the fitting estimator differ; comparing their RMSE values directly would be misleading.
-
-S2 uses 20 experimental participants (7/7/6 by condition) and five model seeds with shared learning rate 6×10⁻⁵, symmetry weight 1 and zero fall-penalty weight. These are the supplied shared Model A results, not the main participant-specific fits. Its reported STA test indicates no detected early-to-late difference, not proof of equivalence or zero adaptation. The manuscript's description of these predictions needs to identify this model variant.
-
-Figure 2B follows the supplied regenerated-trajectory analysis at Δv = 0.7 m/s: smooth and normalize each trajectory, align it to exposure percentage, then average the nine participants and nine fitted simulations. Its exported tables distinguish raw group trajectories from their exponential fits. This reproduces the supplied panel; the manuscript caption's description of a representative participant needs clarification.
-
-S3B reads exactly 50 regenerated trials at each of the 23 unique original best-fit parameter cells. It excludes falls, takes each participant's median energy change across surviving trials, and averages those medians by condition. Shared parameter cells are reused for their corresponding participants. The source table has 1,150 unique trials; participant-weighted counts in the condition summary are larger. The full 60,000-trial sweep is not needed to reconstruct this panel.
-
-The `validate-manuscript` command checks freshly generated results against a historical manuscript snapshot, identified by PDF SHA-256 `6c73972316e0044884175e7399696c66621bd15f0f8b7d83e39776ef572784ae`. It verifies that exact PDF, inputs, analysis code and output hashes before comparison and rejects a different PDF:
-
-```sh
-loco-publication validate-manuscript \
-  --manuscript /path/to/KangMitraSeethapathi_2026_FINAL.pdf \
-  --results outputs/publication \
-  --output outputs/manuscript-validation
-```
-
-Use an empty comparison-output directory. Exit code **2** means agreement is incomplete; **1** indicates an integrity or execution error. The generated report records the comparison and its limits. This snapshot predates the RMSE correction described below; the command does not validate later manuscript revisions. S1 annotates the manuscript's MATLAB p-value; the alternative SciPy value remains exported separately.
-
-Figures have editable text and consistent rendering; manually composed schematics, arrows and the exact submitted page layout remain separate artwork. Newly generated stochastic simulations are not substitutes for the published saved results.
-
-## Coverage and limits
-
-- **Figure 1:** experimental observations, paired tests and the Sánchez comparison are reconstructed, with the time windows exported alongside source values.
-- **Figure 2B:** the regenerated group-trajectory panel and its correlation are reconstructed. The caption's participant description remains unresolved.
-- **Figures 3–4 and S1–S5:** the supplied saved-data analyses, Figure 4 parameter tests, S1 relaxed-grid checks and S3B rollouts are available. The Figure 4 parameter test is not a test of the separate fall-probability claim in the text.
-- **S3A/OpenSim:** the five supplied optimization values are plotted. An independent calculation from the available muscle-output files is exported separately; those files do not establish all five published values. Running the original optimization from scratch is not supported by the supplied inputs.
-- **RMSE correction:** the original 0.4 m/s cohort has mean inverse-fit RMSE 0.3715 across eight participants. The manuscript source reviewed on October 18, 2026 reports 0.37 ± 0.32, resolving the earlier 0.33 mean discrepancy at the reported precision. The historical PDF check retains its original target and result; no participant values or simulation parameters were changed.
-- **Simulation protocol:** the manuscript engine uses a 25-second transition and multiplies experimental belt speeds by 0.5. Model time is converted to seconds using √(leg length / g). The manuscript Methods reviewed on October 19, 2026 match these settings.
-- **Simulation scope:** seeded examples and saved-result analyses are supported. Full original stochastic sweeps and raw COSMED/C3D processing are not reconstructed by this workflow. Saved-reference agreement does not establish agreement of every Methods statement.
-
-Inspect each generated report for incomplete inputs and numerical comparisons before using its outputs.
-
-## Testing
-
-Figure 1 preserves MATLAB's midpoint-percentile box statistics, rather than the different default quartiles in Matplotlib. Exported box summaries make the plotted geometry inspectable. Figure 3D uses the same exponential model and unweighted least-squares objective as the source, with a portable SciPy solver. An independent base-MATLAB optimization agreed within 0.000003 strides at the observed speeds; byte-identical coefficients from the unavailable Curve Fitting Toolbox are not claimed.
+MATLAB versions of the Supplementary Figure 2 and 4 analyses are in the same folder as the Supplementary Figure 1 scripts, `src/locomotor_learning_model/publication/vendor/`. They also need the Statistics and Machine Learning Toolbox, read the prepared inputs and write the same CSV tables as `reproduce`, with PNG figures:
 
 ```matlab
-addpath('matlab/validation');
-validate_fall_fit('outputs/publication/tables');
+addpath('src/locomotor_learning_model/publication/vendor')
+publication_s2_asymmetry('data/publication', 'outputs/matlab/s2')
+publication_s4_fall_penalty('data/publication', 'outputs/matlab/s4')
 ```
 
-```sh
-python -m pytest -q
-```
+Their tables agree with the Python tables to within 3 × 10⁻⁹, with identical model selections and test results; `tests/test_paper_values.py` checks this when MATLAB is available.
 
-Data-dependent tests skip when the prepared dataset is absent. A release check should prepare/extract the data, run the full tests, regenerate the figures, recompute S1 with MATLAB, and inspect the resulting figures. Use `--strict` for a specific figure only when all its inputs and analyses are expected to be complete.
+## Inputs
 
-## Editor source workbook
+`data/publication/manifest.json` lists every input with its origin and SHA-256 checksum. Two realizations of the inverse-adaptation sweep are included. The **original** realization holds the fits reported in the paper. The **regenerated** realization is a second run of the same sweep, with its own fits and a trial-averaged fit grid; of its individual trials, it keeps the 50 at each of the 23 grid cells of the fits reported in the paper.
 
-The requested 1C/D/E, 3C, S1 and S3 numerical values are exported in `outputs/publication/tables/`. They include the Sánchez comparison, participant observations, all 1,750 Figure 3 trials and all 1,150 S3B trials. These CSVs and the documented pipeline provide the reusable figure source data.
+| Folder | Contents | Used by |
+|---|---|---|
+| `original/` | Experimental energy and step-length asymmetry, the fits reported in the paper, the fall-risk landscape, the Sánchez et al. (2021) comparison and trajectory-optimization outputs | Figures 1, 2C, 4; Supplementary Figure 3; `r2` |
+| `regenerated/` | Experimental energy, the regenerated fits, the trial-averaged fit grid, cross-validation results and 50 simulations at each of the 23 grid cells of the fits reported in the paper | Figure 2B, 2C (model); Supplementary Figure 1 |
+| `fall_probability/` | 3,092 simulations; Figure 3 uses trials 1–50 at ψ = 0 (1,750: 7 speed differences × 5 learning rates × 50 trials) | Figure 3 |
+| `extensions/s2/` | Asymmetry measurements and model simulations | Supplementary Figure 2 |
+| `extensions/s5/` | 750 fall-penalty simulation cells and their fits | Supplementary Figure 4 |
+| `extensions/experimental_csv/` | The six experimental CSV tables of the DATA folder | Supplementary Figure 4; checks against the full-precision arrays |
+| `reference_tables/` | Reference tables from the original analysis; only `expfit_r2.csv` is read | Check of the `r2` R² values |
 
-To gather the editor-requested source values into a workbook, use the same Conda environment:
+## Methods of each analysis
+
+**Figure 1C–E.** Energy change is split-belt minus tied-belt metabolic cost over the final 3 minutes of each condition, as a percentage of tied-belt cost; short exposure uses minutes 3–6 of split-belt walking. Step-length asymmetry change compares the final 100 split-belt and tied-belt strides; the short window ends at stride ⌈6/45 · N⌉, where N is the number of split-belt strides. Figure 1E compares adjacent 3-minute means with two-sided paired t-tests (p < 0.05, uncorrected). Box plots use MATLAB's percentile definition. The energy-minimization points are the five reported trajectory-optimization values; the saved OpenSim outputs cover four conditions (tied, 0.4, 0.7 and 1.0 m/s) and are used only for a separate check (`figure1_optimization_source_subset.csv`).
+
+**Figure 2B.** The plotted trajectories are the means of the nine 0.7 m/s participants and of their nine fitted simulations (regenerated realization); the paper's caption describes a representative participant. Each trajectory of n samples is smoothed with a 100-sample moving mean, started at sample max(30, round(0.03 n)) to remove the startup transient, expressed as percent change from the mean of its next 120 samples and resampled to 270 points; an exponential is fitted to each group mean.
+
+**Figure 2C.** For each participant, the model value is the median energy change of the nonfalling simulations among the 50 at the participant's fitted parameters, comparing the final 100 strides with tied-belt strides 31–70; participant values are averaged by condition. The experimental values are those of Figure 1C at 45 minutes.
+
+**Figure 3.** Fall probability is the fraction of 50 simulations per cell that fall. Figure 3B shows the lowest center-of-mass height between consecutive midstances, which is reached at the transition between stances. Figure 3D fits a single exponential to the mean strides until a fall at each speed by unweighted least squares; an independent MATLAB fit agrees within 3 × 10⁻⁶ strides.
+
+**Figure 4 and Supplementary Figure 3.** The saved 20 × 20 fall-risk landscape of each condition. Ellipses are centered on the median fitted learning rate and symmetry weight, with semi-axes equal to their standard errors; each annotation is the mean fall probability of the grid cells inside the ellipse. `figure4_parameter_tests.csv` compares the fitted parameters across conditions. `figure4_fall_probability_tests.csv` tests the Results statement that keeping the same parameters at a larger belt-speed difference would increase fall probability: for each participant, the fall probability at their fitted grid cell on their own condition's landscape is paired with that on each larger belt-speed landscape, and the pairs are compared with a one-sided Wilcoxon signed-rank test (0.4 → 0.7 and 0.4 → 1.0 m/s: 8 of 8 participants higher, p = 0.004; 0.7 → 1.0 m/s: 8 of 9, p = 0.010). Supplementary Figure 3 plots rows and columns of the same landscapes.
+
+**In-sample fit error and R² (`r2`).** For each participant, the reported fit selects, among 20 × 20 parameter cells with 50 simulations each, the single simulation whose exponential fit is closest to the participant's (lowest RMSE); the reported RMSE is that minimum. R² is that of the single-exponential fit to the 3-minute smoothed experimental energy. A double-exponential comparison is also exported; because that fit is poorly conditioned, its R² can vary between runs in the eighth decimal place.
+
+**Supplementary Figure 1.** Leave-one-subject-out cross-validation of condition-specific versus size-matched common parameters on the regenerated trial-averaged grid, which scores each cell by the mean normalized trajectory of its nonfalling trials (at least five). The p-value shown is MATLAB's `signrank`; SciPy's exact value is exported alongside.
+
+**Supplementary Figure 2.** Step-length and step-time asymmetry from the 20 participants with force-plate data (7, 7 and 6 by condition) and five Python-model simulations per condition with one parameter set for all conditions (learning rate 6 × 10⁻⁵ on the Python model's scale, symmetry weight 1, no fall penalty). Time-course bands are ±1.96 standard errors; adapted values have Student-t 95% confidence intervals.
+
+**Supplementary Figure 4 and the fall-penalty comparison.** The simulations were run with the Python model (learning rates 3 × 10⁻⁵ to 4.8 × 10⁻⁴; these are not on the scale of the manuscript engine's learning rates). All 750 saved cell means are refitted. For each condition, the model with a free fall-penalty weight (`C` in the tables) and the model without it (`E`) are selected by RMSE, with both refitting the learning rate and symmetry weight, and compared by leave-one-subject-out cross-validation and paired Wilcoxon tests. The noise floor is the RMSE between the exponential fit to each participant's trajectory and the exponential fit to the mean trajectory of the other participants in the condition.
+
+## Source data workbook
+
+The source data of the figures with Zenodo data statements (Figures 1C–E, 2C, 3C–D and Supplementary Figure 1) can be collected into one Excel workbook:
 
 ```sh
 python scripts/build_source_workbook.py outputs/publication outputs/source-data.xlsx
 python scripts/check_source_workbook.py outputs/publication outputs/source-data.xlsx
 ```
 
-The builder preserves the CSV values, records their hashes, and labels data sources and units. The checker compares workbook cells with the CSVs. Both use `openpyxl`, included in the Conda environment.
+The builder copies the CSV values and records their checksums; the checker compares every workbook cell with its CSV.
+
+## Not reproduced
+
+- The trajectory optimization (OpenSim Moco) of the energy-minimization predictions.
+- The stochastic sweeps and the inverse-adaptation fitting that produced the saved fits; new simulations with the MATLAB engine or the Python model are new realizations.
+- Processing of the raw motion-capture and metabolic recordings, which are included in the DATA folder.
+- Schematic panels and figure layout.

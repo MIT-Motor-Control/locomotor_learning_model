@@ -1,7 +1,19 @@
 function [stateVar0,tStore,stateStore,EmetTotalStore, ...
     EmetPerTimeStore,tStepStore,EworkPushoffStore,EworkHeelstrikeStore] = ...
     simulateManySteps_AsymmetricControl(stateVar0,paramController,paramFixed,tStart)
-% Simulate alternating steps with odd- and even-leg controllers.
+% Simulate paramFixed.numSteps steps, alternating the odd- and even-step controllers.
+% Inputs:  stateVar0       - initial midstance state (layout in loadInitialBodyState)
+%          paramController - feedback gains and the Odd and Even nominal controllers
+%          paramFixed      - model parameters, including numSteps
+%          tStart          - start time (nondimensional)
+% Outputs: stateVar0          - midstance state after the last step
+%          tStore, stateStore - numSteps+1 cells, one stance phase each, from
+%                               heel strike to endstance; the first cell starts
+%                               and the last cell ends at midstance
+%          EmetTotalStore     - energy cost of each step
+%          EmetPerTimeStore   - energy cost per unit time of each step
+%          tStepStore         - duration of each step
+%          EworkPushoffStore, EworkHeelstrikeStore - push-off and heel-strike work of each step
 
 tStore = cell(paramFixed.numSteps+1,1);
 stateStore = cell(paramFixed.numSteps+1,1);
@@ -44,7 +56,8 @@ for iStep = 1:paramFixed.numSteps
         simulateOneStep_MidstanceToMidstance_WithEnergy(stateVar0,iStep,tStart, ...
         paramController,paramFixed);
 
-    % Join half-steps at heel strikes to obtain complete stance trajectories.
+    % The half stance after heel strike opens the next cell; the shared
+    % midstance sample is stored once.
     tStore{iStep} = [tStore{iStep}; tlistTillEndstance];
     stateStore{iStep} = [stateStore{iStep}; statevarlistTillEndstance];
 

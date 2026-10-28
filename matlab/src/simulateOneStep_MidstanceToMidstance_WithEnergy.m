@@ -3,7 +3,24 @@ function [pInput0_out,tlistTillEndstance, statevarlistTillEndstance, ...
    Emet_total,Emet_perTime,tTotal,Ework_pushoff,Ework_heelstrike] = ...
     simulateOneStep_MidstanceToMidstance_WithEnergy(pInput0,iStep,tStart, ...
     paramController,paramFixed)
-% Simulate one midstance-to-midstance step and its mechanical energy costs.
+% Simulate one midstance-to-midstance step and its energy cost.
+% The feedback controller sets the endstance leg angle and push-off impulse from
+% midstance deviations. Stance is integrated to endstance; an impulsive push-off
+% along the trailing leg and an inelastic heel strike, which removes the
+% velocity component along the leading leg, then transfer support to the other
+% leg, whose stance is integrated to the next midstance.
+% The energy cost is the push-off and heel-strike work weighted by inverse
+% muscle efficiencies, plus the swing cost.
+% Inputs:  pInput0         - midstance state (layout in loadInitialBodyState)
+%          iStep           - step index; odd steps push off from belt 1, even from belt 2
+%          tStart          - start time (nondimensional)
+%          paramController - feedback gains and this step's nominal controller
+%          paramFixed      - model parameters and belt-speed profile
+% Outputs: pInput0_out - midstance state at the end of the step
+%          tlistTillEndstance, statevarlistTillEndstance - midstance-to-endstance trajectory
+%          tlistTillMidstance, statevarlistMidstance     - heel-strike-to-midstance trajectory
+%          Emet_total, Emet_perTime, tTotal - energy cost, cost per unit time, step duration
+%          Ework_pushoff, Ework_heelstrike  - magnitudes of push-off and heel-strike work
 
 if rem(iStep,2)==0
     paramController.tList_BeltSpeed = paramFixed.imposedFootSpeeds.tList;
@@ -17,6 +34,7 @@ else
     paramController.PushoffAccelerationNowList = paramFixed.imposedFootSpeeds.footAcc1List;
 end
 
+% Maximum integration time per half-step; the stance events normally stop it earlier.
 numPointsPerInterval = 300;
 tStance = 30; tEnd = tStart+tStance;
 tspan = linspace(tStart,tEnd,numPointsPerInterval)';
@@ -46,7 +64,7 @@ delta_y_atMidstance = y_atMidstance_Slopeframe - ...
 delta_SUMy = SUMy0-paramController.SUMy_atMidstance_nominal_slopeframe;
 
 ydot_atMidstance_LabFrame = ydot_atMidstance+paramController.PushoffFootSpeedNow;
-% Nominal belt speed used for lab-frame velocity feedback.
+% Reference belt speed; the belt-speed feedback acts on deviations from it.
 vFootNominal = -0.35;
 paramController.ydot_atMidstance_nominal_labframe = ...
     paramController.ydot_atMidstance_nominal_beltframe+vFootNominal;
@@ -158,6 +176,8 @@ Emet_step2step = paramFixed.bPos*Ework_pushoff + paramFixed.bNeg*Ework_heelstrik
 Thalfstance1 = range(tlistTillEndstance);
 Thalfstance2 = range(tlistTillMidstance);
 
+% Mean swing-foot speeds over the two half-steps; the swing foot is taken to
+% pass the stance-foot position at midstance.
 vSwing_AtoC = (yFootBegin_Step2-yFootBegin_Step1)/Thalfstance1;
 vSwing_BtoD = (yFootEnd_Step2-yFootEnd_Step1)/Thalfstance2;
 

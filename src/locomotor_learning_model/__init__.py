@@ -1,4 +1,4 @@
-"""Python implementation of the locomotor learning model."""
+"""Baseline adaptation-aware locomotor learning model: simulation, result archives and plots."""
 
 from .workflow import (
     SimulationResults,

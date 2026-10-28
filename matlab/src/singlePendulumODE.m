@@ -1,5 +1,12 @@
 function dStateVar = singlePendulumODE(t,stateVar,paramFixed,paramController)
-% Evaluate stance-leg dynamics and foot motion on the moving treadmill.
+% Return the state derivative of the inverted-pendulum stance phase on a moving belt.
+% The stance foot moves at the belt speed in PushoffFootSpeedNowList, and belt
+% acceleration adds an inertial torque.
+% Inputs:  t               - time (nondimensional)
+%          stateVar        - [stance-leg angle; angular rate; stance-foot position]
+%          paramFixed      - model parameters
+%          paramController - belt-speed and belt-acceleration tables for this step
+% Outputs: dStateVar - time derivative of stateVar
 
 angleTheta = stateVar(1);
 dangleTheta = stateVar(2);

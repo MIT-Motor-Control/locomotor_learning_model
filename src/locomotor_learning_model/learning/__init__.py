@@ -1,1 +1,1 @@
-"""Core simulation routines for the Python locomotor learning model."""
+"""Stance dynamics, step simulation, objective and learning rules of the adaptation model."""

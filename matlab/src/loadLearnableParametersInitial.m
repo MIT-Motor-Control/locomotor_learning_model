@@ -1,6 +1,9 @@
 function pInputControllerAsymmetricNominal = ...
     loadLearnableParametersInitial(paramFixed)
-% Initialize the nominal controller for alternating steps.
+% Return the initial 10-D nominal controller for paramFixed.swingCost.Coeff.
+% Entries 1-5 (odd steps) and 6-10 (even steps) are the nominal endstance leg
+% angle, midstance speed relative to the belt, push-off impulse, midstance foot
+% position and summed midstance foot position.
 
 switch paramFixed.swingCost.Coeff
     case 0.9

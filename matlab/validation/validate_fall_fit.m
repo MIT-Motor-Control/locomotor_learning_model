@@ -1,5 +1,12 @@
 function comparison = validate_fall_fit(table_dir)
-% Compare exponential fall-time fits with the reference source table.
+% Refit the Figure 3D exponential fall-time curves and check them against the source table.
+% For each learning rate, y = a*exp(b*x) is fit by least squares, with a in
+% closed form for each b and b found by bounded scalar search.
+% Inputs:  table_dir  - folder with figure3_d_fit_inputs.csv and figure3_d_fit_coefficients.csv
+% Outputs: comparison - fitted a, b and SSE per learning rate, with the maximum
+%          curve difference and SSE difference from the reference fit; errors if
+%          either exceeds its tolerance
+
 inputs = readtable(fullfile(table_dir, 'figure3_d_fit_inputs.csv'));
 reference = readtable(fullfile(table_dir, 'figure3_d_fit_coefficients.csv'));
 rows = zeros(height(reference), 6);
@@ -22,6 +29,7 @@ disp(comparison);
 end
 
 function a = amplitude(x, y, b)
+% Return the least-squares amplitude of y = a*exp(b*x) for fixed b.
 basis = exp(b .* x);
 a = (basis' * y) / (basis' * basis);
 end

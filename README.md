@@ -1,27 +1,21 @@
 # Locomotor learning model
 
-Code and analysis for **Safety prioritization shapes locomotor adaptation and performance**, by Inseung Kang, Kanishka Mitra and Nidhi Seethapathi.
+Code for **Safety prioritization shapes locomotor adaptation and performance** by Inseung Kang, Kanishka Mitra and Nidhi Seethapathi. The paper refers to this implementation as InvLocAd. The preprint has the earlier title *Fall risk-aware adaptation explains suboptimal locomotor performance*.
 
-[Paper preprint](https://www.biorxiv.org/content/10.64898/2026.03.02.709033v1) · [Zenodo archive (all versions)](https://doi.org/10.5281/zenodo.19547419) · [Model guide](docs/model.md) · [Figure and data guide](docs/reproducibility.md)
+[Code and data (Zenodo)](https://doi.org/10.5281/zenodo.23402153) · [Preprint](https://doi.org/10.64898/2026.03.02.709033) · [Model guide](docs/model.md) · [Reproduction guide](docs/reproducibility.md)
 
-| I want to… | Start here |
-|---|---|
-| Try the model without downloading data | [Get started](#get-started) |
-| Run a longer simulation or resume one | [Run a simulation](#run-a-simulation) |
-| Recreate the paper's available numerical figures | [Reproduce the paper figures](#reproduce-the-paper-figures) |
-| Understand the data files | [Data setup](data/README.md) and the README inside the DATA download |
-| Find a file or function | [Repository map](#repository-map) |
+## Contents
 
-## Get started
+- **Python model** (`src/locomotor_learning_model/`, command `loco-simulate`): the locomotor adaptation model of Seethapathi et al. (2024), in which a gradient-based learner updates a step-to-step feedback controller, with the optional fall penalty of the paper's Eq. 2. It runs, pauses and resumes simulations with the model's baseline settings.
+- **MATLAB manuscript engine** (`matlab/manuscript/`): the model with fall detection and the protocol of the paper's Methods, used for the simulations of Figures 2–4 and Supplementary Figures 1 and 3; the Python model produced those of Supplementary Figures 2 and 4 and the fall-penalty comparison in the Results.
+- **MATLAB baseline** (`matlab/src/`): the MATLAB version of the Python model, used to check it.
+- **Figure workflow** (command `loco-publication`): recomputes the paper's figures, tables and statistics from the saved measurements and simulations on Zenodo.
 
-Install [Miniforge](https://github.com/conda-forge/miniforge#install) to get Conda. Download this repository using GitHub's **Code → Download ZIP** button and extract it, or clone it with Git:
+Requirements: [Miniforge](https://github.com/conda-forge/miniforge#install) (Conda), about 30 GB of disk space for the data, and optionally MATLAB R2021a or later for the MATLAB code. The release was tested on macOS (arm64) with MATLAB R2025a; the automated tests also run on Ubuntu.
 
-```sh
-git clone https://github.com/MIT-Motor-Control/locomotor_learning_model.git
-cd locomotor_learning_model
-```
+## Install
 
-Open a terminal in the repository folder—the one containing `environment.yml`—and run:
+Download this repository (GitHub **Code → Download ZIP**, or `git clone https://github.com/MIT-Motor-Control/locomotor_learning_model.git`) and run from its top-level folder:
 
 ```sh
 conda env create -f environment.yml
@@ -29,131 +23,103 @@ conda activate loco-ada
 loco-simulate demo
 ```
 
-The environment installs the package and its dependencies. The demo runs 40 learning iterations and writes `outputs/demo/split_belt_summary.png`. It needs no DATA download or MATLAB. This is a short installation check and may finish before the treadmill reaches split-belt walking.
-
-Run the commands below from this same repository folder. In each new terminal, activate the environment with `conda activate loco-ada` first.
+The demo runs 40 learning iterations in a few seconds and writes `outputs/demo/split_belt_summary.png`. Activate `loco-ada` in each new terminal before running the commands below.
 
 ## Run a simulation
-
-Run 1,000 learning iterations with a repeatable random seed:
 
 ```sh
 loco-simulate run --seed 42 --iterations 1000 --output-dir outputs/my-run
 ```
 
-| Output | What it contains |
+| Output | Contents |
 |---|---|
-| `split_belt_summary.png` | Simulation overview; tied walking produces `tied_belt_summary.png` |
-| `run.npz` | Numerical results that can be loaded and replotted |
-| `metadata.json` | Settings, seed, runtime versions and completed iterations |
-| `checkpoint.npz` and `checkpoint.metadata.json` | Saved learner state and its description |
+| `run.npz` | Controller, body-state, energy and learner histories |
+| `metadata.json` | Seed, condition, protocol, configuration checksum, software versions, iteration counts and summary values |
+| `checkpoint.npz`, `checkpoint.metadata.json` | Learner state for resuming the run and its description |
+| `split_belt_summary.png` | Summary figure (`tied_belt_summary.png` for tied walking) |
 
-Use a different output folder to keep separate runs. To pause a short example halfway through and then continue it:
+The full split-belt protocol has 3,200 iterations: 6 minutes of tied walking, 45 minutes of split-belt walking and 5 minutes of tied walking. To pause after 10 of 20 iterations and resume:
 
 ```sh
 loco-simulate run --seed 42 --iterations 20 --stop-after 10 --output-dir outputs/paused
 loco-simulate resume outputs/paused/checkpoint.npz --output-dir outputs/resumed
 ```
 
-The resumed run finishes the original target of 20 iterations and preserves the input checkpoint. These examples need only the code. [The model guide](docs/model.md) explains simulation settings, checkpoint compatibility, the Python API and the separate manuscript MATLAB engine. Use `loco-simulate run --help` for all options.
+A resumed run is identical to an uninterrupted run with the same seed. These simulations use the model's baseline settings, not the participant fits of the paper. The [model guide](docs/model.md) maps the paper's parameters to the code and shows how to run the MATLAB manuscript engine with the paper's settings.
 
-## Reproduce the paper figures
+## Reproduce the paper
 
-The figure workflow needs the matching CODE and DATA release. GitHub contains code; the measurements, fitted models and saved simulation trials are distributed on [Zenodo](https://doi.org/10.5281/zenodo.23402153).
-
-**1. Get the data.** Once the matching Zenodo files are public, run:
+**1. Download the data** (13 GB):
 
 ```sh
 python scripts/download_data.py
 ```
 
-The command downloads the single DATA ZIP, verifies its checksum and extracts `data/locomotor_learning_model-DATA/`. Allow about **30 GB of free space** for download and installation. Rerun the command after an interruption to reuse downloaded data. An existing DATA folder is never overwritten.
+This downloads `locomotor_learning_model-DATA.zip` from Zenodo, verifies its checksum and extracts it to `data/locomotor_learning_model-DATA/`. Rerun the command to resume an interrupted download. To install a ZIP you already downloaded, run `python scripts/download_data.py --archive /path/to/locomotor_learning_model-DATA.zip`. The [data guide](data/README.md) describes the files.
 
-If you already downloaded the DATA ZIP, install that file instead. Replace the path below with its location:
-
-```sh
-python scripts/download_data.py --archive ../locomotor_learning_model-DATA.zip
-```
-
-This checks the same release checksum and extracts the data without downloading it again. You can also extract the `locomotor_learning_model-DATA` folder manually into this repository's `data/` folder. Keep the nested `publication-data.zip` compressed. Your layout should be:
-
-```text
-locomotor_learning_model/
-├── environment.yml
-├── data/
-│   └── locomotor_learning_model-DATA/
-│       ├── README.md
-│       ├── processed_csv/
-│       ├── processed_mat/
-│       ├── raw_mocap_c3d/
-│       ├── subject_information/
-│       ├── checkpoints/
-│       └── publication-data.zip
-└── …
-```
-
-**2. Prepare the inputs and make the figures.**
+**2. Prepare the inputs and reproduce the figures:**
 
 ```sh
 loco-publication prepare
-loco-publication verify-data
 loco-publication reproduce --strict
 ```
 
-If the DATA folder is beside this repository instead, use this first command to avoid copying the large recordings:
+`prepare` checks all 5,166 inputs against their SHA-256 checksums and writes them to `data/publication/`; for a DATA folder elsewhere, add `--source /path/to/locomotor_learning_model-DATA`. `reproduce` writes `outputs/publication/figures/` (PNG, PDF and SVG), `outputs/publication/tables/` (CSV source data) and `outputs/publication/report.md`. MATLAB is not needed.
+
+**3. Compare the results with the paper:**
 
 ```sh
-loco-publication prepare --source ../locomotor_learning_model-DATA
+loco-publication validate-manuscript
 ```
 
-Then run the same `verify-data` and `reproduce` commands. Preparation creates `data/publication/` and verifies all 5,166 scientific inputs. The standard figure workflow runs in Conda; MATLAB is only needed to rerun the optional MATLAB calculations.
+This checks 27 values reported in the paper, including sample sizes, test results, fit errors, fall probabilities and cross-validation results, and writes `outputs/manuscript-validation/report.md`.
 
-**3. Open the results.**
+| Paper | Analysis | Figures | Tables |
+|---|---|---|---|
+| Figure 1C–E | `figure1` | `figure1_cd`, `figure1_e` | `figure1_*` |
+| Figure 2B–C | `figure2` | `figure2b_*`, `figure2c` | `figure2b_*`, `figure2c_*` |
+| Figure 3B–D | `figure3` | `figure3_b`, `figure3_c`, `figure3_d` | `figure3_*` |
+| Figure 4 | `figure4` | `figure4` | `figure4_*` |
+| In-sample fit error (Results) and exponential-fit R² (Methods) | `r2` | `r2_expfit` | `inverse_fit_rmse_*`, `r2_*` |
+| Fall-penalty comparison (Results) and Supplementary Figure 4 | `s4` | `s4_fall_penalty` | `s4_*` |
+| Supplementary Figure 1 | `s1` | `s1_loso` | `s1_*` |
+| Supplementary Figure 2 | `s2` | `s2_timeseries`, `s2_adapted` | `s2_*` |
+| Supplementary Figure 3 | `s3` | `s3_fall_risk_slices` | `s3_*` |
 
-| Location | Contents |
-|---|---|
-| `outputs/publication/report.md` | What ran, input coverage and scientific limitations |
-| `outputs/publication/figures/` | Figures in PNG, PDF and SVG formats |
-| `outputs/publication/tables/` | Numerical CSV source tables |
-
-To repeat a run, use `loco-publication reproduce --strict --overwrite`. To select figures, use `loco-publication reproduce --figures figure3 s1 s5 --output outputs/selected`.
-
-These commands reconstruct the **available numerical panels from saved measurements and simulations**. Figures 2B, S1 and S3B use the regenerated realization; other main analyses retain the original published fits. Fresh stochastic simulations need not produce identical trajectories. Original OpenSim optimization, full original sweeps, raw-recording preprocessing and manual figure artwork are outside this workflow. Remaining manuscript discrepancies are documented in the [reproduction guide](docs/reproducibility.md#coverage-and-limits).
-
-See [data setup](data/README.md) for file formats, manual downloads and older experimental-only datasets.
+Select analyses with `--figures`, for example `loco-publication reproduce --figures figure3 s1 --output outputs/selected`. The workflow recomputes every analysis from saved measurements and simulations, except Supplementary Figure 1, which it replots from saved MATLAB cross-validation results (`loco-publication recompute-s1` reruns them). It does not rerun the trajectory optimization, the stochastic parameter sweeps or the processing of raw motion-capture and metabolic recordings, and it does not draw schematic panels. The [reproduction guide](docs/reproducibility.md) describes the inputs and methods of each analysis.
 
 ## Repository map
 
 ```text
 locomotor_learning_model/
-├── README.md                 Installation and common commands
-├── environment.yml           Conda environment
-├── requirements-lock.txt     Pinned scientific dependencies
-├── pyproject.toml            Package configuration and command definitions
-├── CITATION.cff, LICENSE     Citation metadata and code license
 ├── src/locomotor_learning_model/
-│   ├── learning/             Dynamics, controller learning and objectives
-│   ├── initializing/         Initial conditions and treadmill state
+│   ├── learning/             Stance dynamics, objective and learner
+│   ├── initializing/         Initial conditions and treadmill speeds
 │   ├── parameter_loading/    Model, learner and protocol settings
-│   ├── post_processing/      Simulation results and plots
-│   ├── publication/          Figure analyses and data verification
-│   └── cli.py, workflow.py, artifacts.py  Commands, runs and checkpoints
-├── matlab/                   MATLAB baseline, manuscript engine and validation
-├── data/                     Downloaded DATA and prepared inputs; see its README
-├── docs/                     Detailed model and reproduction guides
-├── scripts/                  DATA downloader and source-workbook tools
-├── tests/                    Numerical, checkpoint and data-integrity tests
-├── reproducibility/          Recorded installation and scientific checks
-├── .github/workflows/        Automated tests
-└── outputs/                  Generated results; excluded from Git
+│   ├── post_processing/      Replay, energetics and summary plots
+│   ├── publication/          Figure analyses, data preparation and paper comparison
+│   └── cli.py, workflow.py, artifacts.py   Commands, runs and checkpoints
+├── matlab/
+│   ├── manuscript/           Manuscript simulation engine
+│   ├── src/                  MATLAB baseline model
+│   ├── run_simulation.m      Run the MATLAB baseline model
+│   └── validation/           Python/MATLAB comparison and fit checks
+├── scripts/                  Data download, source-data workbook and Python/MATLAB comparison
+├── tests/                    Unit, regression and paper-value tests
+├── docs/                     Model and reproduction guides
+├── reproducibility/          Verification record of this release
+├── data/                     Downloaded and prepared data (not tracked)
+└── outputs/                  Generated results (not tracked)
 ```
 
-## Check the installation
+## Tests
 
 ```sh
 python -m pytest -q
 ```
 
-Tests needing the publication data skip when it is absent. The [installation record](reproducibility/fresh-install.md) describes the tested environment and scope. Generated results belong in `outputs/`; data, checkpoints and release archives are excluded from Git.
+Tests that need the data skip when it is absent. With the data prepared, `tests/test_paper_values.py` reproduces all analyses and checks them against the paper; set the `MATLAB` environment variable to the MATLAB executable (with the Statistics and Machine Learning Toolbox) to include the MATLAB tests (manuscript-engine regression and the MATLAB versions of the Supplementary Figure 2 and 4 analyses).
 
-Please cite the paper and the Zenodo version you use. Code is MIT licensed; experimental data are CC BY 4.0 and retain their source provenance. Questions: Kanishka Mitra, mitra819@mit.edu.
+## Citation and license
+
+Please cite the paper and the Zenodo record ([CITATION.cff](CITATION.cff)). Code is released under the MIT License and data under CC BY 4.0. Contact: Kanishka Mitra, mitra819@mit.edu.

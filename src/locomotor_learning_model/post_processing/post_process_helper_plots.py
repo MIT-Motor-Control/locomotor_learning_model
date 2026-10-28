@@ -1,4 +1,4 @@
-"""Plotting and summary helpers for simulation outputs."""
+"""Gait asymmetry and metabolic-rate summaries and figures for simulation results."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -29,7 +29,31 @@ def post_process_helper_plots(
     show_plots: bool = True,
     output_dir: str | Path | None = None,
 ) -> dict:
-    """Create manuscript-style plots and return summary statistics."""
+    """Compute gait asymmetry and metabolic-rate summaries and optionally plot them.
+
+    Args:
+        state_var0: Final body state (unused).
+        t_store: Time samples of each stance phase.
+        state_store: States of each stance phase; column 0 is the stance-leg angle.
+        emet_total_store: Metabolic energy per step.
+        emet_per_time_store: Metabolic rate per step.
+        t_step_store: Step durations.
+        param_controller: Controller parameters (unused).
+        param_fixed: Fixed parameters, including the protocol and ``Learner`` settings.
+        do_animate: Unused.
+        ework_pushoff_store: Push-off work per step (unused).
+        ework_heelstrike_store: Heel-strike work per step (unused).
+        edot_store_iteration_average: Metabolic rate per learning iteration.
+        t_total_iteration_store: Duration of each learning iteration.
+        create_plots: Create the split- or tied-belt summary figure.
+        show_plots: Open interactive windows; otherwise figures are closed.
+        output_dir: Directory for PNG figures; None saves nothing.
+
+    Returns:
+        Dictionary of step count, total time, mean step duration, mean energy per step,
+        mean energy rate, first and last iteration energy rates, step time and step
+        length asymmetry per stride, and the VO2-filtered metabolic rate with its times.
+    """
     t_stance_list = np.array([np.ptp(step_times) for step_times in t_store], dtype=float)
     step_length_list = np.array(
         [
@@ -39,6 +63,7 @@ def post_process_helper_plots(
         dtype=float,
     )
 
+    # Odd-numbered stance phases (even indices) are on belt 1, the fast belt when split.
     t_stance_fast = t_stance_list[0::2]
     t_stance_slow = t_stance_list[1::2]
     pair_count = min(len(t_stance_fast), len(t_stance_slow))
@@ -46,6 +71,8 @@ def post_process_helper_plots(
     t_stance_slow = t_stance_slow[:pair_count]
     step_time_asymmetry = (t_stance_slow - t_stance_fast) / (t_stance_slow + t_stance_fast)
 
+    # Step length 2 L |sin(theta)| at the end of each stance phase is assigned to the belt
+    # on which the leading foot lands. SLA = (fast - slow) / (fast + slow) (paper Eq. 3).
     step_length_slow = step_length_list[0::2]
     step_length_fast = step_length_list[1::2]
     pair_count = min(len(step_length_slow), len(step_length_fast))
@@ -75,7 +102,7 @@ def post_process_helper_plots(
         "smoothed_metabolic_rate": emet_smoothed,
     }
 
-    print("\n=== Simulation Summary ===")
+    print("\nSimulation summary")
     print(f"Total steps: {summary['total_steps']}")
     print(f"Total simulation time: {summary['total_time']:.3f}")
     print(f"Average step duration: {summary['average_step_duration']:.4f}")
@@ -98,6 +125,7 @@ def post_process_helper_plots(
 
     if param_fixed["SplitOrTied"] == "split":
         stride_count_list = np.arange(1, len(step_time_asymmetry) + 1)
+        # The first stance phase starts at midstance.
         if len(step_time_asymmetry) > 0:
             step_time_asymmetry[0] = np.nan
 

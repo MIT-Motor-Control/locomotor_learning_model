@@ -1,4 +1,4 @@
-"""Input integrity and compact, machine-readable reproduction reports."""
+"""Verify prepared inputs against their manifest and write reproduction reports."""
 
 from __future__ import annotations
 
@@ -12,15 +12,18 @@ from pathlib import Path
 
 
 def sha256(path: Path) -> str:
+    """Return the SHA-256 hex digest of a file."""
     with path.open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
 def utc_now() -> str:
+    """Return the current UTC time as an ISO 8601 string with seconds precision."""
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def environment() -> dict:
+    """Return the Python version, platform and installed versions of key packages."""
     versions = {}
     for name in ("locomotor-learning-model", "numpy", "scipy", "matplotlib", "pandas"):
         try:
@@ -31,6 +34,18 @@ def environment() -> dict:
 
 
 def verify_data(data_root: Path) -> dict:
+    """Check every file in a prepared dataset against ``manifest.json``.
+
+    Args:
+        data_root: Prepared dataset containing ``manifest.json``.
+
+    Returns:
+        Summary with ``checked_files``, ``manifest_sha256``, ``dataset_kind``, ``purpose``,
+        ``caveats`` and ``errors`` (missing, mismatched or unlisted files).
+
+    Raises:
+        ValueError: If the manifest is unsupported or lists an unsafe or duplicate path.
+    """
     data_root = data_root.resolve()
     manifest_path = data_root / "manifest.json"
     if not manifest_path.resolve().is_relative_to(data_root):
@@ -67,6 +82,7 @@ def verify_data(data_root: Path) -> dict:
 
 
 def source_hashes() -> dict[str, str]:
+    """Return the SHA-256 of every Python and MATLAB source file in the package."""
     root = Path(__file__).resolve().parents[1]
     return {
         path.relative_to(root).as_posix(): sha256(path)
@@ -76,7 +92,19 @@ def source_hashes() -> dict[str, str]:
 
 
 def write_report(output_root: Path, results: list[dict], integrity: dict) -> dict:
+    """Write ``report.json`` and ``report.md`` to ``output_root``.
+
+    Args:
+        output_root: Folder holding the figure and table outputs.
+        results: One record per analysis with ``id``, ``status``, ``outputs`` and ``caveats``.
+        integrity: Summary returned by ``verify_data``.
+
+    Returns:
+        The report saved as ``report.json``, with output paths relative to ``output_root``.
+    """
+
     def relative(value):
+        """Return ``value`` with paths under ``output_root`` made relative."""
         if isinstance(value, Path):
             value = str(value)
         if isinstance(value, str) and value.startswith(str(output_root) + "/"):
@@ -106,7 +134,7 @@ def write_report(output_root: Path, results: list[dict], integrity: dict) -> dic
     lines = [
         "# Reproduction report", "",
         f"Generated {report['created_at']}. Input checksums verified for {integrity['checked_files']} files.", "",
-        "These workflows reproduce available saved results. A passed plot does not certify a fresh simulation sweep or resolve missing manuscript statistics.", "",
+        "These analyses recompute results from saved measurements and simulations; they do not rerun the simulation sweeps.", "",
     ]
     if integrity.get("purpose"):
         lines += [f"Input dataset: {integrity['purpose']}.", ""]

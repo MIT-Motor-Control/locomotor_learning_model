@@ -16,6 +16,7 @@ MODEL_VERSION = "locad-python-1"
 
 
 def _encode(value: Any, arrays: dict[str, np.ndarray]) -> Any:
+    """Return a JSON-compatible tree for ``value``; arrays are moved into ``arrays``."""
     if isinstance(value, np.ndarray):
         if value.dtype.hasobject:
             raise ValueError("Object arrays are not supported in simulation archives")
@@ -49,6 +50,7 @@ def _encode(value: Any, arrays: dict[str, np.ndarray]) -> Any:
 
 
 def _decode(value: Any, archive: Any) -> Any:
+    """Return the value encoded by ``_encode``, reading arrays from ``archive``."""
     if not isinstance(value, dict):
         if value is None or isinstance(value, (str, int, float, bool)):
             return value
@@ -74,7 +76,16 @@ def _decode(value: Any, archive: Any) -> Any:
 
 
 def save_archive(path: str | Path, kind: str, payload: dict[str, Any]) -> None:
-    """Atomically replace an archive; only plain JSON and non-object NumPy arrays."""
+    """Write a compressed ``.npz`` archive atomically, replacing any existing file.
+
+    Args:
+        path: Destination file.
+        kind: Archive type recorded in the header and checked by ``load_archive``.
+        payload: Nested dicts, lists and tuples of JSON scalars and non-object arrays.
+
+    Raises:
+        ValueError: If the payload contains an unsupported value.
+    """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     arrays: dict[str, np.ndarray] = {}
@@ -102,7 +113,19 @@ def save_archive(path: str | Path, kind: str, payload: dict[str, Any]) -> None:
 
 
 def load_archive(path: str | Path, kind: str) -> dict[str, Any]:
-    """Read an archive without executing pickle or importing serialized types."""
+    """Read an archive written by ``save_archive`` without unpickling.
+
+    Args:
+        path: Archive file.
+        kind: Expected archive type.
+
+    Returns:
+        The decoded payload dictionary.
+
+    Raises:
+        ValueError: If the file is unreadable or malformed, or its schema version,
+            model version or kind does not match.
+    """
     try:
         with np.load(path, allow_pickle=False) as archive:
             header = json.loads(str(archive["metadata_json"].item()))
@@ -121,7 +144,19 @@ def load_archive(path: str | Path, kind: str) -> dict[str, Any]:
 
 
 def configuration_digest(configuration: dict[str, Any]) -> str:
-    """Hash configuration content, including array dtype/shape and exact bytes."""
+    """Return the SHA-256 hex digest of a configuration.
+
+    Args:
+        configuration: Nested dicts, lists and tuples of JSON scalars and non-object arrays,
+            as accepted by ``save_archive``.
+
+    Returns:
+        64-character hexadecimal digest of the structure, the scalar values and the dtype,
+        shape and bytes of each array.
+
+    Raises:
+        ValueError: If the configuration contains an unsupported value.
+    """
     arrays: dict[str, np.ndarray] = {}
     tree = _encode(configuration, arrays)
     digest = hashlib.sha256(json.dumps(tree, sort_keys=True, allow_nan=False).encode())
@@ -134,7 +169,7 @@ def configuration_digest(configuration: dict[str, Any]) -> str:
 
 
 def save_json(path: str | Path, value: dict[str, Any]) -> None:
-    """Write a small human-readable manifest atomically."""
+    """Write ``value`` as indented JSON with sorted keys, replacing ``path`` atomically."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = None

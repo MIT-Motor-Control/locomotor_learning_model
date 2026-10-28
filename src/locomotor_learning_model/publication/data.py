@@ -1,4 +1,4 @@
-"""Prepare publication inputs and record their source hashes."""
+"""Build and extend the prepared publication dataset from the original author files."""
 
 from __future__ import annotations
 
@@ -21,10 +21,25 @@ def prepare_data(
     *,
     private_archive: Path | None = None,
 ) -> dict:
-    """Collect experimental, model and optional supplementary inputs into a verified dataset."""
+    """Copy the original inputs into ``destination`` and write its SHA-256 manifest.
+
+    Args:
+        bundle: Author folder with ``code/original_data``, ``code/verify`` and ``results``.
+        destination: Prepared-data folder to create or extend.
+        fall_archive: Optional folder of additional fall-probability MAT files.
+        private_archive: Optional research folder with the Supplementary Figure 2 and 4
+            results and the experimental CSVs.
+
+    Returns:
+        The written manifest.
+
+    Raises:
+        ValueError: If sources conflict or overlap ``destination``, or ``destination`` holds
+            different or unlisted inputs.
+    """
     bundle, destination = Path(bundle).resolve(), Path(destination).resolve()
     if not (bundle / "code/original_data").is_dir():
-        raise FileNotFoundError(f"Author handoff not found: {bundle / 'code/original_data'}")
+        raise FileNotFoundError(f"Original author files not found: {bundle / 'code/original_data'}")
     roots = {"bundle": bundle}
     for name, source in (
         ("bundle", bundle),
@@ -44,6 +59,7 @@ def prepare_data(
     plan: dict[str, dict] = {}
 
     def add(path: Path, relative: str, source: str, transformation: str = "Copied byte-for-byte"):
+        """Plan a copy of ``path`` to ``relative``; an identical duplicate corroborates it."""
         if not path.is_file():
             return
         if not path.resolve().is_relative_to(roots[source.split(":", 1)[0]]):
@@ -131,6 +147,7 @@ def prepare_data(
             )
 
     energy_relative = "original/data/cosmed/processed/processedEnergyData.mat"
+    # Without the standalone energy file, extract its structs from the original fit file.
     if energy_relative not in plan:
         embedded = original / "2d_sweep_trial50_param_result.mat"
         if embedded.is_file():
@@ -145,6 +162,7 @@ def prepare_data(
                 header = (
                     b"MATLAB 5.0 MAT-file, recovered publication energy fields; see manifest.json"
                 )
+                # Timestamp-free header for a stable hash, as in zenodo._mat_payload.
                 payload = header.ljust(116, b" ") + payload[116:]
                 plan[energy_relative] = {
                     "path": energy_relative,
@@ -199,7 +217,7 @@ def prepare_data(
         "available_files": sum(k.startswith("regenerated/data/2d sweep fine/") for k in plan),
         "required_unique_cells": None,
         "required_files": None,
-        "note": "Final S3 requires the complete 50-trial library at each unique selected published-fit cell; "
+        "note": "Figure 2C requires the complete 50-trial library at each unique selected published-fit cell; "
         "best-trial fitted trajectories do not substitute for those rollouts. "
         "File presence alone does not verify the required cell/trial identities.",
     }
@@ -233,7 +251,7 @@ def prepare_data(
     manifest = {
         "schema_version": 1,
         "prepared_at": datetime.now(UTC).isoformat(),
-        "purpose": "Cached numerical reproduction of the submitted publication; not a raw simulation rerun",
+        "purpose": "Cached numerical reproduction of the published analyses; not a raw simulation rerun",
         "files": [
             {key: value for key, value in plan[relative].items() if not key.startswith("_")}
             for relative in sorted(plan)
@@ -248,7 +266,7 @@ def prepare_data(
             "Original and regenerated realizations are retained separately.",
             "Raw COSMED and OpenSim optimization inputs are not supplied by this import.",
             "Reference tables may describe earlier analyses; use per-figure exported tables for plotted data.",
-            "No regenerated S3 rollout subset is synthesized or inferred from fitted parameters.",
+            "No regenerated Figure 2C rollout subset is synthesized or inferred from fitted parameters.",
         ],
     }
     destination.mkdir(parents=True, exist_ok=True)
@@ -259,6 +277,7 @@ def prepare_data(
 
 
 def _same_energy(left: Path, right: Path) -> bool:
+    """Return True if both MAT files hold equal, finite split, tied1 and tied2 energy structs."""
     import numpy as np
     from scipy.io import loadmat
 
@@ -279,7 +298,23 @@ def _same_energy(left: Path, right: Path) -> bool:
     return True
 
 
-def _validate_s3_rollouts(parameter_file: Path, rollouts: dict[str, Path]) -> dict:
+def _validate_figure2c_rollouts(parameter_file: Path, rollouts: dict[str, Path]) -> dict:
+    """Verify the Figure 2C model rollout library and return its manifest summary.
+
+    Each fitted participant's nearest (learning rate, symmetry weight) grid cell must have
+    trials 1-50, each with a 0/1 fall flag and a finite energy trace that has at least 100
+    samples unless the trial fell.
+
+    Args:
+        parameter_file: Original fit file with ``static_params`` and the parameter grids.
+        rollouts: Prepared relative path mapped to the rollout MAT file.
+
+    Returns:
+        The ``missing_analyses["s3_rollouts"]`` manifest entry.
+
+    Raises:
+        ValueError: If a rollout is unrecognized, duplicated, invalid or missing.
+    """
     import numpy as np
     from scipy.io import loadmat
 
@@ -290,12 +325,12 @@ def _validate_s3_rollouts(parameter_file: Path, rollouts: dict[str, Path]) -> di
         np.atleast_1d(values[key]).astype(float) for key in ("learning_pool", "sym_cost_pool")
     ]
     if len(n) != 3 or np.any(n < 1) or np.any(n > params.shape[1]):
-        raise ValueError("Invalid original-fit participant layout for S3")
+        raise ValueError("Invalid original-fit participant layout for Figure 2C")
     if any(
         len(pool) < 2 or not np.isfinite(pool).all() or np.any(np.diff(pool) <= 0)
         for pool in (learning, symmetry)
     ):
-        raise ValueError("Invalid S3 parameter grid")
+        raise ValueError("Invalid Figure 2C parameter grid")
     expected = {
         (
             condition,
@@ -313,7 +348,7 @@ def _validate_s3_rollouts(parameter_file: Path, rollouts: dict[str, Path]) -> di
     for relative, path in rollouts.items():
         match = pattern.fullmatch(path.name)
         if not match:
-            raise ValueError(f"Unrecognized S3 rollout filename: {path.name}")
+            raise ValueError(f"Unrecognized Figure 2C rollout filename: {path.name}")
         slow, fast, rate, weight = map(float, match.groups()[:4])
         trial = int(match.group(5))
         condition = int(np.argmin(abs(np.array([0.8, 0.65, 0.5]) - slow)))
@@ -324,22 +359,23 @@ def _validate_s3_rollouts(parameter_file: Path, rollouts: dict[str, Path]) -> di
             or abs(learning[ia] - rate) > 5.1e-7
             or abs(symmetry[ip] - weight) > 5.1e-6
         ):
-            raise ValueError(f"S3 rollout does not match the published grid: {relative}")
+            raise ValueError(f"Figure 2C rollout does not match the published grid: {relative}")
         key = (condition, ia, ip, trial)
         if (condition, ia, ip) not in expected or not 1 <= trial <= 50 or key in trials:
-            raise ValueError(f"Unexpected or duplicate S3 cell/trial: {relative}")
+            raise ValueError(f"Unexpected or duplicate Figure 2C cell/trial: {relative}")
         trials.add(key)
         result = loadmat(path, variable_names=["energy", "fall_flag"], squeeze_me=True)
         energy, flag = np.atleast_1d(result["energy"]), np.atleast_1d(result["fall_flag"])
         if flag.shape != (2,) or flag[0] not in (0, 1) or not np.isfinite(energy).all():
-            raise ValueError(f"Invalid S3 energy or fall flag: {relative}")
+            raise ValueError(f"Invalid Figure 2C energy or fall flag: {relative}")
         if not flag[0] and energy.size < 100:
-            raise ValueError(f"Nonfalling S3 rollout lacks the analysis windows: {relative}")
+            raise ValueError(f"Nonfalling Figure 2C rollout lacks the analysis windows: {relative}")
         falls += int(flag[0])
     required = {(*cell, trial) for cell in expected for trial in range(1, 51)}
     if trials != required:
         raise ValueError(
-            f"Incomplete S3 rollout library: {len(required - trials)} required trials missing"
+            f"Incomplete Figure 2C rollout library: {len(required - trials)} required trials "
+            "missing"
         )
     return {
         "path": "regenerated/data/2d sweep fine",
@@ -363,7 +399,25 @@ def integrate_addendum(
     generated_s1: Path | None = None,
     generated_s1_script: Path | None = None,
 ) -> dict:
-    """Merge supplementary inputs after checking them against the prepared dataset."""
+    """Merge supplementary inputs into a verified prepared dataset.
+
+    Inputs already in the manifest must be byte-identical, except the aggregate energy MAT
+    file, which may differ in encoding when its three energy structs are equal; the existing
+    file is kept. The Figure 2C model rollout library must be complete.
+
+    Args:
+        source: Supplementary author folder containing ``code/verify``.
+        destination: Existing prepared dataset.
+        previous_bundle: Optional earlier author folder whose original inputs are also merged.
+        generated_s1: Optional folder with MATLAB cross-validation grid-sensitivity CSVs.
+        generated_s1_script: MATLAB script that produced ``generated_s1``; required with it.
+
+    Returns:
+        The updated manifest.
+
+    Raises:
+        ValueError: If an input conflicts with the dataset or fails validation.
+    """
     if Path(destination).is_symlink():
         raise ValueError("The prepared dataset must not be a symlink")
     destination = Path(destination).resolve()
@@ -380,7 +434,9 @@ def integrate_addendum(
     if previous_bundle is not None:
         roots["previous_bundle"] = Path(previous_bundle).resolve()
     if (generated_s1 is None) != (generated_s1_script is None):
-        raise ValueError("Generated S1 tables require both their folder and MATLAB source script")
+        raise ValueError(
+            "Generated grid-sensitivity tables require both their folder and MATLAB source script"
+        )
     if generated_s1 is not None:
         roots["generated_s1"] = Path(generated_s1).resolve()
     for label, root in roots.items():
@@ -394,6 +450,7 @@ def integrate_addendum(
     observations = []
 
     def add(path: Path, relative: str, label: str, generated: dict | None = None):
+        """Stage ``path`` as ``relative`` or record it as corroborating an existing input."""
         if not path.is_file():
             return
         if path.is_symlink() or not path.resolve().is_relative_to(roots[label]):
@@ -484,11 +541,11 @@ def integrate_addendum(
         ):
             path = roots["generated_s1"] / name
             if not path.is_file():
-                raise FileNotFoundError(f"Generated S1 table missing: {name}")
+                raise FileNotFoundError(f"Generated grid-sensitivity table missing: {name}")
             with path.open() as stream:
                 rows = list(csv.DictReader(stream))
             if not rows or any(None in row or None in row.values() for row in rows):
-                raise ValueError(f"Malformed generated S1 table: {name}")
+                raise ValueError(f"Malformed generated grid-sensitivity table: {name}")
             for row in rows:
                 for value in row.values():
                     try:
@@ -496,7 +553,7 @@ def integrate_addendum(
                     except ValueError:
                         continue
                     if not np.isfinite(number):
-                        raise ValueError(f"Nonfinite generated S1 value: {name}")
+                        raise ValueError(f"Nonfinite generated grid-sensitivity value: {name}")
             add(path, f"regenerated/figures/{name}", "generated_s1", generated)
     original_fit = "original/2d_sweep_trial50_param_result.mat"
     rollout_paths = {
@@ -504,7 +561,7 @@ def integrate_addendum(
         for relative in records
         if relative.startswith("regenerated/data/2d sweep fine/")
     }
-    rollout_info = _validate_s3_rollouts(
+    rollout_info = _validate_figure2c_rollouts(
         additions.get(original_fit, destination / original_fit), rollout_paths
     )
     manifest["files"] = [records[key] for key in sorted(records)]

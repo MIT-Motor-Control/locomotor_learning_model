@@ -3,14 +3,10 @@
 from __future__ import annotations
 
 import json
-import sys
 from copy import deepcopy
-from pathlib import Path
 
 import numpy as np
 import pytest
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from locomotor_learning_model import (
     load_simulation_results,
@@ -40,6 +36,7 @@ def test_protocol_iteration_budget_after_even_step_normalization(
 
 
 def assert_numerically_identical(first, second):
+    """Assert that two simulation results have identical arrays, diagnostics and summaries."""
     for name in (
         "controller_history_8d",
         "controller_history_10d",
@@ -139,6 +136,7 @@ def test_safe_results_roundtrip_and_replot(tmp_path, monkeypatch, condition):
 
 @pytest.fixture
 def checkpoint(tmp_path):
+    """Return the path of a seed-42 checkpoint paused after 8 of 10 iterations."""
     path = tmp_path / "checkpoint.npz"
     run_simulation(seed=42, num_iterations=10, stop_after=8, checkpoint_path=path, make_plots=False)
     return path
@@ -225,6 +223,7 @@ def test_atomic_checkpoint_preserves_previous_file(tmp_path, monkeypatch):
     before = path.read_bytes()
 
     def fail(*args, **kwargs):
+        """Raise OSError as a write to a full disk would."""
         raise OSError("simulated full disk")
 
     monkeypatch.setattr(np, "savez_compressed", fail)

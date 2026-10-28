@@ -1,5 +1,5 @@
 {
-  "source": "Inseung handoff, 2026-10-12, code/model",
+  "source": "Original manuscript simulation code, 2026-10-12",
   "files": [
     {
       "file": "DetectEndstance.m",
@@ -143,10 +143,15 @@
     }
   ],
   "modified": [
-    "run_sim.m: explicit seed, iteration limit and protocol options; corrected nested learner field in odd-step guard",
-    "convertMetToVO2.m: bound the initial smoothing window for short trials",
-    "loadProtocolParameters.m and loadHowLongParameters.m: use the nested learner field and round to complete step pairs before deriving the iteration budget",
-    "loadLearnerParameters.m: removed an overwritten assignment; effective memory-learning rate is 0.03",
-    "Comments simplified throughout the engine; original_sha256 values identify the original source files"
+    "run_sim.m: options for the seed (replacing rng('shuffle')), iteration limit, transition duration and belt-speed divisor, with the original 25 s and divisor 2 as defaults; corrected learner field name in the odd-step guard",
+    "convertMetToVO2.m: return single-sample input unchanged and limit the initial-value window to the available samples",
+    "loadProtocolParameters.m and loadHowLongParameters.m: corrected learner field name in the odd-step guard and moved the guard before the iteration-budget calculation",
+    "loadLearnerParameters.m: removed an overwritten assignment; the memory-formation learning rate remains 0.03",
+    "All files: comments rewritten; executable code is otherwise unchanged"
+  ],
+  "omitted": [
+    "rootSimulateLearningWhileWalking.m",
+    "runSim2FileSave.m (replaced by run_manuscript_trial.m and run_manuscript_sweep.m)",
+    "sla_exp_fit.m"
   ]
 }

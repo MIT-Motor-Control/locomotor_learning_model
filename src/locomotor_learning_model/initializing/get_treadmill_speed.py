@@ -7,7 +7,7 @@ import numpy as np
 
 
 def _interp_extrap(t: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
-    """Linear interpolation with extrapolation."""
+    """Return ``y`` interpolated linearly at ``t``, extrapolating from the end segments."""
     result = np.empty_like(t, dtype=float)
     idxs = np.searchsorted(x, t, side="left")
     for i, (ti, idx) in enumerate(zip(t, idxs)):
@@ -28,10 +28,16 @@ def get_treadmill_speed(
     t: Sequence[float] | float,
     belt_speeds_imposed: Mapping[str, np.ndarray],
 ) -> tuple[float, float] | tuple[np.ndarray, np.ndarray]:
-    """Return the belt speeds corresponding to time ``t``.
+    """Return the two imposed belt speeds at time ``t``.
 
-    Scalar and vector time inputs are supported. Values outside the supplied
-    protocol range are linearly extrapolated from the nearest two samples.
+    Times outside the protocol are extrapolated linearly from the nearest two samples.
+
+    Args:
+        t: Dimensionless time, scalar or 1D sequence.
+        belt_speeds_imposed: Protocol with ``tList``, ``footSpeed1List`` and ``footSpeed2List``.
+
+    Returns:
+        Belt 1 and belt 2 speeds; floats for scalar ``t``, otherwise arrays.
     """
     t_arr = np.atleast_1d(np.asarray(t, dtype=float))
     foot_speed1 = _interp_extrap(

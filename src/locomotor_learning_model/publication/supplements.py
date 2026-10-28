@@ -1,4 +1,9 @@
-"""Reproduce Figure 2B and supplementary analyses from saved numerical inputs."""
+"""Reproduce Figures 2B and 2C and supplementary analyses from saved numerical inputs.
+
+Renderer identifiers map to the paper as follows: ``figure2`` is Figures 2B and 2C, ``s1``,
+``s2`` and ``s4`` are Supplementary Figures 1, 2 and 4, and ``r2`` gives the in-sample fit RMSE
+and exponential-fit R². Supplementary Figure 3 is rendered by ``main_figures``.
+"""
 
 from __future__ import annotations
 
@@ -6,6 +11,7 @@ import csv
 import json
 import shutil
 import subprocess
+import traceback
 import warnings
 from pathlib import Path
 
@@ -35,6 +41,7 @@ STYLE = {
 
 
 def _require(root: Path, relative: str) -> Path:
+    """Return ``root / relative``, raising FileNotFoundError if the file is missing."""
     path = root / relative
     if not path.is_file():
         raise FileNotFoundError(f"Required publication input is missing: {relative}")
@@ -42,6 +49,7 @@ def _require(root: Path, relative: str) -> Path:
 
 
 def _read_csv(path: Path) -> list[dict]:
+    """Return the rows of a nonempty CSV file as dictionaries."""
     with path.open(newline="", encoding="utf-8-sig") as stream:
         rows = list(csv.DictReader(stream))
     if not rows:
@@ -50,6 +58,7 @@ def _read_csv(path: Path) -> list[dict]:
 
 
 def _write_csv(root: Path, name: str, rows: list[dict]) -> Path:
+    """Write nonempty ``rows`` to ``root/tables/<name>.csv`` and return the path."""
     if not rows:
         raise ValueError(f"Refusing to write an empty source table: {name}")
     path = root / "tables" / f"{name}.csv"
@@ -62,6 +71,7 @@ def _write_csv(root: Path, name: str, rows: list[dict]) -> Path:
 
 
 def _save(fig, root: Path, name: str) -> list[Path]:
+    """Save ``fig`` as PNG, PDF and SVG in ``root/figures``, close it and return the paths."""
     directory = root / "figures"
     directory.mkdir(parents=True, exist_ok=True)
     outputs = []
@@ -74,6 +84,7 @@ def _save(fig, root: Path, name: str) -> list[Path]:
 
 
 def _record(identifier, outputs, sources, mode, caveats=(), status="passed", **details):
+    """Return the report entry for one renderer; extra keywords are stored in ``details``."""
     return {
         "id": identifier,
         "status": status,
@@ -84,7 +95,17 @@ def _record(identifier, outputs, sources, mode, caveats=(), status="passed", **d
 
 
 def matlab_movmean(x: np.ndarray, window: int) -> np.ndarray:
-    """Compute a shrinking-endpoint mean with MATLAB's asymmetric even window."""
+    """Compute MATLAB ``movmean(x, window)`` with shrinking endpoints.
+
+    An even window spans samples ``i - window/2`` through ``i + window/2 - 1``.
+
+    Args:
+        x: Finite one-dimensional signal.
+        window: Window length in samples.
+
+    Returns:
+        Moving mean with the same length as ``x``.
+    """
     x = np.asarray(x, dtype=float)
     if x.ndim != 1 or not x.size or not np.all(np.isfinite(x)):
         raise ValueError("movmean requires a nonempty finite one-dimensional signal")
@@ -98,7 +119,18 @@ def matlab_movmean(x: np.ndarray, window: int) -> np.ndarray:
 
 
 def stored_fit_metrics(y: np.ndarray, normalized_fit: np.ndarray) -> tuple[float, float]:
-    """Estimate the least-squares scale and R² of a stored normalized curve."""
+    """Score a stored normalized fit against an observed signal without refitting its shape.
+
+    The fitted signal is ``scale * (1 + normalized_fit / 100)``, with ``scale`` estimated by
+    least squares.
+
+    Args:
+        y: Observed signal.
+        normalized_fit: Stored fit in percent change from onset, same length as ``y``.
+
+    Returns:
+        Tuple ``(r2, scale)``: coefficient of determination and least-squares onset scale.
+    """
     y, g = np.asarray(y, float), np.asarray(normalized_fit, float)
     if y.ndim != 1 or y.shape != g.shape or not y.size:
         raise ValueError("Observed signal and stored fit must be equal-length vectors")
@@ -114,6 +146,7 @@ def stored_fit_metrics(y: np.ndarray, normalized_fit: np.ndarray) -> tuple[float
 
 
 def _load_published(root: Path):
+    """Return the published 3×9 fit structures, subject counts per condition and COSMED energy."""
     p = loadmat(
         _require(root, PARAMETERS),
         struct_as_record=False,
@@ -132,8 +165,8 @@ def _load_published(root: Path):
     return p["static_params"], n, e
 
 
-def _figure2(root: Path, output: Path) -> dict:
-    """Plot regenerated group trajectories for the 0.7 m/s condition."""
+def _figure2b(root: Path, output: Path) -> dict:
+    """Render Figure 2B from regenerated group energy trajectories at 0.7 m/s."""
     from .regenerated import (
         REGENERATED_ENERGY,
         REGENERATED_PARAMETERS,
@@ -148,6 +181,7 @@ def _figure2(root: Path, output: Path) -> dict:
     low, high = [], []
 
     def exponential(x, a, tau, offset):
+        """Return a first-order exponential with offset at exposure percent ``x``."""
         return a * np.exp(-x / tau) + offset
 
     for ax, name, color, overlay_color in zip(
@@ -198,17 +232,28 @@ def _figure2(root: Path, output: Path) -> dict:
         "figure2", outputs, [REGENERATED_PARAMETERS, REGENERATED_ENERGY],
         "regenerated_raw_group_trajectories",
         [
-            "Figure 2B only; conceptual panels are not numerical analyses.",
-            "Addendum source identifies group means from nine experimental and nine model participants; the final caption's representative-participant description still requires author correction.",
-            "Both channels use a 100-sample moving mean, remove the startup transient, normalize to the next 120 samples, and resample to 270 exposure points. Overlay bands are SEM, not confidence intervals.",
-            "Schematic exponential curves are refitted to displayed group means, as in SPLIT=1; stored individual fits use a different normalization.",
-            "Uses the regenerated realization; a new stochastic sweep will not be bit-identical.",
+            "Figure 2A is a conceptual schematic, not a numerical analysis.",
+            "Figure 2B shows group means of nine experimental and nine model participants, not a single representative participant.",
+            "In Figure 2B both channels use a 100-sample moving mean, remove the startup transient, normalize to the next 120 samples, and resample to 270 exposure points. Overlay bands are SEM, not confidence intervals.",
+            "The illustrative Figure 2B exponential curves are refitted to the displayed group means; stored individual fits use a different normalization.",
+            "Figure 2B uses the regenerated realization; a new stochastic sweep will not be bit-identical.",
         ],
         **metrics, samples_per_trajectory=270, participant_trajectories=18,
     )
 
 
 def _s1_from_tables(prefix: Path, output: Path, mode: str, sources: list[str]) -> dict:
+    """Export Supplementary Figure 1 cross-validation tables and plot paired held-out RMSE.
+
+    Args:
+        prefix: Path prefix of the ``_persubject``, ``_test`` and ``_stats`` CSV files.
+        output: Output root for tables and figures.
+        mode: Analysis mode recorded in the report.
+        sources: Input paths recorded in the report.
+
+    Returns:
+        Report record for ``s1``.
+    """
     rows = _read_csv(Path(f"{prefix}_persubject.csv"))
     saved_test = _read_csv(Path(f"{prefix}_test.csv"))[0]
     saved_stats = _read_csv(Path(f"{prefix}_stats.csv"))
@@ -216,8 +261,9 @@ def _s1_from_tables(prefix: Path, output: Path, mode: str, sources: list[str]) -
     shared = np.array([float(r["common_size_matched"]) for r in rows])
     cond = np.array([int(r["condition"]) for r in rows])
     if len(rows) != 26 or not np.all(np.isfinite([cs, shared])):
-        raise ValueError("S1 requires finite paired errors for all 26 participants")
-    # The manuscript uses MATLAB's approximate signed-rank p-value; export both methods.
+        raise ValueError("Cross-validation requires finite paired errors for all 26 participants")
+    # For n = 26, MATLAB signrank defaults to the normal approximation, which the paper
+    # reports; the SciPy exact p-value is exported alongside it.
     p_exact = float(stats.wilcoxon(cs, shared, method="exact").pvalue)
     p_matlab = float(saved_test["wilcoxon_p_condspec_vs_commonsize"])
     summary = [
@@ -297,7 +343,7 @@ def _s1_from_tables(prefix: Path, output: Path, mode: str, sources: list[str]) -
         mode,
         [
             "Uses the regenerated trial-average grid, not the original best-trial grid.",
-            "Figure displays the manuscript's MATLAB signrank approximation; the historical SciPy exact value is exported separately.",
+            "Supplementary Figure 1 displays the MATLAB signrank approximation reported in the paper; the SciPy exact p-value is exported separately.",
             "Cached replot does not rerun LOSO sampling."
             if mode == "saved_reference_replot"
             else "Fresh LOSO is evaluated on a stored RMSE grid; simulations are not rerun.",
@@ -307,6 +353,7 @@ def _s1_from_tables(prefix: Path, output: Path, mode: str, sources: list[str]) -
 
 
 def _s1(root: Path, output: Path) -> dict:
+    """Replot Supplementary Figure 1 from saved MATLAB tables, with the grid check if cached."""
     from .regenerated import S1_GRID_PREFIX
 
     sources = [f"{S1_PREFIX}_{suffix}.csv" for suffix in ("persubject", "stats", "test")]
@@ -328,25 +375,37 @@ def _s1(root: Path, output: Path) -> dict:
 
 
 def _attach_s1_grid(root: Path, prefix: Path, output: Path, record: dict, mode: str) -> None:
+    """Validate and export the cross-validation grid-sensitivity tables into ``record``.
+
+    Each summary row is checked against its 26 participant folds and against admissible-cell
+    counts recomputed from the trial-average RMSE grid.
+
+    Args:
+        root: Data root containing the trial-average grid.
+        prefix: Path prefix of the ``_summary`` and ``_persubject`` CSV files.
+        output: Output root for tables.
+        record: ``s1`` report record, updated in place.
+        mode: Grid-sensitivity mode recorded in the report.
+    """
     from .regenerated import TRIAL_AVERAGE_GRID, grid_finite_counts
 
     summary = _read_csv(Path(f"{prefix}_summary.csv"))
     participants = _read_csv(Path(f"{prefix}_persubject.csv"))
     counts = grid_finite_counts(root)
     if [int(row["minimum_finite_subjects"]) for row in summary] != [26, 17, 8]:
-        raise ValueError("S1 grid sensitivity must contain thresholds 26/17/8 in source order")
+        raise ValueError("Grid sensitivity must contain thresholds 26/17/8 in source order")
     if len(participants) != 78:
-        raise ValueError("S1 grid sensitivity requires 26 participant folds for each of three grids")
+        raise ValueError("Grid sensitivity requires 26 participant folds for each of three grids")
     expected_pairs = {(c, s) for c, n in enumerate((8, 9, 9), 1) for s in range(1, n + 1)}
     for row, count in zip(summary, counts):
         threshold = int(row["minimum_finite_subjects"])
         folds = [p for p in participants if int(p["minimum_finite_subjects"]) == threshold]
         if len(folds) != 26 or {(int(p["condition"]), int(p["subject"])) for p in folds} != expected_pairs:
-            raise ValueError("S1 grid sensitivity participant pairs are incomplete or duplicated")
+            raise ValueError("Grid sensitivity participant pairs are incomplete or duplicated")
         cs, shared = (np.array([float(p[key]) for p in folds])
                       for key in ("cond_specific", "common_size_matched"))
         if not np.isfinite([cs, shared]).all():
-            raise ValueError("S1 grid sensitivity contains nonfinite held-out scores")
+            raise ValueError("Grid sensitivity contains nonfinite held-out scores")
         checks = {
             "median_condition_specific": np.median(cs),
             "median_common_size_matched": np.median(shared),
@@ -358,10 +417,12 @@ def _attach_s1_grid(root: Path, prefix: Path, output: Path, record: dict, mode: 
         }
         for key, expected in checks.items():
             if not np.isclose(float(row[key]), expected, rtol=1e-12, atol=1e-12):
-                raise ValueError(f"S1 grid sensitivity summary conflicts with source folds/grid: {key}")
+                raise ValueError(
+                    f"Grid sensitivity summary conflicts with source folds/grid: {key}"
+                )
         pvalue = float(row["wilcoxon_two_sided_matlab_signrank_default"])
         if not 0 <= pvalue <= 1:
-            raise ValueError("Invalid S1 grid sensitivity p value")
+            raise ValueError("Invalid grid sensitivity p value")
     paths = [
         _write_csv(output, "s1_grid_sensitivity_summary", summary),
         _write_csv(output, "s1_grid_sensitivity_persubject", participants),
@@ -372,14 +433,32 @@ def _attach_s1_grid(root: Path, prefix: Path, output: Path, record: dict, mode: 
                              grid_sensitivity_summary=summary)
     record["details"]["sources"].append(TRIAL_AVERAGE_GRID)
     record["caveats"].append(
-        "Additional grid sensitivity preserves MATLAB rng(0), 200 subsamples and threshold order 26/17/8; finite-cell counts are independently recomputed from the trial-average grid."
+        "Grid sensitivity uses MATLAB rng(0), 200 subsamples and minimum finite-participant thresholds of 26, 17 and 8 per grid cell, in that order; admissible-cell counts are recomputed independently from the trial-average grid."
     )
 
 
 def recompute_s1_matlab(
     data_root: Path, output_root: Path, matlab_executable: str = "matlab"
 ) -> dict:
-    """Recompute S1 using MATLAB with the Statistics and Machine Learning Toolbox."""
+    """Recompute Supplementary Figure 1 in MATLAB from the trial-average RMSE grid.
+
+    Requires MATLAB with the Statistics and Machine Learning Toolbox. The cross-validation and
+    grid-sensitivity tables and figure are exported as by the ``s1`` renderer; MATLAB CSV files
+    are written to ``output_root/tables/s1_matlab`` and its console output to
+    ``output_root/tables/s1_matlab.log``.
+
+    Args:
+        data_root: Prepared data directory containing the trial-average grid.
+        output_root: Output directory for tables, figures and the MATLAB log.
+        matlab_executable: MATLAB command name or path.
+
+    Returns:
+        Report record for ``s1``, including the grid-sensitivity check.
+
+    Raises:
+        FileNotFoundError: If the grid or the MATLAB executable is missing.
+        RuntimeError: If MATLAB exits with an error.
+    """
     data_root, output_root = Path(data_root), Path(output_root)
     source = "regenerated/2d_sweep_trial50_param_result_trialavg.mat"
     grid = _require(data_root, source).resolve()
@@ -394,11 +473,13 @@ def recompute_s1_matlab(
         f"addpath('{quote(vendor)}'); publication_s1_loso('{quote(grid)}','{quote(tables)}');"
         f"publication_s1_grid_sensitivity('{quote(grid)}','{quote(tables)}');"
     )
-    result = subprocess.run(
-        [executable, "-batch", command], capture_output=True, text=True, timeout=600, check=False
-    )
     log = output_root / "tables" / "s1_matlab.log"
-    log.write_text(result.stdout + result.stderr, encoding="utf-8")
+    # MATLAB can start helper processes that keep a pipe open, so its output goes to a file.
+    with log.open("w", encoding="utf-8") as stream:
+        result = subprocess.run(
+            [executable, "-batch", command], stdout=stream, stderr=subprocess.STDOUT,
+            timeout=600, check=False,
+        )
     if result.returncode:
         raise RuntimeError(f"MATLAB LOSO failed (exit {result.returncode}); see {log}")
     with plt.rc_context(STYLE):
@@ -412,7 +493,11 @@ def recompute_s1_matlab(
 
 
 def _s2(root: Path, output: Path) -> dict:
-    """Plot S2 trajectories and recompute t-intervals from participant summaries."""
+    """Render Supplementary Figure 2 step length and step time asymmetry with its statistics.
+
+    Student-t intervals and STA tests are recomputed from participant summaries and checked
+    against the saved analysis summary; model values and trajectories are replotted from cache.
+    """
     base = "extensions/s2"
     sources = [
         f"{base}/{name}"
@@ -445,7 +530,10 @@ def _s2(root: Path, output: Path) -> dict:
                 [float(row[column]) for row in participants if float(row["speed_diff_ms"]) == speed]
             )
             if len(values) < 2 or not np.all(np.isfinite(values)):
-                raise ValueError(f"S2 {metric}: missing participant values at {speed} m/s")
+                raise ValueError(
+                    f"Supplementary Figure 2 {metric.upper()}: missing participant values "
+                    f"at {speed} m/s"
+                )
             mean = float(values.mean())
             half = float(stats.t.ppf(0.975, len(values) - 1) * stats.sem(values))
             reference = summary["statistics"][
@@ -460,7 +548,7 @@ def _s2(root: Path, output: Path) -> dict:
             maximum_reference_error = max(error, maximum_reference_error)
             if error > 1e-10:
                 raise ValueError(
-                    "S2 participant statistics do not match the original analysis cache"
+                    "Supplementary Figure 2 statistics do not match the original analysis cache"
                 )
             prediction = float(model[f"scalar_{metric}_adapted_{speed}"])
             rows.append(
@@ -550,11 +638,13 @@ def _s2(root: Path, output: Path) -> dict:
         },
     ]
     if not np.isclose(slope.pvalue, summary["statistics"]["sta_vs_speed"]["p"], rtol=1e-10):
-        raise ValueError("S2 STA regression differs from the original source")
+        raise ValueError("Supplementary Figure 2 STA regression differs from the original source")
     if not np.isclose(
         paired.pvalue, summary["statistics"]["sta_adapted_vs_early"]["p"], rtol=1e-10
     ):
-        raise ValueError("S2 STA adaptation test differs from the original source")
+        raise ValueError(
+            "Supplementary Figure 2 STA adaptation test differs from the original source"
+        )
     outputs.append(_write_csv(output, "s2_sta_statistics", statistics))
     sweep_rows = []
     for speed in SPEEDS:
@@ -585,7 +675,9 @@ def _s2(root: Path, output: Path) -> dict:
                 )
                 sem = np.asarray(z[f"{metric}_{speed}_sem"], float) if c == 0 else None
                 if mean.shape != minutes.shape or not np.all(np.isfinite(mean)):
-                    raise ValueError("S2 trajectory cache has invalid dimensions or values")
+                    raise ValueError(
+                        "Supplementary Figure 2 trajectory cache has invalid dimensions or values"
+                    )
                 axes[r, c].plot(
                     minutes, mean, "-" if c == 0 else "--", color=color, label=f"{speed:.1f} m/s"
                 )
@@ -624,9 +716,9 @@ def _s2(root: Path, output: Path) -> dict:
         sources,
         "recomputed_summary_and_cached_trajectories",
         [
-            "Participant summaries and model trajectories come from original comment_2 computations; no SVG digitization.",
+            "Participant summaries and model trajectories are read from saved numerical outputs.",
             "Adapted intervals are Student-t 95% CIs; time-course shading is 1.96 × SEM.",
-            "S2 uses 20 participants (7/7/6 by condition) and shared model parameters alpha=6e-5, psi=1 selected by the energy-only Model A; these differ from the main individual condition-specific fits.",
+            "Supplementary Figure 2 uses 20 participants (7/7/6 by condition) and one model parameter set shared across conditions (alpha=6e-5, psi=1, no fall penalty, fitted to energy alone); these differ from the main individual condition-specific fits.",
             "A nonsignificant STA adaptation test is not an equivalence test establishing zero adaptation.",
             "Raw force/marker preprocessing and model simulations are not rerun.",
         ],
@@ -635,7 +727,12 @@ def _s2(root: Path, output: Path) -> dict:
     )
 
 
-def _s3(root: Path, output: Path) -> dict:
+def _figure2c(root: Path, output: Path) -> dict:
+    """Render the Figure 2C energy changes for energy minimization, model and experiment.
+
+    Without the regenerated model rollouts, the inverse adaptation model series is omitted and
+    the record is partial.
+    """
     source = _require(root, ENERGY)
     energy = loadmat(
         source,
@@ -650,11 +747,11 @@ def _s3(root: Path, output: Path) -> dict:
         tied = np.asarray(getattr(energy["tied1_energy"], f"condition_{condition}"), float)
         baseline = tied[:, -180:].mean(axis=1)
         if split.shape[0] != tied.shape[0] or np.any(baseline == 0):
-            raise ValueError("S3 split/tied participants differ or tied baseline is zero")
+            raise ValueError("Figure 2C split/tied participants differ or tied baseline is zero")
         adapted = split[:, -180:].mean(axis=1)
         percent = (adapted - baseline) / baseline * 100
         if not np.all(np.isfinite(percent)):
-            raise ValueError("S3 experimental energy contains nonfinite values")
+            raise ValueError("Figure 2C experimental energy contains nonfinite values")
         means.append(float(percent.mean()))
         experimental.extend(
             {
@@ -667,6 +764,7 @@ def _s3(root: Path, output: Path) -> dict:
             }
             for i, value in enumerate(percent)
         )
+    # Reported trajectory-optimization metabolic cost (W/kg); 3.147 is tied walking.
     trajectory_speeds = np.array([0.2, 0.4, 0.6, 0.8, 1.0])
     trajectory_energy = np.array([3.161, 3.183, 3.138, 3.046, 2.968])
     trajectory_pct = (trajectory_energy - 3.147) / 3.147 * 100
@@ -680,26 +778,28 @@ def _s3(root: Path, output: Path) -> dict:
         for speed, value, pct in zip(trajectory_speeds, trajectory_energy, trajectory_pct)
     ]
     outputs = [
-        _write_csv(output, "s3a_trajectory_optimization", trajectory),
-        _write_csv(output, "s3c_experimental", experimental),
+        _write_csv(output, "figure2c_energy_minimization", trajectory),
+        _write_csv(output, "figure2c_experimental_participants", experimental),
         _write_csv(
             output,
-            "s3c_group_means",
+            "figure2c_experimental_summary",
             [
                 {"delta_mps": speed, "mean_energy_change_pct": mean}
                 for speed, mean in zip(SPEEDS, means)
             ],
         ),
     ]
-    from .regenerated import S3_SWEEP, s3_model_tables
+    from .regenerated import FIGURE2C_ROLLOUTS, figure2c_model_tables
 
     missing_reason = None
     try:
-        trials, model_participants, model_summary = s3_model_tables(root)
+        trials, model_participants, model_summary = figure2c_model_tables(root)
     except FileNotFoundError as error:
         missing_reason = str(error)
         trials, model_participants, model_summary = [], [], []
-    panels = [("A", "Trajectory optimization", trajectory_speeds, trajectory_pct, "#009900")]
+    series = [
+        ("energy_minimization", "Energy Minimization", trajectory_speeds, trajectory_pct, "#009900")
+    ]
     sources = [ENERGY, "reported trajectory-optimization constants in supplements.py"]
     details = {"experimental_means": means}
     if model_summary:
@@ -708,68 +808,133 @@ def _s3(root: Path, output: Path) -> dict:
         trajectory_at_conditions = np.polyval(np.polyfit(trajectory_speeds, trajectory_pct, 2), SPEEDS)
         trajectory_corr = float(np.corrcoef(trajectory_at_conditions, means)[0, 1])
         outputs += [
-            _write_csv(output, "s3b_model_trials", trials),
-            _write_csv(output, "s3b_model_participants", model_participants),
-            _write_csv(output, "s3b_model_summary", model_summary),
-            _write_csv(output, "s3_direction_correlations", [{
+            _write_csv(output, "figure2c_model_trials", trials),
+            _write_csv(output, "figure2c_model_participants", model_participants),
+            _write_csv(output, "figure2c_model_summary", model_summary),
+            _write_csv(output, "figure2c_direction_correlations", [{
                 "model_vs_experiment_pearson_r": model_corr,
                 "trajectory_quadratic_vs_experiment_pearson_r": trajectory_corr,
             }]),
         ]
-        panels.append(("B", "Adaptation-aware model", SPEEDS, model_means, "#000099"))
-        sources += [PARAMETERS, S3_SWEEP]
+        series.append(
+            ("inverse_adaptation_model", "Inverse Adaptation Model", SPEEDS, model_means, "#000099")
+        )
+        sources += [PARAMETERS, FIGURE2C_ROLLOUTS]
         details.update(model_means=model_means, unique_model_trials=len(trials),
                        model_participants=len(model_participants),
                        model_vs_experiment_pearson_r=model_corr,
                        trajectory_quadratic_vs_experiment_pearson_r=trajectory_corr)
-    panels.append(("C", "Experimental data", SPEEDS, means, "#990000"))
-    fig, axes = plt.subplots(1, len(panels), figsize=(7.5 if model_summary else 5.7, 2.9),
+    series.append(("experimental_data", "Experimental Data", SPEEDS, means, "#990000"))
+    fig, axes = plt.subplots(1, len(series), figsize=(7.5 if model_summary else 5.7, 2.9),
                              layout="constrained")
-    for ax, (letter, title, x, y, color) in zip(axes, panels):
+    for ax, (key, title, x, y, color) in zip(axes, series):
         ax.axhline(0, color=".75", lw=0.7, ls=":")
         ax.plot(x, y, "o-", color=color, lw=1.8)
-        ax.set(xlabel="Speed difference (m/s)", ylabel="Energy change (%)",
-               title=f"{letter}  {title}", xticks=x)
-        if letter == "A":
+        ax.set(xlabel="Speed difference (m/s)", ylabel="Energy change (%)", title=title, xticks=x)
+        if key == "energy_minimization":
             ax.set_ylim(-7, 2.5)
-        elif letter == "B":
+        elif key == "inverse_adaptation_model":
             ax.set(ylim=(-26.25, 350), yticks=[0, 100, 200, 300])
         else:
             ax.set_ylim(-15, 27)
     caveats = [
-        "Panel A preserves five reported OpenSim/Moco constants; the addendum's four muscle-output STO conditions are a separate source check, not an exact five-point regeneration.",
-        "Panel C uses the original experimental means over the last 180 seconds of split and tied walking.",
+        "The Figure 2C energy-minimization series uses five reported OpenSim/Moco energy values; the four muscle-output STO files (tied, 0.4, 0.7 and 1.0 m/s) are checked separately and do not regenerate all five points.",
+        "The Figure 2C experimental series uses the original experimental means over the last 180 seconds of split and tied walking.",
     ]
     if model_summary:
         caveats += [
-            "Panel B uses regenerated trials at the original published participant parameter cells; new stochastic sweeps need not be bit-identical.",
-            "Nonfalling trials use tied strides 31–70 (Python slice 30:70) and the final 100 strides. Participant medians across successful trials are averaged within condition; no uncertainty band is drawn.",
+            "The Figure 2C inverse adaptation model series uses regenerated trials at the original published participant parameter cells; new stochastic sweeps need not be bit-identical.",
+            "Nonfalling model trials use tied strides 31–70 (Python slice 30:70) and the final 100 strides. Participant medians across successful trials are averaged within condition; no uncertainty band is drawn.",
             "Shared fitted cells are reused for multiple participants. Unique trial rows and participant-weighted fall counts are exported separately.",
         ]
     else:
-        fig.suptitle("S3 partial reproduction — panel B unavailable", fontsize=9)
-        caveats.append(f"Panel B unavailable: {missing_reason}")
-    outputs += _save(fig, output, "s3_abc" if model_summary else "s3_ac_partial")
+        fig.suptitle("Figure 2C (partial: inverse adaptation model unavailable)", fontsize=9)
+        caveats.append(
+            f"The Figure 2C inverse adaptation model series is unavailable: {missing_reason}"
+        )
+    outputs += _save(fig, output, "figure2c" if model_summary else "figure2c_partial")
     return _record(
-        "s3", outputs, sources,
+        "figure2", outputs, sources,
         "experimental_reanalysis_and_regenerated_model_trials" if model_summary
         else "experimental_reanalysis_and_reported_trajectory_values",
         caveats, status="passed" if model_summary else "partial",
-        reproduced_panels=[p[0] for p in panels], missing_panels=[] if model_summary else ["B"],
+        reproduced_series=[item[0] for item in series],
+        missing_series=[] if model_summary else ["inverse_adaptation_model"],
         **details,
     )
 
 
-def reviewer_energy_percent(
+def _figure2(root: Path, output: Path) -> dict:
+    """Render Figures 2B and 2C and merge their results into one ``figure2`` record.
+
+    Each part is rendered independently: a part with missing inputs is recorded as blocked,
+    and a part that raises any other error is recorded as failed, with its traceback in
+    ``logs/``. The merged status is that of the least complete part (failed, then blocked,
+    partial and passed). Outputs, sources and caveats are concatenated with Figure 2B first,
+    ``details["panels"]`` gives each part's status, and each part's own details are kept under
+    ``details["figure2b"]`` and ``details["figure2c"]``.
+
+    Raises:
+        FileNotFoundError: If the inputs of both parts are missing.
+    """
+    parts, missing, errors = {}, [], []
+    for key, panel, render in (("figure2b", "2B", _figure2b), ("figure2c", "2C", _figure2c)):
+        try:
+            parts[key] = render(root, output)
+        except FileNotFoundError as error:
+            missing.append(str(error))
+            parts[key] = _record(
+                "figure2", [], [], "unavailable", [f"Figure {panel} is blocked: {error}"],
+                status="blocked",
+            )
+        except Exception as error:  # noqa: BLE001
+            message = f"Figure {panel}: {type(error).__name__}: {error}"
+            errors.append(message)
+            logs = output / "logs"
+            logs.mkdir(parents=True, exist_ok=True)
+            (logs / f"{key}.txt").write_text(traceback.format_exc())
+            parts[key] = _record(
+                "figure2", [], [], "unavailable", [message], status="failed"
+            )
+    if len(missing) == len(parts):
+        raise FileNotFoundError("; ".join(missing))
+    order = ("passed", "partial", "blocked", "failed")
+    record = {
+        "id": "figure2",
+        "status": max((part["status"] for part in parts.values()), key=order.index),
+        "outputs": [path for part in parts.values() for path in part["outputs"]],
+        "caveats": [note for part in parts.values() for note in part["caveats"]],
+        "details": {
+            "sources": [name for part in parts.values() for name in part["details"]["sources"]],
+            "panels": {"2B": parts["figure2b"]["status"], "2C": parts["figure2c"]["status"]},
+            **{key: part["details"] for key, part in parts.items()},
+        },
+    }
+    if errors:
+        record["error"] = "; ".join(errors)
+    return record
+
+
+def fall_penalty_energy_percent(
     raw: np.ndarray, window: int = 180, onset_window: int = 30
 ) -> np.ndarray:
-    """Normalize a NaN-aware centered mean to its first ``onset_window`` samples.
+    """Smooth an energy signal and express it as percent change from its onset.
 
-    Even windows include both endpoints: ``window=180`` averages 181 interior samples.
+    Smoothing is a NaN-aware centered moving mean with shrinking endpoints. Even windows include
+    both endpoints, so ``window=180`` averages 181 samples in the interior. Supplementary
+    Figure 4 applies it to the experimental energy.
+
+    Args:
+        raw: One-dimensional energy signal; NaN samples are ignored.
+        window: Smoothing window in samples.
+        onset_window: Number of initial smoothed samples averaged as the onset baseline.
+
+    Returns:
+        Smoothed signal in percent change from the onset baseline.
     """
     raw = np.asarray(raw, float)
     if raw.ndim != 1 or not raw.size or window < 1 or onset_window < 1:
-        raise ValueError("Invalid S5 energy signal or smoothing window")
+        raise ValueError("Invalid energy signal or smoothing window")
     finite = np.isfinite(raw)
     cs = np.concatenate(([0.0], np.cumsum(np.where(finite, raw, 0.0))))
     counts = np.concatenate(([0], np.cumsum(finite)))
@@ -779,12 +944,17 @@ def reviewer_energy_percent(
     smoothed = np.divide(cs[hi] - cs[lo], n, out=np.full(raw.size, np.nan), where=n > 0)
     onset = float(np.nanmean(smoothed[:onset_window]))
     if not np.isfinite(onset) or abs(onset) < 1e-6:
-        raise ValueError("S5 energy has an invalid smoothed-onset baseline")
+        raise ValueError("Energy signal has an invalid smoothed-onset baseline")
     return (smoothed - onset) / onset * 100
 
 
-def _s5(root: Path, output: Path) -> dict:
-    from .s5_analysis import analyze_s5_grid
+def _s4(root: Path, output: Path) -> dict:
+    """Render Supplementary Figure 4 energy trajectories with and without a fall penalty.
+
+    The selected model C and E cells are plotted against the experimental mean, and model
+    selection and leave-one-subject-out predictions are recomputed from all cached cells.
+    """
+    from .fall_penalty_analysis import analyze_fall_penalty_grid
 
     base = "extensions/s5"
     selection_source = f"{base}/analysis_summary.json"
@@ -793,9 +963,9 @@ def _s5(root: Path, output: Path) -> dict:
     raw_rows = _read_csv(_require(root, energy_source))
     time_columns = [key for key in raw_rows[0] if key.startswith("t") and key[1:].isdigit()]
     if len(time_columns) != 2700:
-        raise ValueError("S5 requires 2700 ordered experimental energy samples")
+        raise ValueError("Supplementary Figure 4 requires 2700 ordered experimental energy samples")
     if [int(key[1:]) for key in time_columns] != sorted(int(key[1:]) for key in time_columns):
-        raise ValueError("S5 experimental time columns are not ordered")
+        raise ValueError("Supplementary Figure 4 experimental time columns are not ordered")
     sources = [selection_source, energy_source]
     rows, selections, subject_rows = [], [], []
     experimental, participant_ids = {}, {}
@@ -803,10 +973,12 @@ def _s5(root: Path, output: Path) -> dict:
     for ax, speed in zip(axes, SPEEDS):
         condition_rows = [row for row in raw_rows if float(row["speed_diff_ms"]) == speed]
         if len(condition_rows) != (8 if speed == 0.4 else 9):
-            raise ValueError(f"S5 has an unexpected energy cohort at {speed} m/s")
+            raise ValueError(
+                f"Supplementary Figure 4 has an unexpected energy cohort at {speed} m/s"
+            )
         em = np.vstack(
             [
-                reviewer_energy_percent(np.array([float(row[k]) for k in time_columns]))
+                fall_penalty_energy_percent(np.array([float(row[k]) for k in time_columns]))
                 for row in condition_rows
             ]
         )
@@ -820,7 +992,7 @@ def _s5(root: Path, output: Path) -> dict:
             parameters = selection[model_name]["per_speed"][str(speed)]
             lr, sym, weight = (float(parameters[k]) for k in ("lr", "sym", "w"))
             if model_name == "E" and weight != 0:
-                raise ValueError("S5 no-fall selection has a nonzero fall weight")
+                raise ValueError("The selected model without a fall term has a nonzero fall weight")
             relative = f"{base}/cells/sp{speed:g}_lr{lr:.3e}_sym{sym:g}_w{weight:g}.npz"
             sources.append(relative)
             with np.load(_require(root, relative), allow_pickle=False) as cell:
@@ -831,15 +1003,17 @@ def _s5(root: Path, output: Path) -> dict:
                     ("fall_weight", weight),
                 ):
                     if not np.isclose(float(cell[key]), expected, rtol=1e-12, atol=0):
-                        raise ValueError(f"S5 cell metadata does not match selected {key}")
+                        raise ValueError(
+                            f"Fall-penalty cell metadata does not match selected {key}"
+                        )
                 values = np.asarray(cell["energy_pct"], float)
                 successful = int(cell["ok_seeds"].size)
                 failed = int(cell["failed_seeds"].size)
                 if values.ndim != 2 or values.shape != (successful, 2700) or not successful:
-                    raise ValueError("S5 cell has no valid complete energy trajectories")
+                    raise ValueError("Fall-penalty cell has no valid complete energy trajectories")
                 predictions[label] = np.nanmean(values, axis=0)
                 if not np.all(np.isfinite(predictions[label])):
-                    raise ValueError("S5 selected model mean has nonfinite values")
+                    raise ValueError("Selected fall-penalty model mean has nonfinite values")
             selections.append(
                 {
                     "delta_mps": speed,
@@ -879,22 +1053,22 @@ def _s5(root: Path, output: Path) -> dict:
         ax.plot(
             minutes,
             predictions["fall_weight_zero"],
-            "--",
+            "-.",
             color="#8B0000",
             lw=1.7,
-            label="Model without fall penalty",
+            label="Without fall",
         )
         ax.plot(
             minutes,
             predictions["fall_weight_free"],
             color="#0000CD",
             lw=1.7,
-            label="Model with fall penalty",
+            label="With fall",
         )
         weight = selection["C"]["per_speed"][str(speed)]["w"]
         ax.set(
             xlabel="Time (min)",
-            title=f"{speed:.1f} m/s  (w = {weight:g})",
+            title=f"{speed:.1f} m/s (fitted w = {weight:g})",
             xlim=(0, 45),
             xticks=[0, 15, 30, 45],
         )
@@ -902,16 +1076,17 @@ def _s5(root: Path, output: Path) -> dict:
     axes[1].legend(
         frameon=False, loc="upper center", bbox_to_anchor=(0.5, -0.23), ncol=3, fontsize=8
     )
+    fig.suptitle("Supplementary Figure 4: models with and without a fall penalty")
     outputs = [
-        _write_csv(output, "s5_energy_timeseries", rows),
-        _write_csv(output, "s5_selected_models", selections),
-        _write_csv(output, "s5_experimental_subjects", subject_rows),
+        _write_csv(output, "s4_energy_timeseries", rows),
+        _write_csv(output, "s4_selected_models", selections),
+        _write_csv(output, "s4_experimental_subjects", subject_rows),
     ]
-    outputs += _save(fig, output, "s5_energy")
-    analysis = analyze_s5_grid(root, experimental, participant_ids)
+    outputs += _save(fig, output, "s4_fall_penalty")
+    analysis = analyze_fall_penalty_grid(root, experimental, participant_ids)
     for name, values in analysis["tables"].items():
         outputs.append(_write_csv(output, name, values))
-    for fresh in analysis["tables"]["s5_recomputed_selection"]:
+    for fresh in analysis["tables"]["s4_recomputed_selection"]:
         saved = next(
             row
             for row in selections
@@ -919,18 +1094,20 @@ def _s5(root: Path, output: Path) -> dict:
         )
         for key in ("learning_rate", "symmetry_weight", "fall_weight"):
             if saved[key] != fresh[key]:
-                raise ValueError(f"S5 fresh selection disagrees with archived selection: {key}")
+                raise ValueError(
+                    f"Recomputed fall-penalty selection disagrees with the saved selection: {key}"
+                )
     sources.extend(analysis["sources"])
     return _record(
-        "s5",
+        "s4",
         outputs,
         list(dict.fromkeys(sources)),
         "experimental_reanalysis_and_original_cached_model_trajectories",
         [
-            "Original comment_4 current cells are used; no SVG digitization or obsolete buggy-interpolation cells.",
-            "Model C versus E allows learning rate and symmetry to refit; this is not a fixed-parameter fall-term toggle.",
+            "Model trajectories are read from the saved fall-penalty simulation cells.",
+            "Model C (with fall term) versus model E (without fall term) allows learning rate and symmetry to refit; this is not a fixed-parameter fall-term toggle.",
             "All cached model means are refitted and C/E model selection and LOSO are recomputed; simulations are not rerun.",
-            "Historical S5 smoothing includes 181 interior samples for its window=180 setting.",
+            "Experimental energy smoothing with window=180 averages 181 centered samples in the interior.",
             "The noise floor compares fitted exponential curves, not raw measured trajectories.",
             "Saved per-seed aggregate mechanical metrics cannot establish that every step has a nonzero penalty gradient.",
         ],
@@ -940,9 +1117,18 @@ def _s5(root: Path, output: Path) -> dict:
 
 
 def compare_exponential_timescales(values: np.ndarray) -> dict:
-    """Compare unbounded single- and double-exponential fits.
+    """Compare unbounded single- and double-exponential fits to one signal.
 
-    Export raw R² and covariance warnings alongside gains clipped to zero.
+    Both models include a constant offset and are fitted against the sample index ``1..n``.
+
+    Args:
+        values: Finite, nonconstant signal with at least six samples.
+
+    Returns:
+        Dictionary with the single-fit R² (``r2_single_refit``), the double-fit R² before and
+        after taking the maximum with the single-fit R² (``r2_double_refit_raw``,
+        ``r2_double_refit_reported``), the R² gain clipped at zero (``delta_r2_reported``) and
+        whether ``curve_fit`` issued an OptimizeWarning (``covariance_warning``).
     """
     y = np.asarray(values, float)
     if y.ndim != 1 or y.size < 6 or not np.all(np.isfinite(y)) or np.var(y) == 0:
@@ -950,9 +1136,11 @@ def compare_exponential_timescales(values: np.ndarray) -> dict:
     x = np.arange(1, y.size + 1, dtype=float)
 
     def single(t, a, b, c):
+        """Single exponential with offset."""
         return a * np.exp(b * t) + c
 
     def double(t, a, b, c, d, g):
+        """Sum of two exponentials with offset."""
         return a * np.exp(b * t) + c * np.exp(d * t) + g
 
     with (
@@ -985,6 +1173,10 @@ def compare_exponential_timescales(values: np.ndarray) -> dict:
 
 
 def _r2(root: Path, output: Path) -> dict:
+    """Recompute in-sample fit RMSE, stored-fit R² and the single/double-exponential comparison.
+
+    R² values are checked against ``reference_tables/expfit_r2.csv`` when it is present.
+    """
     parameters, nsub, energy = _load_published(root)
     rows, timescales, rmse_rows = [], [], []
     for condition, speed in enumerate(SPEEDS):
@@ -1008,6 +1200,7 @@ def _r2(root: Path, output: Path) -> dict:
                     "units": "percentage points relative to split onset",
                 }
             )
+            # Smoothing as in the Methods: 180 samples (3 min) for experiment, 100 strides for model.
             ye = matlab_movmean(raw[subject], 180)
             r2e, _ = stored_fit_metrics(ye, np.asarray(st.exp_energy))
             ym = matlab_movmean(np.asarray(st.model_energy_raw), 100)
@@ -1023,6 +1216,8 @@ def _r2(root: Path, output: Path) -> dict:
                     }
                 )
             r2m, scale = stored_fit_metrics(ym, gm)
+            # coeff = [a, b, c, d] of a*exp(b*x) + c*exp(d*x) (d = 0 for a first-order fit); its
+            # value at the first sample is the onset scale, a check on the least-squares scale.
             a, b, c, d = np.asarray(st.coeff, float).ravel()
             coefficient_scale = float(a * np.exp(b) + c * np.exp(d))
             fit = scale * (1 + gm / 100)
@@ -1150,8 +1345,8 @@ def _r2(root: Path, output: Path) -> dict:
         [
             "Stored normalized exponential shapes are rescaled by least squares; curves are not refitted.",
             "300/500-window columns score the same fit against more smoothed model signals.",
-            "Separate timescale-comparison tables repeat the original unbounded SciPy single/double exponential diagnostic; these are distinct from the MATLAB headline fits.",
-            "The 0.011–0.055 gain range spans model and experiment condition means; experiment-only gains are approximately 0.015–0.027.",
+            "Timescale-comparison tables refit unbounded SciPy single- and double-exponential models; they are separate from the stored MATLAB fits used for R² and RMSE.",
+            "The Methods range of 0.011–0.055 for the double-exponential R² gain spans model and experiment condition means; experiment-only gains are approximately 0.015–0.027.",
         ],
         reference_verified=verified,
         max_coefficient_scale_disagreement_pct=max(r["scale_check_pct_diff"] for r in rows),
@@ -1161,8 +1356,21 @@ def _r2(root: Path, output: Path) -> dict:
 def render_supplements(
     data_root: Path, output_root: Path, figures: list[str] | None = None
 ) -> list[dict]:
-    """Render selected supplementary figures and export their numerical source tables."""
-    renderers = {"figure2": _figure2, "s1": _s1, "s2": _s2, "s3": _s3, "s5": _s5, "r2": _r2}
+    """Render selected supplementary figures and export their numerical source tables.
+
+    Args:
+        data_root: Prepared publication data directory.
+        output_root: Directory that receives ``figures/`` and ``tables/``.
+        figures: Renderer identifiers (``figure2``, ``s1``, ``s2``, ``s4``, ``r2``); all
+            renderers when None.
+
+    Returns:
+        One report record per selected renderer, in selection order.
+
+    Raises:
+        ValueError: If a selection is not a known renderer.
+    """
+    renderers = {"figure2": _figure2, "s1": _s1, "s2": _s2, "s4": _s4, "r2": _r2}
     selected = list(renderers) if figures is None else list(dict.fromkeys(figures))
     unknown = set(selected) - renderers.keys()
     if unknown:

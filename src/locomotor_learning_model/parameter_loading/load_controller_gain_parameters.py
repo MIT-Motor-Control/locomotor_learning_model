@@ -1,9 +1,21 @@
-"""Feedback controller gain loader."""
+"""Fixed gains of the step-to-step feedback controller."""
 from __future__ import annotations
 
 
 def load_controller_gain_parameters(param_fixed: dict) -> dict:
-    """Return feedback controller gains."""
+    """Return the feedback gains and zero-initialized odd- and even-step targets.
+
+    Gains map midstance deviations in velocity (``ydot``), position (``y``), summed
+    position error (``SUMy``) and belt speed to the endstance leg angle and push-off
+    impulse.
+
+    Args:
+        param_fixed: Fixed parameters; gains are defined for ``swingCost["Coeff"] == 0.9``.
+
+    Returns:
+        Controller dictionary with gains, ``Odd`` and ``Even`` targets and
+        ``ControllerBeltFrameVsLabFrame``; for any other coefficient, only the last.
+    """
     param_controller = {}
 
     swing_coeff = param_fixed.get('swingCost', {}).get('Coeff')
@@ -18,7 +30,7 @@ def load_controller_gain_parameters(param_fixed: dict) -> dict:
             'legAngle_gain_BeltSpeed': -0.075044622818653,
             'pushoff_gain_BeltSpeed': -1.055930819923483,
         }
-        # Controller targets are initialized before learning.
+        # Targets are overwritten from the controller vector before each simulated iteration.
         param_controller['Odd'] = {
             'theta_end_nominal': 0.0,
             'ydot_at_midstance_nominal_beltframe': 0.0,
@@ -34,6 +46,7 @@ def load_controller_gain_parameters(param_fixed: dict) -> dict:
             'sumy_at_midstance_nominal_slopeframe': 0.0,
         }
         param_controller.update(gains)
+    # Not read by the simulation.
     param_controller['ControllerBeltFrameVsLabFrame'] = 1
 
     return param_controller

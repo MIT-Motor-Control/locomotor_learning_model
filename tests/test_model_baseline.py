@@ -20,6 +20,7 @@ from locomotor_learning_model.learning.simulate_learning_step_by_step import (
 
 @pytest.fixture(autouse=True)
 def preserve_random_state():
+    """Restore the global NumPy random state after each test."""
     state = np.random.get_state()
     yield
     np.random.set_state(state)
@@ -68,6 +69,7 @@ def test_objective_is_repeatable(model_parameters):
 
 
 def run_learning(fixed, controller, iterations):
+    """Return the (8, iterations) controller history of a learning run seeded with 42."""
     parameters = load_learnable_parameters_initial(fixed)
     state = load_initial_body_state(parameters)
     context = np.array(get_treadmill_speed(0.0, fixed["imposedFootSpeeds"]))

@@ -1,13 +1,21 @@
 function [pInputControllerStore_OnesTried, fall_flag_vec,min_vert_pos] = simulateLearningStepByStep(paramFixed, ...
     pInputControllerAsymmetricNominal,stateVar0_Model,contextNow, ...
     paramControllerGains,SwingCostCoeff,speedChangeIdx)
-% Update the controller from noisy energy estimates and learned dynamics.
+% Learn the controller by gradient descent on the model-estimated steady-state objective.
+% Inputs:  paramFixed - model, learner and protocol settings
+%          pInputControllerAsymmetricNominal - initial 10 controller targets
+%          stateVar0_Model - initial midstance state; contextNow - unused
+%          paramControllerGains - feedback gains; SwingCostCoeff - swing-cost multiplier
+%          speedChangeIdx - iteration after which a two-element learning rate decays
+% Outputs: pInputControllerStore_OnesTried - 8 x N controllers evaluated, including exploration
+%          fall_flag_vec - [1 iteration] after a fall, otherwise [0 0]
+%          min_vert_pos - minimum height per step, one row per iteration without a fall
 
 noiseSTD = paramFixed.Learner.noiseSTDExploratory;
 numIterations = paramFixed.numIterations;
 includeInternalModelOrNot = paramFixed.Learner.includeInternalModel;
 
-% Fix the two odd-leg position coordinates to define the spatial origin.
+% The two odd-step position targets stay at zero; learn the other 8.
 pInputControllerAsymmetricNominal = pInputControllerAsymmetricNominal([1:3 6:10]);
 numLearningDimensions = length(pInputControllerAsymmetricNominal);
 numStateDimensions = length(stateVar0_Model);
@@ -58,6 +66,7 @@ for iStride = 1:numIterations
 
     delta_pInputNow1_Noise = noiseSTD*randn(numLearningDimensions,1);
 
+    % A two-element learning rate [initial, decay] decreases linearly after speedChangeIdx.
     if length(alphaEnergyLearningRate) == 1
         delta_pInputNow2_Gradient = alphaEnergyLearningRate*(-gEnergyGradientNow);
 
@@ -90,6 +99,7 @@ for iStride = 1:numIterations
         fObjective_AsymmetricNominal_8DTo10D(pInputNow_ToTry,stateVar0_ModelNow, ...
         paramControllerGains,paramFixed,tStart,SwingCostCoeff,iStride);
 
+    % The learner measures the full objective with multiplicative sensory noise.
     EdotNow = EdotNow*(1+randn*paramFixed.noiseEnergySensory);
 
     stateVarNowStore =  [stateVarNowStore  stateVar0_ModelNow];
@@ -99,6 +109,7 @@ for iStride = 1:numIterations
     pInputControllerStore_OnesConsideredGood = ...
         [pInputControllerStore_OnesConsideredGood pInputNow_ConsideredGood];
 
+    % The linear models, and hence the gradient, remain zero for the first numStridesToUse iterations.
     if iStride>numStridesToUse
         [AdynamicsModelNow,errorOldDynamicsModel,errorNewDynamicsModel] = ...
             computeModelDynamicsModelRLS_NoSingular(AdynamicsModelNow,stateVarNowStore,...

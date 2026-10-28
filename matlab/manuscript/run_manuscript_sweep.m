@@ -1,4 +1,13 @@
 function summary = run_manuscript_sweep(output_dir, options)
+% Run a grid of independent seeded trials and write summary.csv.
+% Inputs:  output_dir - directory for sweep.mat, trial_NNNNNN.mat and summary.csv
+%          options.speed_differences, options.learning_rates, options.energy_weights - grid
+%          options.trials - trials per grid point
+%          options.seed - seed of the first trial; trial i uses seed + i - 1
+%          options.max_iterations - iteration limit per trial
+% Outputs: summary - one row per trial: job, speed_difference, learning_rate, psi, trial,
+%              iterations and fell
+% Completed trials are reloaded on rerun; an existing sweep.mat must have the same options.
 arguments
     output_dir (1,1) string
     options.speed_differences (1,:) double = [0.4 0.7 1.0]

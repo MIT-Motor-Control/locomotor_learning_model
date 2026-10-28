@@ -1,4 +1,4 @@
-"""Adaptation protocol settings."""
+"""Treadmill protocol and learning-iteration budget."""
 from __future__ import annotations
 
 import numpy as np
@@ -18,7 +18,27 @@ def load_protocol_parameters(
     transition_time: float | None = None,
     split_speed_diff_ms: float | None = None,
 ) -> dict:
-    """Return protocol parameters for the simulation."""
+    """Add the treadmill protocol and the number of learning iterations.
+
+    Arguments left as None fall back to values already in ``param_fixed``, then to
+    the defaults: split belt, ``"classic split belt"`` or ``"four speed changes"``,
+    a 15 s (split) or 3 s (tied) transition and a 1.0 m/s split speed difference.
+
+    Args:
+        param_fixed: Parameter dictionary, updated in place; its learner steps per
+            iteration set the iteration count.
+        split_or_tied: ``"split"`` or ``"tied"``.
+        speed_protocol: Protocol name understood by the split or tied speed builder.
+        transition_time: Duration of each belt-speed ramp in seconds.
+        split_speed_diff_ms: Split-belt speed difference in m/s.
+
+    Returns:
+        The updated ``param_fixed``, including ``imposedFootSpeeds`` and ``num_iterations``.
+
+    Raises:
+        ValueError: For an unknown configuration or protocol, or an invalid transition
+            time or speed difference.
+    """
     split_or_tied = split_or_tied or param_fixed.get("SplitOrTied", "split")
     effective_transition = transition_time if transition_time is not None else param_fixed.get("transitionTime", 15 if split_or_tied == "split" else 3)
     if not np.isscalar(effective_transition) or not np.isfinite(effective_transition) or effective_transition <= 0:
@@ -60,8 +80,10 @@ def load_protocol_parameters(
     else:
         raise ValueError(f"Unknown treadmill configuration: {split_or_tied}")
 
+    # Level treadmill.
     param_fixed["angleSlope"] = 0
 
+    # Step budget: protocol duration over a nominal dimensionless step time, to the nearest 100.
     nominal_step_time = 1.7
     t_list = param_fixed["imposedFootSpeeds"]["tList"]
     if not np.all(np.isfinite(t_list)) or not np.all(np.diff(t_list) > 0):
@@ -70,7 +92,7 @@ def load_protocol_parameters(
     param_fixed["numStepsToLearn"] = round(param_fixed["numStepsToLearn"] / 100) * 100
 
     learner = param_fixed.get("Learner", {})
-    # Each learning iteration includes an equal number of steps on both legs.
+    # Round the steps per iteration up to an even number so both legs step equally often.
     if learner.get("numStepsPerIteration", 1) % 2 != 0:
         learner["numStepsPerIteration"] = learner.get("numStepsPerIteration", 1) + 1
         param_fixed["Learner"] = learner

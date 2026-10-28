@@ -1,5 +1,5 @@
 function paramFixed = loadHowLongParameters(paramFixed)
-% Override the protocol duration with a fixed physical-step budget.
+% Replace the protocol-derived step budget with 2000 steps.
 
 paramFixed.numStepsToLearn = 2000;
 

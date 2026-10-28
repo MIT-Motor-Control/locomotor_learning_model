@@ -1,4 +1,4 @@
-"""Check workbook cells, source hashes and coverage against publication results.
+"""Verify a source workbook against the reproduction report, CSV tables and checksums.
 
 Usage: python scripts/check_source_workbook.py REPRODUCTION_DIR OUTPUT.xlsx
 """
@@ -17,6 +17,7 @@ from openpyxl import load_workbook
 
 
 def typed(value):
+    """Convert a CSV field with the same rules as ``build_source_workbook.typed``."""
     if value == "":
         return None
     if value in ("True", "False"):
@@ -32,6 +33,7 @@ def typed(value):
 
 
 def equal(actual, expected):
+    """Return whether a workbook value matches a CSV value (numbers: rtol 2e-14, atol 1e-14)."""
     if isinstance(expected, bool):
         return isinstance(actual, bool) and actual == expected
     if isinstance(expected, (float, int)):
@@ -44,9 +46,25 @@ def equal(actual, expected):
 
 
 def check(input_root: Path, output: Path) -> dict:
+    """Verify a workbook against its sidecar metadata, report.json and the source CSVs.
+
+    Checks the report, input-manifest and CSV checksums, every table header and cell, the
+    source guide, the source index and the coverage labels of the Figure 2C model, Figure 3D
+    and grid-sensitivity tables, and rejects formula or error cells.
+
+    Args:
+        input_root: Reproduction output directory containing report.json and tables/.
+        output: Workbook path; the ``.validation.json`` sidecar is read from beside it.
+
+    Returns:
+        Counts of sheets, tables, verified cells and source CSVs, with ``status``.
+
+    Raises:
+        ValueError: If the metadata schema is unsupported or any check fails.
+    """
     metadata = json.loads(output.with_suffix(".validation.json").read_text())
-    if metadata.get("schema_version") != 2:
-        raise ValueError("Unsupported source workbook metadata; rebuild with the Python formatter")
+    if metadata.get("schema_version") != 3:
+        raise ValueError("Unsupported workbook metadata; rebuild with build_source_workbook.py")
     input_root = input_root.resolve()
     report_payload = (input_root / "report.json").read_bytes()
     if hashlib.sha256(report_payload).hexdigest() != metadata["sourceReportSha256"]:
@@ -60,6 +78,7 @@ def check(input_root: Path, output: Path) -> dict:
     hashes = {}
 
     def source(name, digest):
+        """Return the rows of one CSV after checking it against the sidecar and report hashes."""
         path = input_root / "tables" / name
         if not path.resolve().is_relative_to(input_root / "tables"):
             raise ValueError("Workbook metadata contains an unsafe CSV path")
@@ -119,10 +138,14 @@ def check(input_root: Path, output: Path) -> dict:
     # Cross-check coverage labels against the imported numerical tables.
     coverage = {row["values"][0]: row["values"][1] for row in metadata["guide"]}
     for panel, filename in (
-        ("S3B", "s3b_model_trials.csv"),
-        ("S1 sensitivity", "s1_grid_sensitivity_summary.csv"),
+        ("Figure 2C model", "figure2c_model_trials.csv"),
+        ("Figure 3D", "figure3_d_fit_inputs.csv"),
+        ("S1 Text grid sensitivity", "s1_grid_sensitivity_summary.csv"),
     ):
-        if (coverage[panel] == "available") != (filename in hashes):
+        label = coverage.get(panel)
+        if label is None:
+            raise ValueError(f"Workbook guide lacks coverage row: {panel}")
+        if (label == "available") != (filename in hashes):
             raise ValueError(f"Coverage does not match imported source tables: {panel}")
     for sheet in workbook:
         for row in sheet.iter_rows():

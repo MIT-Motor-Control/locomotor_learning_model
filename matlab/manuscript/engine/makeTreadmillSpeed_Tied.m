@@ -1,5 +1,6 @@
 function beltSpeedsImposed = makeTreadmillSpeed_Tied(paramFixed)
 % Build a tied-belt speed profile with linear transition ramps.
+% Inputs and outputs are as in makeTreadmillSpeed_Split; the ramp duration is set to 3 s.
 
 L = 0.95; g = 9.81;
 timeScaling = sqrt(L/g);

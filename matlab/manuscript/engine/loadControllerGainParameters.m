@@ -1,5 +1,5 @@
 function paramController = loadControllerGainParameters(paramFixed)
-% Set fixed gains for the feedback controller.
+% Set the constant gains of the feedback controller.
 
 switch paramFixed.swingCost.Coeff
     case 0.9

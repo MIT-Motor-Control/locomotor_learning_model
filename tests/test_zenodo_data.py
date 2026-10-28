@@ -1,4 +1,4 @@
-"""Portable imports of experimental measurements."""
+"""Import of the public experimental CSVs into a publication dataset."""
 
 import csv
 import hashlib
@@ -25,6 +25,7 @@ from locomotor_learning_model.publication.zenodo import (
 
 @pytest.fixture
 def public_data(tmp_path):
+    """Return a synthetic DATA folder with every public CSV for the published cohorts."""
     source = tmp_path / "wrapper/DATA"
     folder = source / "processed_csv"
     folder.mkdir(parents=True)
@@ -54,6 +55,7 @@ def public_data(tmp_path):
 
 
 def change_csv(path, change):
+    """Apply ``change`` to the rows of a CSV file in place."""
     with path.open() as stream:
         rows = list(csv.reader(stream))
     change(rows)

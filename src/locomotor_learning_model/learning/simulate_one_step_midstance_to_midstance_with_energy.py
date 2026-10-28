@@ -1,3 +1,5 @@
+"""Single walking step and its metabolic cost."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -29,7 +31,33 @@ def simulate_one_step_midstance_to_midstance_with_energy(
     float,
     float,
 ]:
-    """Return trajectories, duration, and energy costs for a midstance-to-midstance step."""
+    """Simulate one step from midstance to the next midstance and its energy cost.
+
+    The feedback controller sets the endstance angle and push-off impulse from
+    midstance deviations. The stance leg follows inverted-pendulum dynamics to
+    that angle, the push-off impulse acts along the trailing leg, and heel strike
+    removes the velocity component along the leading leg. Metabolic cost is
+    ``bPos`` times push-off work plus ``bNeg`` times heel-strike work plus the
+    swing cost of both half stances (``swing_cost_doke``).
+
+    Args:
+        p_input0: Midstance state ``[theta, theta_dot, y_foot, sum_y, v_swing]``
+            (see ``simulate_many_steps_asymmetric_control``).
+        i_step: Step number from 1; odd steps push off from belt 1 and land on
+            belt 2, even steps the reverse.
+        t_start: Start time.
+        param_controller: Targets and gains of the current step; updated in
+            place, including the commanded angle ``theta_end_thisStep``.
+        param_fixed: Model parameters and ``imposedFootSpeeds`` belt schedule.
+
+    Returns:
+        Tuple ``(state_next, t_endstance, states_endstance, t_midstance,
+        states_midstance, emet_total, emet_per_time, t_total, ework_pushoff,
+        ework_heelstrike)``: the next midstance state (5,); time and
+        ``[theta, theta_dot, y_foot]`` trajectories from midstance to endstance
+        and from heel strike to midstance; the step's metabolic cost, metabolic
+        power and duration; and absolute push-off and heel-strike work.
+    """
 
     if i_step % 2 == 0:
         param_controller['tList_BeltSpeed'] = param_fixed['imposedFootSpeeds']['tList']
@@ -93,6 +121,7 @@ def simulate_one_step_midstance_to_midstance_with_energy(
     delta_SUMy = SUMy0 - param_controller['sumy_at_midstance_nominal_slopeframe']
 
     ydot_atMidstance_LabFrame = ydot_atMidstance + param_controller['PushoffFootSpeedNow']
+    # Reference belt speed of the belt-speed feedback terms.
     vFootNominal = -0.35
     param_controller['ydot_atMidstance_nominal_labframe'] = (
         param_controller['ydot_at_midstance_nominal_beltframe'] + vFootNominal
@@ -115,7 +144,9 @@ def simulate_one_step_midstance_to_midstance_with_energy(
         + param_controller['legAngle_gain_BeltSpeed'] * delta_vFoot_labFrame
     )
 
-    # Uncapped rollouts use a larger angle limit to permit lower COM heights.
+    # Upper limit on the commanded endstance angle (rad). With ``uncapStepAngle`` the
+    # limit is ``stepAngleHardLimit`` (default 0.49 pi), which permits low COM heights
+    # but keeps the COM above ground.
     _cap = 0.95 * np.pi / 4
     if param_fixed.get("uncapStepAngle", False):
         _cap = param_fixed.get("stepAngleHardLimit", 0.49 * np.pi)

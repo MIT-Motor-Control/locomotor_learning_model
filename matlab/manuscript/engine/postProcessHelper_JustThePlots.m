@@ -2,7 +2,18 @@ function [time_list, stepLengthAsymmetryList, stepTimeAsymmetryList, energy_resu
     EmetStore,EmetPerTimeStore,tStepStore,paramController,paramFixed,delta, ...
     EworkPushoffStore,EworkHeelstrikeStore, EdotStore_IterationAverage, ...
     tTotalIterationStore)
-% Compute gait asymmetries and the metabolic transient.
+% Compute step asymmetries from replayed steps and return them with the iteration-averaged power.
+% Inputs:  tStore, stateStore - stance trajectories; EmetStore - per-step energies
+%          paramFixed - leg length and slope
+%          EdotStore_IterationAverage, tTotalIterationStore - power and duration per iteration
+%          The remaining inputs are unused.
+% Outputs: time_list - cumulative model time at the end of each iteration
+%          stepLengthAsymmetryList - (fast-slow)/(fast+slow) step length, one value per stride
+%          stepTimeAsymmetryList - (slow-fast)/(slow+fast) stance time, one value per stride
+%          energy_result - metabolic power averaged over each iteration
+%          steptime_fast, steptime_slow - stance durations on each belt
+%          stepLength_fast, stepLength_slow - lengths of steps landing on each belt
+% The convertMetToVO2 transient and the knee trajectories are computed but not returned.
 
 paramFixed.numSteps = length(EmetStore);
 for iStep = 1:paramFixed.numSteps

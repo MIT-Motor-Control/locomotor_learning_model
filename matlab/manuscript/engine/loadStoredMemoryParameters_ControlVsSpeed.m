@@ -13,6 +13,7 @@ switch paramFixed.swingCost.Coeff
             -0.000000038953735];
 end
 
+% Context: the two belt speeds.
 paramFixed.storedmemory.nominalContext = [-0.35; -0.35];
 
 paramFixed.storedmemory.controlSlopeVsContext = ...

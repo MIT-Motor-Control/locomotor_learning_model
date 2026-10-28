@@ -1,4 +1,7 @@
-"""Fit S5 model grids and evaluate leave-one-subject-out predictions."""
+"""Refit the fall-penalty model grid and evaluate leave-one-subject-out predictions.
+
+Used by the ``s4`` renderer for Supplementary Figure 4 (models with and without a fall penalty).
+"""
 
 from __future__ import annotations
 
@@ -12,16 +15,27 @@ from scipy.optimize import curve_fit
 
 
 def fit_energy_exponential(values: np.ndarray) -> np.ndarray:
-    """Fit A+B*exp(-t/tau), with the original S5 bounds and initialization."""
+    """Return the bounded least-squares fit of A + B exp(-t / tau) on a 2700-s grid.
+
+    Only finite samples are fitted. The fit starts from (last value, first minus last
+    value, 300 s) with bounds |A| <= 200, |B| <= 500 and 5 <= tau <= 8100 s.
+
+    Args:
+        values: Energy change (%) at 1 Hz, shape (2700,).
+
+    Returns:
+        Fitted curve at t = 0, ..., 2699 s.
+    """
     y = np.asarray(values, float)
     if y.shape != (2700,):
-        raise ValueError("S5 exponential fitting requires 2700 one-Hz samples")
+        raise ValueError("Fall-penalty exponential fitting requires 2700 one-Hz samples")
     finite = np.isfinite(y)
     if finite.sum() < 10:
-        raise ValueError("S5 exponential fitting requires at least ten finite samples")
+        raise ValueError("Fall-penalty exponential fitting requires at least ten finite samples")
     t = np.arange(2700, dtype=float)
 
     def model(time, a, b, tau):
+        """Return A + B exp(-t / tau) at ``time`` (s)."""
         return a + b * np.exp(-time / tau)
 
     v = y[finite]
@@ -35,19 +49,21 @@ def fit_energy_exponential(values: np.ndarray) -> np.ndarray:
     )
     fitted = model(t, *parameters)
     if not np.all(np.isfinite(fitted)):
-        raise ValueError("S5 exponential fitting produced nonfinite values")
+        raise ValueError("Fall-penalty exponential fitting produced nonfinite values")
     return fitted
 
 
 def _rmse(first, second):
+    """Return the RMSE over samples where both inputs are finite."""
     difference = np.asarray(first) - np.asarray(second)
     finite = difference[np.isfinite(difference)]
     if not finite.size:
-        raise ValueError("S5 RMSE has no finite paired samples")
+        raise ValueError("Fall-penalty RMSE has no finite paired samples")
     return float(np.sqrt(np.mean(finite**2)))
 
 
 def _paired(rows, speed):
+    """Return the paired Wilcoxon test of held-out RMSE C - E at one speed or pooled."""
     selected = [r for r in rows if speed == "pooled" or r["delta_mps"] == speed]
     difference = np.array([r["rmse_C"] - r["rmse_E"] for r in selected])
     nonzero = int(np.count_nonzero(difference))
@@ -63,19 +79,38 @@ def _paired(rows, speed):
     }
 
 
-def analyze_s5_grid(data_root: Path, experimental: dict, participant_ids: dict) -> dict:
-    """Refit every cached cell, reselect C/E, and recompute all 26 LOSO folds.
+def analyze_fall_penalty_grid(
+    data_root: Path, experimental: dict, participant_ids: dict
+) -> dict:
+    """Refit the fall-penalty cells, select models C and E, and run leave-one-subject-out tests.
 
-    ``experimental`` contains the original S5 smoothed/onset-normalized participant
-    matrices, keyed by speed. Every grid cell and seed is validated before use.
-    Saved selection and summary results are not used in this computation.
+    Model C selects learning rate, symmetry weight and fall weight per speed; model E fixes
+    the fall weight at zero. Cell mean trajectories and participant-group mean trajectories
+    are summarized by ``fit_energy_exponential``, and models are selected by the minimum
+    RMSE between fits. Each fold selects on the remaining participants and scores the
+    held-out participant; the noise floor is the RMSE between the training-group and
+    held-out fits. Cell metadata and seeds are validated against ``grid_config.json``;
+    saved selections and summaries are not used.
+
+    Args:
+        data_root: Prepared publication data directory containing ``extensions/s5``.
+        experimental: Speed to (participants, 2700) array of smoothed, onset-normalized
+            energy change (%) at 1 Hz.
+        participant_ids: Speed to participant identifiers in the row order of
+            ``experimental``.
+
+    Returns:
+        Dict with ``tables`` (folds, summaries, Wilcoxon tests with Holm adjustment across
+        the three speeds, group selections, per-cell mechanical summaries and their
+        fall-weight slices at the model C selections), ``sources`` (relative input paths)
+        and ``details``.
     """
     base = Path(data_root) / "extensions/s5"
     config = json.loads((base / "grid_config.json").read_text())
     speeds = config["speeds"]
     axes = [config[k] for k in ("learning_rates", "symmetry_weights", "fall_weights")]
     if len(axes[2]) != len(set(axes[2])) or 0.0 not in axes[2]:
-        raise ValueError("S5 fall-weight grid must have distinct values including zero")
+        raise ValueError("Fall-weight grid must have distinct values including zero")
     cells, mechanical, sources = {}, [], ["extensions/s5/grid_config.json"]
     for speed, lr, sym, weight in product(speeds, *axes):
         relative = f"extensions/s5/cells/sp{speed:g}_lr{lr:.3e}_sym{sym:g}_w{weight:g}.npz"
@@ -87,21 +122,21 @@ def analyze_s5_grid(data_root: Path, experimental: dict, participant_ids: dict) 
                 ("fall_weight", weight),
             ):
                 if not np.isclose(float(cell[name]), expected, rtol=1e-12, atol=0):
-                    raise ValueError(f"S5 cached cell metadata differs: {relative}: {name}")
+                    raise ValueError(f"Fall-penalty cell metadata differs: {relative}: {name}")
             seeds, failed = np.asarray(cell["ok_seeds"]), np.asarray(cell["failed_seeds"])
             if sorted(np.r_[seeds, failed].tolist()) != sorted(config["seeds"]):
-                raise ValueError(f"S5 cached cell has missing or duplicate seeds: {relative}")
+                raise ValueError(f"Fall-penalty cell has missing or duplicate seeds: {relative}")
             energy = np.asarray(cell["energy_pct"], float)
             penalty, height = (
                 np.asarray(cell["mean_penalty"], float),
                 np.asarray(cell["min_com"], float),
             )
             if energy.shape != (seeds.size, 2700) or not seeds.size:
-                raise ValueError(f"S5 cached cell has invalid energy trajectories: {relative}")
+                raise ValueError(f"Fall-penalty cell has invalid energy trajectories: {relative}")
             if penalty.shape != seeds.shape or height.shape != seeds.shape:
-                raise ValueError(f"S5 cached cell has invalid mechanical records: {relative}")
+                raise ValueError(f"Fall-penalty cell has invalid mechanical records: {relative}")
             if not np.all(np.isfinite(energy)) or not np.all(np.isfinite([penalty, height])):
-                raise ValueError(f"S5 cached cell contains nonfinite values: {relative}")
+                raise ValueError(f"Fall-penalty cell contains nonfinite values: {relative}")
             curve = fit_energy_exponential(np.mean(energy, axis=0))
             key = (speed, lr, sym, weight)
             cells[key] = curve
@@ -126,7 +161,7 @@ def analyze_s5_grid(data_root: Path, experimental: dict, participant_ids: dict) 
         matrix = np.asarray(experimental[speed], float)
         ids = participant_ids[speed]
         if matrix.ndim != 2 or matrix.shape != (len(ids), 2700) or len(ids) < 2:
-            raise ValueError("S5 participant matrix and identifiers differ")
+            raise ValueError("Fall-penalty participant matrix and identifiers differ")
         keys = [key for key in cells if key[0] == speed]
         zero_keys = [key for key in keys if key[-1] == 0]
         group = fit_energy_exponential(np.nanmean(matrix, axis=0))
@@ -197,12 +232,12 @@ def analyze_s5_grid(data_root: Path, experimental: dict, participant_ids: dict) 
     ]
     return {
         "tables": {
-            "s5_loso_folds": folds,
-            "s5_loso_summary": summaries,
-            "s5_loso_tests": tests,
-            "s5_recomputed_selection": selections,
-            "s5_mechanical_cells": mechanical,
-            "s5_mechanical_weight_slices": mechanical_slices,
+            "s4_loso_folds": folds,
+            "s4_loso_summary": summaries,
+            "s4_loso_tests": tests,
+            "s4_recomputed_selection": selections,
+            "s4_mechanical_cells": mechanical,
+            "s4_mechanical_weight_slices": mechanical_slices,
         },
         "sources": sources,
         "details": {

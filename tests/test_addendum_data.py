@@ -1,4 +1,4 @@
-"""Addendum imports, dataset integrity and complete trial sets."""
+"""Integration of supplementary source data into an existing publication dataset."""
 
 import json
 from pathlib import Path
@@ -14,13 +14,15 @@ ENERGY = "original/data/cosmed/processed/processedEnergyData.mat"
 
 
 def save(path, values):
+    """Write a compressed MAT file, creating its parent folders."""
     path.parent.mkdir(parents=True, exist_ok=True)
     savemat(path, values, do_compression=True)
 
 
 @pytest.fixture
 def dataset(tmp_path):
-    target, source = tmp_path / "publication", tmp_path / "addendum"
+    """Return (source, target): a supplementary tree with 150 Figure 2C rollouts and a dataset."""
+    target, source = tmp_path / "publication", tmp_path / "supplementary"
     params = np.empty((3, 1), dtype=[("learning_rate", object), ("sym_cost", object)])
     for c in range(3):
         params[c, 0] = (0.01, 0.0)
@@ -72,7 +74,7 @@ def dataset(tmp_path):
     return source, target
 
 
-def test_addendum_preserves_original_bytes_and_is_idempotent(dataset):
+def test_import_preserves_original_bytes_and_is_idempotent(dataset):
     source, target = dataset
     energy_before = (target / ENERGY).read_bytes()
     before = sha256(source / "code/original_data/data/cosmed/processed/processedEnergyData.mat")
@@ -101,7 +103,7 @@ def test_addendum_preserves_original_bytes_and_is_idempotent(dataset):
 @pytest.mark.parametrize(
     "problem", ["missing_trial", "conflicting_energy", "invalid_grid", "nonfinite"]
 )
-def test_bad_addendum_never_changes_existing_dataset(dataset, problem):
+def test_bad_import_never_changes_existing_dataset(dataset, problem):
     source, target = dataset
     before = {p.relative_to(target): p.read_bytes() for p in target.rglob("*") if p.is_file()}
     rollout = next((source / "code/verify/data/2d sweep fine").glob("*.mat"))
@@ -173,6 +175,7 @@ def test_failed_install_restores_existing_dataset(dataset, monkeypatch):
     rename = Path.rename
 
     def fail_staging(path, destination):
+        """Fail the rename of the staged dataset; rename other paths."""
         if path.parent.name.startswith(".publication-addendum-"):
             raise OSError("Simulated install failure")
         return rename(path, destination)

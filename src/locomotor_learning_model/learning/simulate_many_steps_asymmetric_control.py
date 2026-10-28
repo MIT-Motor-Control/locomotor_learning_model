@@ -1,3 +1,5 @@
+"""Multi-step walking with separate odd-step and even-step controllers."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -22,10 +24,31 @@ def simulate_many_steps_asymmetric_control(
     np.ndarray,
     np.ndarray,
 ]:
-    """Simulate asymmetric walking and return trajectories and step-wise energies.
+    """Simulate ``param_fixed['num_steps']`` steps with alternating odd and even controllers.
 
-    The initial state contains stance angle, angular velocity, foot position,
-    accumulated foot position, and swing-foot velocity at midstance.
+    The midstance state is ``[theta, theta_dot, y_foot, sum_y, v_swing]``:
+    stance-leg angle (rad), its angular velocity, stance-foot position (lab
+    frame), running sum of midstance position errors, and mean swing-foot
+    velocity over the preceding half stance (lab frame). Quantities are
+    nondimensional (body mass, leg length and gravity equal 1).
+
+    Args:
+        state_var0: Midstance state at the start (5,).
+        param_controller: Gains with ``Odd`` and ``Even`` targets; the targets of
+            the current step are copied to its top level, with zero position
+            targets on odd steps.
+        param_fixed: Model parameters, including ``num_steps``.
+        t_start: Start time.
+
+    Returns:
+        Tuple ``(state_var0, t_store, state_store, emet_total_store,
+        emet_per_time_store, t_step_store, ework_pushoff_store,
+        ework_heelstrike_store)``: the final midstance state; ``num_steps + 1``
+        time and ``[theta, theta_dot, y_foot]`` trajectories of the stance phases
+        (with steps numbered from 1, entry ``k`` runs from heel strike of step
+        ``k`` to endstance of step ``k + 1``; the first and last entries are half
+        stance phases); and, per step, metabolic cost, metabolic power, duration,
+        and absolute push-off and heel-strike work.
     """
 
     num_steps = int(param_fixed['num_steps'])
@@ -63,7 +86,6 @@ def simulate_many_steps_asymmetric_control(
             param_controller['pushoff_impulse_magnitude_nominal'] = (
                 param_controller['Odd']['pushoff_impulse_magnitude_nominal']
             )
-            # Odd-leg position targets define the reference frame.
             param_controller['y_at_midstance_nominal_slopeframe'] = 0.0
             param_controller['sumy_at_midstance_nominal_slopeframe'] = 0.0
 
@@ -86,7 +108,8 @@ def simulate_many_steps_asymmetric_control(
             param_fixed,
         )
 
-        # Each midstance-to-midstance interval spans two stance trajectories.
+        # The midstance-to-endstance part of the step ends stance phase i_step - 1;
+        # its heel-strike-to-midstance part begins stance phase i_step.
         t_store[i_step - 1] = np.concatenate(
             [t_store[i_step - 1], np.asarray(tlist_till_endstance).flatten()]
         )

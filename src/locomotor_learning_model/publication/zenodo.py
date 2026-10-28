@@ -1,4 +1,4 @@
-"""Prepare experimental figure inputs directly from the public DATA CSVs."""
+"""Prepare the experimental figure inputs from the six public DATA measurement CSVs."""
 
 from __future__ import annotations
 
@@ -28,12 +28,14 @@ SLA_PATH = "original/processedSLAData_23Subj.mat"
 EXPERIMENTAL_PATHS = frozenset(
     [f"extensions/experimental_csv/{name}" for name in CSV_NAMES] + [ENERGY_PATH, SLA_PATH]
 )
+# Belt-speed difference (m/s) and coded participant IDs of each condition.
 CONDITIONS = {"condition_1": 0.4, "condition_2": 0.7, "condition_3": 1.0}
 CONDITION_IDS = {
     "condition_1": {3, 8, 9, 10, 13, 17, 19, 23, 25},
     "condition_2": {2, 4, 7, 11, 14, 18, 21, 24, 26},
     "condition_3": {1, 5, 6, 12, 15, 16, 20, 22, 27},
 }
+# Participant IDs present in the energy, SLA and step-time/DSA CSVs.
 COHORTS = {
     "energy": set(range(1, 28)) - {19},
     "sla": set(range(1, 28)) - {11, 23, 25, 27},
@@ -42,6 +44,7 @@ COHORTS = {
 
 
 def _dataset(source: Path) -> Path:
+    """Return the DATA folder with ``processed_csv/``: ``source`` or its single subfolder."""
     if not source.is_dir():
         raise FileNotFoundError(f"Public DATA folder not found: {source}")
     if (source / "processed_csv").is_dir():
@@ -57,6 +60,17 @@ def _dataset(source: Path) -> Path:
 
 
 def _read_csv(name: str, payload: bytes) -> list[dict]:
+    """Parse and validate one public measurement CSV.
+
+    Args:
+        name: CSV file name, which identifies the modality (energy, SLA or temporal).
+        payload: Raw CSV bytes.
+
+    Returns:
+        One record per participant with ``subject_id``, ``condition``, ``values``,
+        ``source_row``, ``declared_samples`` and ``missing_terminal_samples``, sorted by
+        condition and participant ID.
+    """
     reader = csv.DictReader(io.StringIO(payload.decode("utf-8-sig")), strict=True)
     fields = reader.fieldnames or []
     fixed = ["subject_id", "condition", "speed_diff_ms"]
@@ -98,11 +112,12 @@ def _read_csv(name: str, payload: bytes) -> list[dict]:
             raise ValueError(f"{name}:{line}: nonfinite scientific values")
         if any(row[f"{prefix}{i}"].strip() for i in range(count, length)):
             raise ValueError(f"{name}:{line}: nonempty values in sample padding")
+        # Records must cover the 100-stride windows of the Figure 1 SLA analysis.
         if modality == "sla" and (
             count < 100 or (name.startswith("split") and np.ceil(count * 6 / 45) < 100)
         ):
             raise ValueError(
-                f"{name}:{line}: insufficient strides for the submitted analysis windows"
+                f"{name}:{line}: insufficient strides for the 100-stride analysis windows"
             )
         rows.append(
             {
@@ -122,6 +137,7 @@ def _read_csv(name: str, payload: bytes) -> list[dict]:
 
 
 def _mat_payload(fields: dict) -> bytes:
+    """Return compressed MAT-file bytes whose header text has no timestamp, for stable hashes."""
     stream = io.BytesIO()
     savemat(stream, fields, do_compression=True)
     payload = stream.getvalue()
@@ -130,6 +146,17 @@ def _mat_payload(fields: dict) -> bytes:
 
 
 def _arrays(tables: dict[str, list[dict]]) -> tuple[dict, dict]:
+    """Arrange parsed CSV records in the layout of the original energy and SLA MAT files.
+
+    Returns:
+        ``energy``: ``split_energy`` and ``tied1_energy``, each mapping condition to a
+        participants x samples array; ``sla``: ``{split,tied1}_sla_cond{1,2,3}`` 1 x 9
+        object arrays of column vectors, padded with empty cells.
+
+    Raises:
+        ValueError: If a tied-belt normalization baseline (mean of the final 180 samples)
+            is zero.
+    """
     energy, sla = {}, {}
     for stem, field in (("split", "split_energy"), ("tied", "tied1_energy")):
         rows = tables[f"{stem}_energy.csv"]
@@ -155,6 +182,12 @@ def _arrays(tables: dict[str, list[dict]]) -> tuple[dict, dict]:
 def _compare_existing(
     destination: Path, payloads: dict[str, bytes], energy: dict, sla: dict
 ) -> dict:
+    """Check an existing prepared dataset against the public CSVs and return its manifest.
+
+    Arrays must be equal in an experimental-only dataset. Full-precision author arrays may
+    differ from the six-decimal CSV values by at most 5.00001e-7 (half a unit in the sixth
+    decimal plus floating-point slack).
+    """
     integrity = verify_data(destination)
     if integrity["errors"]:
         raise ValueError(
@@ -170,6 +203,7 @@ def _compare_existing(
     s = loadmat(destination / SLA_PATH, squeeze_me=True, struct_as_record=False)
 
     def compare(actual, expected, label):
+        """Raise if the arrays differ in shape or by more than ``tolerance``."""
         actual, expected = np.asarray(actual), np.asarray(expected)
         if actual.shape != expected.shape or not np.allclose(
             actual, expected, rtol=0, atol=tolerance
@@ -197,7 +231,21 @@ def _compare_existing(
 
 
 def prepare_zenodo_data(source: Path, destination: Path) -> dict:
-    """Prepare six measurement CSVs or check them against existing full-precision inputs."""
+    """Prepare the public measurement CSVs, or check an existing dataset against them.
+
+    A new ``destination`` receives byte copies of the six CSVs, energy and SLA MAT files
+    built from them and a manifest; an existing ``destination`` is only checked.
+
+    Args:
+        source: Public DATA folder, or its parent when that holds a single DATA folder.
+        destination: Prepared-data folder.
+
+    Returns:
+        The manifest of the new or existing dataset.
+
+    Raises:
+        ValueError: If a CSV fails validation or conflicts with an existing ``destination``.
+    """
     source = Path(source).expanduser().resolve()
     destination = Path(destination).expanduser()
     if destination.is_symlink():
@@ -283,7 +331,7 @@ def prepare_zenodo_data(source: Path, destination: Path) -> dict:
         "schema_version": 1,
         "dataset_kind": "zenodo_experimental",
         "prepared_at": utc_now(),
-        "purpose": "Public experimental data for partial Figure 1 and S3 reproduction; model caches are absent",
+        "purpose": "Public experimental data for partial Figure 1 and Figure 2C reproduction; model caches are absent",
         "source_identity": {"kind": "public_DATA_processed_csv", "files": source_records},
         "files": entries,
         "missing_inputs": missing,
@@ -333,10 +381,10 @@ def prepare_zenodo_data(source: Path, destination: Path) -> dict:
         },
         "caveats": [
             "Input integrity does not imply complete manuscript reproduction: model fits, fall trials, supplementary model caches, Sanchez data and optimization solutions are absent.",
-            "Public CSVs are six-decimal exports; reconstruction preserves CSV values and is not byte-exact recovery of full-precision author MAT files. Source rounding is at most 0.5e-6 in measured units for the audited dataset.",
+            "Public CSVs are six-decimal exports; reconstruction preserves CSV values and is not byte-exact recovery of full-precision author MAT files. Source rounding is at most 0.5e-6 in measured units for the published dataset.",
             "Per-subject processed MAT files, raw C3D recordings and participant metadata are not copied or required for this CSV import.",
-            "Missing tied2 energy and SLA short_idx values are not synthesized; the submitted analysis uses available tied/split measurements and fractional-stride windows.",
-            "The public DSA CSV includes absent final samples in some records; their positions are retained and listed in participant_mapping, never filled or interpolated.",
+            "Missing tied2 energy and SLA short_idx values are not synthesized; the manuscript analysis uses available tied/split measurements and fractional-stride windows.",
+            "The public DSA CSV includes absent final samples in some records; their positions are retained and listed in participant_mapping, not filled or interpolated.",
         ],
     }
     destination.parent.mkdir(parents=True, exist_ok=True)

@@ -1,4 +1,4 @@
-"""Unit checks for stance dynamics, gait events, swing cost and the objective."""
+"""Unit checks of stance dynamics, gait events, swing cost, objective values and fall penalty."""
 
 import numpy as np
 import pytest
@@ -53,37 +53,88 @@ def test_detection_functions(model_parameters, angle):
     )
 
 
+# Costs computed with matlab/src/swingCostDoke.m and the parameters of loadBipedModelParameters.m.
 @pytest.mark.parametrize(
-    "duration,initial_speed,final_speed,body_speed",
+    "duration,initial_speed,final_speed,body_speed,matlab_cost",
     [
-        (0.5, 0.0, 0.1, 0.0),
-        (0.5, 0.1, 0.0, 0.0),
-        (1.0, 0.2, 0.3, 0.1),
-        (0.3, -0.1, 0.1, 0.0),
-        (0.8, 0.5, 0.5, 0.2),
+        (0.5, 0.0, 0.1, 0.0, 0.02012461179749811),
+        (0.5, 0.1, 0.0, 0.0, 0.02012461179749811),
+        (1.0, 0.2, 0.3, 0.1, 0.010062305898749053),
+        (0.3, -0.1, 0.1, 0.0, 0.10040418317978592),
+        (0.8, 0.5, 0.5, 0.2, 0.009000000000000001),
+        (0.96, -0.3276, 0.4, 0.31, 0.03664958599944431),
+        (0.02, 0.0, 0.01, 0.0, 1.1250359994240184),
     ],
 )
-def test_swing_cost_function(
-    model_parameters, duration, initial_speed, final_speed, body_speed
+def test_swing_cost_matches_matlab(
+    model_parameters, duration, initial_speed, final_speed, body_speed, matlab_cost
 ):
     fixed, _ = model_parameters
     cost = swing_cost_doke(duration, initial_speed, final_speed, body_speed, fixed)
-    assert np.isfinite(cost)
-    assert cost >= 0
+    assert cost == pytest.approx(matlab_cost, rel=1e-12, abs=0)
 
 
-@pytest.mark.parametrize("perturbation", [0.0, 0.01, 0.05, 0.1, -0.01, -0.05])
-def test_objective_function_robustness(model_parameters, perturbation):
+# Outputs for offsets added to every entry of the initial controller. The objective is
+# deterministic because the sensed-velocity noise is zero; the values agree to better than
+# 1e-14 between OpenBLAS and Accelerate builds of NumPy and SciPy.
+OBJECTIVE_REFERENCE = {
+    0.0: {
+        "objective": 0.035074851810527406,
+        "end_time": 3.7993241410053233,
+        "metabolic_power": 0.04663591093913591,
+        "periodicity_error": 0.001307915917299884,
+    },
+    0.01: {
+        "objective": 0.03840660018239915,
+        "end_time": 3.8067936229458814,
+        "metabolic_power": 0.05115850182164205,
+        "periodicity_error": 0.0033345209769652735,
+    },
+    0.05: {
+        "objective": 0.05490316898026243,
+        "end_time": 3.835614551621519,
+        "metabolic_power": 0.07307059558709247,
+        "periodicity_error": 0.030820858157076397,
+    },
+    0.1: {
+        "objective": 0.08243419768200166,
+        "end_time": 3.8813220488797824,
+        "metabolic_power": 0.10852627253574029,
+        "periodicity_error": 0.10516266759278992,
+    },
+    -0.01: {
+        "objective": 0.0320668549732573,
+        "end_time": 3.7913233841041887,
+        "metabolic_power": 0.04251205388808839,
+        "periodicity_error": 0.00121376735972464,
+    },
+    -0.05: {
+        "objective": 0.023370664548591893,
+        "end_time": 3.7483480572519916,
+        "metabolic_power": 0.030216710040515214,
+        "periodicity_error": 0.018849462494561344,
+    },
+}
+
+
+@pytest.mark.parametrize("controller_offset", list(OBJECTIVE_REFERENCE))
+def test_objective_matches_reference(model_parameters, controller_offset):
     fixed, controller = model_parameters
     parameters = load_learnable_parameters_initial(fixed)
     initial_state = load_initial_body_state(parameters)
-    objective, final_state, end_time, energy, constraint = f_objective_asymmetric_nominal(
-        parameters + perturbation, initial_state, controller, fixed, 0.0
+    objective, final_state, end_time, metabolic_power, periodicity_error = (
+        f_objective_asymmetric_nominal(
+            parameters + controller_offset, initial_state, controller, fixed, 0.0
+        )
     )
-    assert np.all(np.isfinite([objective, end_time, energy, constraint]))
+    actual = {
+        "objective": objective,
+        "end_time": end_time,
+        "metabolic_power": metabolic_power,
+        "periodicity_error": periodicity_error,
+    }
     assert np.all(np.isfinite(final_state))
-    assert objective > 0
-    assert end_time > 0
+    assert actual == pytest.approx(OBJECTIVE_REFERENCE[controller_offset], rel=1e-12, abs=0)
 
 
 @pytest.mark.parametrize("collect_diagnostics", [False, True])

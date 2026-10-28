@@ -10,7 +10,12 @@ from .workflow import run_simulation
 
 
 def _add_options(parser: argparse.ArgumentParser, command: str | None = None) -> None:
-    """Add simulation options and command-specific output defaults."""
+    """Add simulation options and command-specific output defaults.
+
+    Args:
+        parser: Parser or subcommand parser to extend.
+        command: ``"demo"``, ``"run"`` or ``"resume"``; None for the option-only parser.
+    """
     output = (
         Path("outputs") / {"demo": "demo", "run": "run", "resume": "resumed"}[command]
         if command
@@ -104,7 +109,10 @@ def _add_options(parser: argparse.ArgumentParser, command: str | None = None) ->
         "--checkpoint-every",
         type=int,
         default=25 if command else None,
-        help="Save every N completed iterations and at the end (new commands default: 25).",
+        help=(
+            "Save every N completed iterations and at the end "
+            "(default for demo, run, and resume: 25)."
+        ),
     )
     parser.add_argument(
         "--stop-after",
@@ -118,7 +126,7 @@ def _add_options(parser: argparse.ArgumentParser, command: str | None = None) ->
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Build the demo, run and resume commands."""
+    """Return the argument parser for the demo, run and resume commands."""
     parser = argparse.ArgumentParser(
         prog="loco-simulate",
         description="Run and resume baseline model examples. These are not published participant fits.",
@@ -128,7 +136,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  loco-simulate demo\n"
             "  loco-simulate run --seed 42 --iterations 100 --stop-after 40\n"
             "  loco-simulate resume outputs/run/checkpoint.npz\n\n"
-            "Use COMMAND --help for options. Existing flag-only commands remain supported."
+            "Use COMMAND --help for options. Options without a command run a single simulation."
         ),
     )
     commands = parser.add_subparsers(dest="command", required=True)
@@ -165,10 +173,23 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run the simulation from the command line."""
+    """Run the ``loco-simulate`` command line.
+
+    Arguments that start with an option rather than a command use the option-only
+    parser, which saves nothing unless ``--output-dir`` or ``--checkpoint`` is given.
+
+    Args:
+        argv: Command-line arguments without the program name; defaults to ``sys.argv[1:]``.
+
+    Returns:
+        Exit status 0. Invalid arguments, and ``ValueError`` or ``OSError`` raised by the
+        simulation, are reported through ``parser.error`` (exit status 2).
+    """
     arguments = list(sys.argv[1:] if argv is None else argv)
     if arguments and arguments[0].startswith("-") and arguments[0] not in ("-h", "--help"):
-        parser = argparse.ArgumentParser(description="Legacy flag-only simulation interface.")
+        parser = argparse.ArgumentParser(
+            description="Run one simulation from options; results are saved only on request."
+        )
         parser.set_defaults(command=None)
         _add_options(parser)
     else:

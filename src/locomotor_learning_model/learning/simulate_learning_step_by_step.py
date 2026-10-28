@@ -1,3 +1,5 @@
+"""Iteration-by-iteration learning loop and validation of its checkpoint state."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -26,7 +28,7 @@ from locomotor_learning_model.learning.gradient_of_error_from_memory_compute imp
 
 
 def safe_float(value):
-    """Convert a scalar or summed array to float; empty arrays return zero."""
+    """Return a scalar, or the sum of an array, as a float (zero for an empty array)."""
     if np.isscalar(value):
         return float(value)
 
@@ -53,16 +55,51 @@ def simulate_learning_step_by_step(
     checkpoint_every: int | None = None,
     stop_after: int | None = None,
 ) -> np.ndarray | tuple[np.ndarray, dict[str, Any]]:
-    """Run stride-by-stride adaptation of the locomotor controller.
+    """Simulate learning of the 8D controller over successive iterations.
 
-    Each iteration applies exploratory noise, updates controller parameters from
-    the estimated energy gradient, refreshes internal dynamics and energy
-    models, and adjusts context-dependent memory.
+    Each iteration (one stride) moves the accepted controller down the estimated
+    objective gradient, within a trust region if enabled, and toward the
+    controller that memory predicts for the current context. It then evaluates
+    the accepted controller plus exploratory noise. After the first
+    ``numStepsToUseForEstimator`` iterations, the internal state and objective
+    models are refit to recent iterations and give the next gradient estimate;
+    with ``shouldWeThresholdPredictionError``, the estimate is set to zero when
+    an objective-model residual exceeds ``predictionErrorThreshold``. The memory
+    slope is then updated toward the accepted controller.
+
+    Args:
+        param_fixed: Model, protocol, noise, learner and memory parameters;
+            ``_rng`` supplies the random draws.
+            ``storedmemory['controlSlopeVsContext']`` is updated in place.
+        p_input_controller_asymmetric_nominal: Initial 10D controller; entries
+            3 and 4 are not learned.
+        state_var0_model: Initial midstance state (5,).
+        context_now: Initial context, the two belt speeds (2,).
+        param_controller_gains: Controller gains and targets; updated in place.
+        return_diagnostics: Also return per-iteration diagnostics.
+        verbose: Print progress every 50 iterations.
+        resume_state: Learner state from ``checkpoint_callback`` to continue from.
+        checkpoint_callback: Called with a copy of the learner state after
+            every ``checkpoint_every`` iterations and after the last iteration.
+        checkpoint_every: Checkpoint interval in iterations.
+        stop_after: Last iteration to run; defaults to ``num_iterations``.
+
+    Returns:
+        Controllers tried in all completed iterations, shape (8, n). With
+        ``return_diagnostics``, a tuple of that array and a dict of
+        per-iteration arrays: ``objective_store`` (noisy objective),
+        ``energy_store`` (metabolic power), ``t_end_store``,
+        ``fall_penalty_store``, ``min_com_store`` and
+        ``nominal_step_length_asymmetry_store``.
+
+    Raises:
+        ValueError: If the iteration arguments or ``resume_state`` are invalid.
     """
 
     if verbose:
         print(
-            f"Simulating Learning While Walking ... ({param_fixed['num_iterations']} learning iterations)"
+            "Simulating learning while walking "
+            f"({param_fixed['num_iterations']} learning iterations)"
         )
 
     rng = param_fixed.get("_rng", np.random)
@@ -196,6 +233,8 @@ def simulate_learning_step_by_step(
         ]["controlSlopeVsContext"] @ (context_now - param_fixed["storedmemory"]["nominalContext"])
         p_input_memory_now_store.append(p_input_memory_now)
 
+        # The step toward memory has rate LearningRateTowardMemory * ((1 + c) / 2) ** power,
+        # where c is the cosine between the memory direction and the descent direction.
         dir_toward_memory = p_input_memory_now - p_input_now_considered_good
         temp = safe_float(
             np.dot(dir_toward_memory, -g_energy_gradient_now)
@@ -242,6 +281,7 @@ def simulate_learning_step_by_step(
         fall_penalty_store.append(float(param_fixed.get("_lastFallPenalty", np.nan)))
         min_com_store.append(float(param_fixed.get("_lastMinCom", np.nan)))
 
+        # Odd steps end with heel strike on belt 2, the slow belt in split walking.
         step_length_slow = abs(2 * param_fixed["leglength"] * np.sin(p_input_now_to_try[0]))
         step_length_fast = abs(2 * param_fixed["leglength"] * np.sin(p_input_now_to_try[3]))
         nominal_step_length_asymmetry_store.append(
@@ -333,6 +373,8 @@ def simulate_learning_step_by_step(
             context_now,
         )
 
+        # The memory-slope update has the same form, with c the cosine between the
+        # controller's motion and the direction from memory to the controller.
         n_memory_to_current_controller = -dir_toward_memory
         n_memory_to_current_controller = n_memory_to_current_controller / (
             np.linalg.norm(n_memory_to_current_controller) + 1e-8
@@ -374,8 +416,7 @@ def simulate_learning_step_by_step(
         context_now = np.array([v_a, v_b])
         context_now = context_now + param_fixed["noiseEnergySensory"] * rng.randn()
 
-        # The boundary is after learning, memory, environment and RNG updates.
-        # Save before post-processing, whose replay consumes its own random draws.
+        # Checkpoint after all updates and random draws of this iteration.
         if checkpoint_callback is not None and (
             i_stride == limit or (checkpoint_every is not None and i_stride % checkpoint_every == 0)
         ):
@@ -404,6 +445,7 @@ def simulate_learning_step_by_step(
     return controller_history, diagnostics
 
 
+# Learner state saved in checkpoints; entries from index 7 are per-iteration histories.
 _STATE_FIELDS = (
     "t_start",
     "context_now",
@@ -438,7 +480,15 @@ _STATE_FIELDS = (
 
 
 def validate_learning_state(state: dict[str, Any], param_fixed: dict[str, Any]) -> None:
-    """Reject malformed checkpoints before continuing a learned trajectory."""
+    """Check that a learner checkpoint state is complete and consistent.
+
+    Args:
+        state: Learner state passed to ``checkpoint_callback``.
+        param_fixed: Parameters of the run to be continued.
+
+    Raises:
+        ValueError: If fields, shapes, history lengths or times are invalid.
+    """
     if not isinstance(state, dict) or set(state) != set(_STATE_FIELDS) | {"completed_iterations"}:
         raise ValueError("Checkpoint learner state fields are incomplete or unsupported")
     n = state["completed_iterations"]

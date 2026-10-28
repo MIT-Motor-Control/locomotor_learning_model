@@ -1,3 +1,5 @@
+"""Windowed least-squares refit of the linear internal models."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -8,10 +10,11 @@ def _pivoted_basic_lstsq(
     input_now_store: np.ndarray,
     output_next_store: np.ndarray,
 ) -> np.ndarray:
-    """Solve a least-squares system with a pivoted basic solution.
+    """Return the basic least-squares solution of ``input @ X = output``.
 
-    The rolling estimator can become rank deficient, so pivoted QR is used to
-    select a consistent subset of independent columns before solving.
+    QR with column pivoting gives zero coefficients to linearly dependent
+    columns of a rank-deficient window, as MATLAB's backslash operator does,
+    rather than returning the minimum-norm solution.
     """
 
     q_factor, r_factor, pivot = qr(input_now_store, mode="economic", pivoting=True)
@@ -40,15 +43,30 @@ def rlsupdate(
     mu_measurement: float,
     num_steps_to_use: int,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Update a rolling linear model from recent input/output histories.
+    """Refit a linear model with intercept to the most recent observations.
 
-    ``beta`` and ``mu_measurement`` are retained for API compatibility; the
-    estimate uses a finite window without exponential forgetting.
+    The model ``output = A @ [input; 1]`` is refit by least squares over the
+    last ``num_steps_to_use`` columns each call.
+
+    Args:
+        aold: Previous coefficients, shape (n_outputs, n_inputs + 1); used only
+            to compute its prediction error.
+        beta: Unused; the fit has no exponential forgetting.
+        input_now_store: Inputs, shape (n_inputs, n_samples), one column per stride.
+        output_next_store: Outputs, shape (n_outputs, n_samples), or 1D for a
+            single output.
+        mu_measurement: Unused; the fit has no measurement weighting.
+        num_steps_to_use: Number of most recent columns in the fit.
+
+    Returns:
+        Tuple ``(anew, error_old, error_new)``: refit coefficients, shape
+        (n_outputs, n_inputs + 1) with the intercept in the last column, and the
+        residuals of ``aold`` and ``anew`` on the most recent sample, each of
+        shape (n_outputs, 1).
     """
 
-    # History columns correspond to successive strides.
     input_now_store = input_now_store[:, -num_steps_to_use:]
-    
+
     if output_next_store.ndim == 1:
         output_next_store = output_next_store[-num_steps_to_use:]
         output_next_store = output_next_store.reshape(1, -1)

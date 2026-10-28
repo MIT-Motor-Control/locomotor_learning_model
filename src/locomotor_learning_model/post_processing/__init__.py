@@ -1,4 +1,4 @@
-"""Post-processing module for learning simulation results."""
+"""Replay of learned controllers, gait summaries and metabolic-rate filtering."""
 
 from .convert_met_to_vo2 import convert_met_to_vo2
 from .post_process_after_learning import post_process_after_learning

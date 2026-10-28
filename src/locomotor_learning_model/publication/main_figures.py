@@ -1,4 +1,7 @@
-"""Portable cached-data reproduction of main figures and landscape slices."""
+"""Reproduce Figures 1, 3 and 4 and the fall-risk landscape slices from cached data.
+
+The renderer ``s3`` produces the landscape slices of Supplementary Figure 3.
+"""
 
 from __future__ import annotations
 
@@ -18,22 +21,27 @@ from scipy.stats import (
     t,
     ttest_ind,
     ttest_rel,
+    wilcoxon,
 )
 
 from .trajectory import trajectory_source_tables
 
 SPEEDS = (0.4, 0.7, 1.0)
+# Rounded trajectory-optimization predictions plotted in Figure 1C/D: energy change (%)
+# from the tied-belt cost of 3.147 W/kg and SLA change (percentage points).
 OPT_SPEEDS = np.array([0.2, 0.4, 0.6, 0.8, 1.0])
 OPT_ENERGY = (np.array([3.161, 3.183, 3.138, 3.046, 2.968]) - 3.147) / 3.147 * 100
 OPT_SLA = np.array([11.268, 16.814, 23.186, 29.740, 42.391])
 
 
 def _mat(path: Path, **kwargs) -> dict:
+    """Load a MAT file with MATLAB structs as attribute objects."""
     with path.open("rb") as stream:
         return loadmat(stream, struct_as_record=False, squeeze_me=True, **kwargs)
 
 
 def _csv(root: Path, name: str, rows: list[dict]) -> str:
+    """Write nonempty ``rows`` to ``root/tables/<name>.csv`` and return the resolved path."""
     if not rows:
         raise ValueError(f"Refusing to export an empty source table: {name}")
     path = root / "tables" / f"{name}.csv"
@@ -46,6 +54,7 @@ def _csv(root: Path, name: str, rows: list[dict]) -> str:
 
 
 def _plotting():
+    """Return ``pyplot`` set up for headless rendering with editable vector text."""
     import matplotlib
 
     matplotlib.use("Agg")
@@ -65,6 +74,7 @@ def _plotting():
 
 
 def _save(root: Path, name: str, figure) -> list[str]:
+    """Save ``figure`` as PNG, PDF and SVG in ``root/figures``, close it, return the paths."""
     from matplotlib import pyplot as plt
 
     folder = root / "figures"
@@ -79,6 +89,7 @@ def _save(root: Path, name: str, figure) -> list[str]:
 
 
 def _record(identifier, status="passed", outputs=None, caveats=None, details=None):
+    """Return a figure result record for the reproduction report."""
     return {
         "id": identifier,
         "status": status,
@@ -89,7 +100,18 @@ def _record(identifier, status="passed", outputs=None, caveats=None, details=Non
 
 
 def matlab_box_summary(values) -> dict:
-    """Match MATLAB boxplot midpoint percentiles and its 1.5-IQR whiskers."""
+    """Return MATLAB ``boxplot`` statistics for one group.
+
+    Quartiles use midpoint (Hazen) interpolation, as MATLAB ``prctile`` does. Whiskers
+    extend to the most extreme values within 1.5 IQR of the box.
+
+    Args:
+        values: Finite, nonempty one-dimensional participant values.
+
+    Returns:
+        Dict with ``n``, ``q1``, ``median``, ``q3``, ``whisker_low``, ``whisker_high`` and
+        the number of ``hidden_outliers`` beyond the whiskers.
+    """
     values = np.asarray(values, dtype=float)
     if values.ndim != 1 or not len(values) or not np.isfinite(values).all():
         raise ValueError("Boxplots need finite, nonempty one-dimensional participant data")
@@ -107,6 +129,7 @@ def matlab_box_summary(values) -> dict:
 
 
 def _boxes(axis, groups, positions, widths=0.5) -> list[dict]:
+    """Draw MATLAB-style box plots without outliers on ``axis``; return their summaries."""
     summaries = [matlab_box_summary(group) for group in groups]
     axis.bxp(
         [
@@ -130,7 +153,21 @@ def _boxes(axis, groups, positions, widths=0.5) -> list[dict]:
 
 
 def figure1_tables(data_root: Path) -> dict[str, list[dict]]:
-    """Summarize experimental energy and symmetry by condition and exposure."""
+    """Tabulate Figure 1C-E experimental energy and SLA changes and the Figure 1E tests.
+
+    Energy (1 Hz) is compared with the mean of the last 3 tied-belt minutes; the short and
+    long exposures are split-belt minutes 3-6 and 42-45. SLA changes compare 100-stride
+    means with the last 100 tied strides; the short SLA window ends at stride
+    ceil(6/45 x split strides) and the long window is the last 100 strides. Figure 1E compares
+    each 3-minute mean with the preceding one by a two-sided paired t-test.
+
+    Args:
+        data_root: Prepared publication data directory.
+
+    Returns:
+        Dict of row lists keyed by ``energy_participants``, ``sla_participants``,
+        ``energy_timeseries``, ``paired_tests`` and ``optimization``.
+    """
     original = Path(data_root) / "original"
     energy = _mat(original / "data/cosmed/processed/processedEnergyData.mat")
     sla = _mat(original / "processedSLAData_23Subj.mat")
@@ -192,7 +229,7 @@ def figure1_tables(data_root: Path) -> dict[str, list[dict]]:
                     "df": ne - 1,
                     "p_two_sided": float(test.pvalue),
                     "significant_p_lt_005": bool(test.pvalue < 0.05),
-                    "correction": "none (submitted Methods)",
+                    "correction": "none",
                 }
             )
         split_sla = np.atleast_1d(sla[f"split_sla_cond{condition}"])
@@ -204,7 +241,7 @@ def figure1_tables(data_root: Path) -> dict[str, list[dict]]:
             s, t = np.asarray(split_sla[index]).ravel(), np.asarray(tied_sla[index]).ravel()
             end = int(np.ceil(6 / 45 * len(s)))
             if end < 100 or len(t) < 100 or not np.isfinite(s).all() or not np.isfinite(t).all():
-                raise ValueError("SLA record cannot support the submitted 100-stride windows")
+                raise ValueError("SLA record is too short or nonfinite for the 100-stride windows")
             baseline_sla = float(t[-100:].mean() * 100)
             for label, values in (
                 ("short_6_min_fractional_stride", s[end - 100 : end]),
@@ -230,7 +267,10 @@ def figure1_tables(data_root: Path) -> dict[str, list[dict]]:
             "tied_energy_w_kg": 3.147,
             "energy_change_pct": float(e),
             "sla_change_percentage_points": float(s),
-            "source": "Rounded five-condition values from the submitted plotting script; retained separately from the available OpenSim source subset",
+            "source": (
+                "Rounded trajectory-optimization values plotted in Figure 1C/D; "
+                "independent of the OpenSim source subset"
+            ),
         }
         for speed, e, s in zip(OPT_SPEEDS, OPT_ENERGY, OPT_SLA)
     ]
@@ -244,6 +284,12 @@ def figure1_tables(data_root: Path) -> dict[str, list[dict]]:
 
 
 def _sanchez(data_root: Path) -> list[dict]:
+    """Return short and long energy and SLA changes for the 15 Sánchez et al. (2021) participants.
+
+    Baselines are the last 100 tied samples. The short window is the 100 samples ending at
+    round(6/45 x energy samples), or the first 100 samples if fewer precede it, and is
+    applied to both signals. The long window is the last 100 samples of each signal.
+    """
     folder = data_root / "original/data/sanchez data"
     energy = _mat(folder / "sanchez_energy.mat")["MetabolicPower"]
     sla = _mat(folder / "sanchez_sla.mat")["StepLengthAsymmetry"]
@@ -258,7 +304,7 @@ def _sanchez(data_root: Path) -> list[dict]:
         end = int(np.floor(6 / 45 * len(es) + 0.5))
         window = slice(end - 100, end) if end > 100 else slice(0, 100)
         if max(window.stop, 100) > min(len(es), len(ss)) or eb == 0:
-            raise ValueError("Sanchez input does not support the submitted windows")
+            raise ValueError("Sanchez input is too short for its windows or has a zero baseline")
         for label, w in (("short_6_min", window), ("long_45_min", slice(-100, None))):
             rows.append(
                 {
@@ -287,16 +333,21 @@ def _sanchez(data_root: Path) -> list[dict]:
 
 
 def _figure1(data_root: Path, output_root: Path) -> dict:
+    """Export Figure 1C-E tables and plots; 1C/D are partial without the Sánchez inputs."""
     tables = figure1_tables(data_root)
     outputs = [_csv(output_root, f"figure1_{name}", rows) for name, rows in tables.items()]
     caveats = [
         "Participant indices identify ordering within each condition, not global participant IDs.",
         (
-            "Short SLA uses ceil(6/45 × total strides), preserving the submitted script's approximation; "
-            "stored short_idx variables are not used."
+            "Short SLA uses the 100 strides ending at stride ceil(6/45 × total strides), "
+            "a stride-count approximation of the 6-minute point; stored short_idx variables "
+            "are not used."
         ),
-        "The five optimization points retain the submitted script's rounded constants; saved-source subset calculations are exported separately when available.",
-        "Fig 1E tests are two-sided paired t-tests without multiplicity correction, as submitted.",
+        "The five trajectory-optimization points are fixed rounded values, not recomputed here.",
+        (
+            "Figure 1E tests are two-sided paired t-tests between adjacent time points, without "
+            "multiplicity correction."
+        ),
     ]
     missing = [
         name
@@ -307,17 +358,19 @@ def _figure1(data_root: Path, output_root: Path) -> dict:
     if sanchez:
         outputs.append(_csv(output_root, "figure1_sanchez_participants", sanchez))
         caveats.append(
-            "Sánchez short exposure uses the same energy-derived sample indices for energy and SLA, "
-            "preserving the source script even though the two signals have different sample counts."
+            "Sánchez short exposure applies the energy-derived sample indices to both energy and "
+            "SLA, as in the original analysis, although the two signals have different sample "
+            "counts."
         )
     else:
-        caveats.append("Sanchez comparison inputs are missing; Fig 1C/D are explicitly partial.")
+        caveats.append("Sánchez comparison inputs are missing; Figures 1C and 1D are partial.")
     trajectory = trajectory_source_tables(data_root)
     if trajectory:
         outputs.append(_csv(output_root, "figure1_optimization_source_subset", trajectory))
         caveats.append(
-            "The saved optimization subset covers tied/0.4/0.7/1.0 m/s and does not recover the "
-            "plotted five-condition constants; it is evaluated without replacing those points."
+            "The saved OpenSim outputs cover tied, 0.4, 0.7 and 1.0 m/s and do not reproduce "
+            "the five plotted constants; their energy values are exported separately and are "
+            "not plotted."
         )
     plt = _plotting()
     fig, axes = plt.subplots(2, 3, figsize=(11, 6.5))
@@ -381,7 +434,7 @@ def _figure1(data_root: Path, output_root: Path) -> dict:
         for axis in axes[row]:
             axis.set_xlabel("Belt-speed difference (m/s)")
             axis.set_ylabel(ylabel)
-    fig.suptitle("Figure 1C/D" + (" — PARTIAL: Sánchez comparison unavailable" if missing else ""))
+    fig.suptitle("Figure 1C/D" + (" (partial: Sánchez comparison unavailable)" if missing else ""))
     fig.tight_layout()
     outputs += _save(output_root, "figure1_cd", fig)
     outputs.append(_csv(output_root, "figure1_cd_summary", summaries))
@@ -413,7 +466,7 @@ def _figure1(data_root: Path, output_root: Path) -> dict:
         axis.set_xlabel("Time (min)")
     axes[0].set_ylabel("Metabolic cost (W/kg)")
     axes[0].set_ylim(top=max(r["metabolic_cost_w_kg"] for r in tables["energy_timeseries"]) + 0.7)
-    fig.suptitle("Figure 1E — three-minute means and adjacent paired tests")
+    fig.suptitle("Figure 1E: three-minute means and adjacent paired tests")
     fig.tight_layout()
     outputs += _save(output_root, "figure1_e", fig)
     outputs.append(_csv(output_root, "figure1_e_box_summary", box_rows))
@@ -441,6 +494,14 @@ def _figure1(data_root: Path, output_root: Path) -> dict:
 
 
 def fall_filename(speed: float, rate: float, trial: int) -> str:
+    """Return the cached Figure 3 trial filename.
+
+    Args:
+        speed: Belt-speed difference (m/s); the name stores belt speeds 1 - speed/2 and
+            1 + speed/2.
+        rate: Learning rate α.
+        trial: Trial number, 1-50.
+    """
     return (
         f"model_split45_trans20_slow{1 - speed / 2:g}_fast{1 + speed / 2:g}_noise0.01_"
         f"learning{rate:g}_energysym1_swingcost1_trial{trial}.mat"
@@ -448,7 +509,22 @@ def fall_filename(speed: float, rate: float, trial: int) -> str:
 
 
 def fall_tables(data_root: Path) -> tuple[list[dict], list[dict]]:
-    """Load the complete set of fall-probability trials."""
+    """Load all 1,750 Figure 3 fall-probability trials at ψ = 0.
+
+    The grid is 7 belt-speed differences x 5 learning rates x 50 trials. ``fall_flag``
+    holds (fell, fall stride); a fall recorded at stride 0 takes its stride from the
+    length of ``time``.
+
+    Args:
+        data_root: Prepared publication data directory.
+
+    Returns:
+        Tuple of per-trial rows and per-cell rows with fall counts, probabilities and mean
+        strides until fall.
+
+    Raises:
+        FileNotFoundError: If any trial file is missing.
+    """
     folder = Path(data_root) / "fall_probability"
     speeds, rates = (0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0), (0.01, 0.02, 0.03, 0.04, 0.05)
     expected = [
@@ -503,7 +579,20 @@ def fall_tables(data_root: Path) -> tuple[list[dict], list[dict]]:
 
 
 def fit_exp1(x, y) -> dict:
-    """Unweighted nonlinear least squares for the submitted ``a*exp(b*x)`` model."""
+    """Fit ``y = a * exp(b * x)`` by unweighted nonlinear least squares.
+
+    The fit is parameterized by log(a). It starts from a log-linear fit and from five
+    fixed slopes and keeps the converged solution with the lowest cost.
+
+    Args:
+        x: Belt-speed differences (m/s); at least three values, not all equal.
+        y: Positive mean strides until fall at each ``x``.
+
+    Returns:
+        Dict with ``a``, ``b``, ``sse``, ``rmse``, ``rmse_df_adjusted`` (sqrt(SSE / (n - 2))),
+        ``n``, ``residuals`` (fitted minus observed) and ``objective`` and ``model``
+        descriptions.
+    """
     x, y = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
     if (
         x.shape != y.shape
@@ -517,9 +606,11 @@ def fit_exp1(x, y) -> dict:
         raise ValueError("exp1 requires positive mean fall strides and distinct speeds")
 
     def residual(parameters):
+        """Return fitted minus observed strides for parameters (log a, b)."""
         return np.exp(parameters[0] + parameters[1] * x) - y
 
     def jacobian(parameters):
+        """Return the residual Jacobian with respect to (log a, b)."""
         prediction = np.exp(parameters[0] + parameters[1] * x)
         return np.column_stack((prediction, x * prediction))
 
@@ -566,6 +657,7 @@ def fit_exp1(x, y) -> dict:
 
 
 def _figure3(data_root: Path, output_root: Path) -> dict:
+    """Export Figure 3B-D tables and plots from the cached fall trials."""
     trials, summary = fall_tables(data_root)
     outputs = [
         _csv(output_root, "figure3_trials", trials),
@@ -587,11 +679,13 @@ def _figure3(data_root: Path, output_root: Path) -> dict:
         ylabel="Fall probability",
         xlim=(0.35, 1.05),
         ylim=(-0.05, 1.05),
-        title="Figure 3C — 50 trials per cell; ψ = 0",
+        title="Figure 3C: 50 trials per cell; ψ = 0",
     )
     axis.legend(frameon=False)
     outputs += _save(output_root, "figure3_c", fig)
 
+    # Figure 3B examples at α = 0.05, searching 0.9 then 1.0 m/s in trial order: the first
+    # fall after stride 1000 and the first trial without a fall.
     examples = []
     for speed in (0.9, 1.0):
         for trial in range(1, 51):
@@ -629,8 +723,9 @@ def _figure3(data_root: Path, output_root: Path) -> dict:
             "that display range, remain in the source table and exponential-fit inputs."
         ),
         (
-            "Figure 3D preserves the source exp1 model and unweighted nonlinear least-squares objective on cell means. "
-            "A portable SciPy solver is used; the original MATLAB Curve Fitting solver is unavailable and byte-identical coefficients are not claimed."
+            "Figure 3D fits the exp1 model a*exp(b*x) to cell means by unweighted nonlinear "
+            "least squares. SciPy replaces the MATLAB Curve Fitting Toolbox solver, so "
+            "bit-identical coefficients are not claimed."
         ),
     ]
     panels = {"3C": "passed", "3D": "passed", "3B": "passed" if len(examples) == 2 else "blocked"}
@@ -658,7 +753,7 @@ def _figure3(data_root: Path, output_root: Path) -> dict:
                 ylim=(0, 1.1),
                 xlim=(0, 2500) if kind == "fall" else (0, 2000),
             )
-        fig.suptitle("Figure 3B — original representative-trial selection")
+        fig.suptitle("Figure 3B: original representative-trial selection")
         fig.tight_layout()
         outputs += [_csv(output_root, "figure3_b_traces", example_rows)] + _save(
             output_root, "figure3_b", fig
@@ -715,7 +810,7 @@ def _figure3(data_root: Path, output_root: Path) -> dict:
             xlim=(0.35, 1.05),
             ylim=(0, 2000),
         )
-    fig.suptitle("Figure 3D — original exponential model fitted to the seven cell means")
+    fig.suptitle("Figure 3D: original exponential model fitted to the seven cell means")
     fig.tight_layout()
     outputs += [
         _csv(output_root, "figure3_d_fit_inputs", rows_d),
@@ -738,6 +833,15 @@ def _figure3(data_root: Path, output_root: Path) -> dict:
 
 
 def landscape_data(data_root: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Load the original Figure 4 fall-risk landscape.
+
+    Args:
+        data_root: Prepared publication data directory.
+
+    Returns:
+        Tuple of learning rates α, ascending symmetry weights ψ = 1 - sym_cost, and fall
+        probabilities (%) with shape (len(α), len(ψ), 3) for 0.4, 0.7 and 1.0 m/s.
+    """
     value = _mat(Path(data_root) / "original/iso_fall_risk_heat_map.mat")
     alpha = np.asarray(value["learning_pool"], dtype=float).ravel()
     cost = np.asarray(value["sym_cost_pool"], dtype=float).ravel()
@@ -754,7 +858,20 @@ def landscape_data(data_root: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray]
 
 
 def _rank_sum_probability(x, y, alternative: str) -> tuple[float, float, str]:
-    """Match MATLAB ranksum's small-sample exact test, including tied ranks."""
+    """Return the one-sided Wilcoxon rank-sum test of ``x`` against ``y`` as MATLAB ``ranksum``.
+
+    The exact distribution of average ranks, including ties, is used when
+    min(n_x, n_y) < 10 and n_x + n_y < 20; otherwise the normal approximation with tie
+    and continuity corrections.
+
+    Args:
+        x: First sample; its rank sum is the statistic.
+        y: Second sample.
+        alternative: ``"greater"`` or ``"less"``.
+
+    Returns:
+        Tuple of rank sum of ``x``, p-value and method description.
+    """
     x, y = np.asarray(x), np.asarray(y)
     ranks = rankdata(np.concatenate([x, y]))
     observed = float(ranks[: len(x)].sum())
@@ -767,7 +884,19 @@ def _rank_sum_probability(x, y, alternative: str) -> tuple[float, float, str]:
 
 
 def parameter_statistics(data_root: Path) -> dict[str, list[dict]]:
-    """Compare fitted alpha and psi across independent participant cohorts."""
+    """Compare fitted α and ψ across the independent 8/9/9 participant cohorts.
+
+    For the original fits and, when present, the regenerated fits, each parameter is tested
+    by Kruskal-Wallis, one-way ANOVA and a linear trend on belt-speed difference, and by
+    one-sided 0.4 vs 1.0 m/s t and rank-sum tests (α greater, ψ smaller at 0.4 m/s).
+    No multiplicity correction is applied.
+
+    Args:
+        data_root: Prepared publication data directory.
+
+    Returns:
+        Dict with ``parameter_summary`` and ``parameter_tests`` row lists.
+    """
     summaries, tests = [], []
     for source in ("original", "regenerated"):
         path = Path(data_root) / source / "2d_sweep_trial50_param_result.mat"
@@ -819,7 +948,7 @@ def parameter_statistics(data_root: Path) -> dict[str, list[dict]]:
                 "n_07": 9,
                 "n_10": 9,
                 "sampling_unit": "participant, independent condition cohorts",
-                "multiplicity_correction": "none, matching supplied analysis",
+                "multiplicity_correction": "none",
             }
             kw = kruskal(*groups)
             anova = f_oneway(*groups)
@@ -889,7 +1018,74 @@ def parameter_statistics(data_root: Path) -> dict[str, list[dict]]:
     return {"parameter_summary": summaries, "parameter_tests": tests}
 
 
+def fall_probability_tests(alpha, psi, rates, fitted) -> list[dict]:
+    """Test whether each participant's fitted parameters are riskier at larger speed differences.
+
+    For the participants of each condition, the fall probability at their fitted (α, ψ) grid
+    cell on their own condition's landscape is paired with the probability at the same cell
+    on each landscape of a larger belt-speed difference, and compared with a Wilcoxon
+    signed-rank test.
+
+    Args:
+        alpha: Landscape learning rates.
+        psi: Landscape symmetry weights.
+        rates: Fall probabilities (%), shape (len(alpha), len(psi), 3).
+        fitted: Per condition, a pair of arrays (learning rates, symmetry weights).
+
+    Returns:
+        One row per (fitted condition, larger landscape) pair with means, counts and p-values.
+
+    Raises:
+        ValueError: If a fitted parameter does not lie on the landscape grid.
+    """
+    rows = []
+    for c, (lr, sym) in enumerate(fitted):
+        cells = []
+        for a, p in zip(lr, sym):
+            i, j = np.flatnonzero(np.isclose(alpha, a)), np.flatnonzero(np.isclose(psi, p))
+            if len(i) != 1 or len(j) != 1:
+                raise ValueError("A fitted parameter pair is not on the fall-risk landscape grid")
+            cells.append((i[0], j[0]))
+        own = np.array([rates[i, j, c] for i, j in cells])
+        for larger in range(c + 1, len(SPEEDS)):
+            other = np.array([rates[i, j, larger] for i, j in cells])
+            one_sided = wilcoxon(other, own, alternative="greater")
+            two_sided = wilcoxon(other, own)
+            rows.append(
+                {
+                    "fitted_delta_mps": SPEEDS[c],
+                    "landscape_delta_mps": SPEEDS[larger],
+                    "n": len(own),
+                    "mean_own_landscape_pct": float(own.mean()),
+                    "mean_larger_landscape_pct": float(other.mean()),
+                    "n_increased": int(np.sum(other > own)),
+                    "n_equal": int(np.sum(other == own)),
+                    "n_decreased": int(np.sum(other < own)),
+                    "wilcoxon_statistic": float(one_sided.statistic),
+                    "p_one_sided_greater": float(one_sided.pvalue),
+                    "p_two_sided": float(two_sided.pvalue),
+                    "method": "paired Wilcoxon signed-rank, scipy.stats.wilcoxon",
+                }
+            )
+    return rows
+
+
 def landscape_tables(data_root: Path) -> dict[str, list[dict]]:
+    """Tabulate the Figure 4 landscape, participant fits and ellipse fall risk.
+
+    Each condition's ellipse is centered at the participant medians of ψ and α, with
+    semi-axes equal to their standard errors of the mean. Its fall risk is the mean
+    probability of the grid nodes inside it, evaluated on its own landscape and on those of
+    larger belt-speed differences, and rounded half up for display.
+
+    Args:
+        data_root: Prepared publication data directory.
+
+    Returns:
+        Dict of row lists: ``landscape``, ``participant_parameters``, ``ellipses``,
+        ``ellipse_risk``, ``fall_probability_tests`` and the tables of
+        ``parameter_statistics``.
+    """
     alpha, psi, rates = landscape_data(data_root)
     grid = [
         {
@@ -905,13 +1101,14 @@ def landscape_tables(data_root: Path) -> dict[str, list[dict]]:
     value = _mat(Path(data_root) / "original/2d_sweep_trial50_param_result.mat")
     n = np.asarray(value["exp_subj_num"]).ravel().astype(int)
     parameters = np.asarray(value["static_params"])
-    participants, ellipses, risks = [], [], []
+    participants, ellipses, risks, fitted = [], [], [], []
     x, y = np.meshgrid(psi, alpha)
     for c, speed in enumerate(SPEEDS):
         lr = np.array([parameters[c, s].learning_rate for s in range(n[c])], dtype=float)
         sym = 1 - np.array([parameters[c, s].sym_cost for s in range(n[c])], dtype=float)
         if not np.isfinite(lr).all() or not np.isfinite(sym).all():
             raise ValueError("Non-finite fitted parameters")
+        fitted.append((lr, sym))
         cx, cy = float(np.median(sym)), float(np.median(lr))
         rx, ry = float(sym.std(ddof=1) / np.sqrt(n[c])), float(lr.std(ddof=1) / np.sqrt(n[c]))
         if rx == 0 or ry == 0:
@@ -958,11 +1155,13 @@ def landscape_tables(data_root: Path) -> dict[str, list[dict]]:
         "participant_parameters": participants,
         "ellipses": ellipses,
         "ellipse_risk": risks,
+        "fall_probability_tests": fall_probability_tests(alpha, psi, rates, fitted),
         **parameter_statistics(data_root),
     }
 
 
 def _figure4(data_root: Path, output_root: Path) -> dict:
+    """Export Figure 4 tables and the landscape plot with parameter ellipses."""
     tables = landscape_tables(data_root)
     outputs = [_csv(output_root, f"figure4_{key}", rows) for key, rows in tables.items()]
     alpha, psi, rates = landscape_data(data_root)
@@ -1005,7 +1204,7 @@ def _figure4(data_root: Path, output_root: Path) -> dict:
         )
     axes[0].set_ylabel("Learning rate α")
     fig.colorbar(display, ax=axes, label="Fall probability", fraction=0.025, pad=0.03)
-    fig.suptitle("Figure 4 — original cached landscape and inferred parameter regions")
+    fig.suptitle("Figure 4: original cached landscape and inferred parameter regions")
     outputs += _save(output_root, "figure4", fig)
     return _record(
         "figure4",
@@ -1014,9 +1213,17 @@ def _figure4(data_root: Path, output_root: Path) -> dict:
         [
             "Original cached landscape; raw trial counts, seeds and simulation revision are absent from its MAT metadata.",
             "Ellipse values are arithmetic means of included grid nodes, not significance tests.",
-            "Across-condition tests compare fitted participant learning rates and symmetry weights; they do not test the gray/red ellipse fall-probability comparison.",
-            "The manuscript risk-comparison p<.05 claim cannot be reproduced from the supplied analysis; no p-value is invented.",
-            "Styling is portable; original manual Figma arrows and MATLAB colormap are not reproduced.",
+            (
+                "The increase in fall probability for unchanged parameters is tested per "
+                "participant: fall probability at the fitted grid cell on the own-condition "
+                "landscape versus each larger belt-speed landscape, paired Wilcoxon signed-rank "
+                "test (figure4_fall_probability_tests.csv)."
+            ),
+            "Across-condition parameter tests compare fitted learning rates and symmetry weights.",
+            (
+                "The manually drawn arrows and MATLAB colormap of the published figure are not "
+                "reproduced."
+            ),
         ],
         {
             "grid_shape": list(rates.shape),
@@ -1031,6 +1238,14 @@ def _figure4(data_root: Path, output_root: Path) -> dict:
                 for r in tables["parameter_tests"]
                 if r["test"] == "kruskal_wallis"
             ],
+            "fall_probability_tests": [
+                {
+                    "fitted_delta_mps": r["fitted_delta_mps"],
+                    "landscape_delta_mps": r["landscape_delta_mps"],
+                    "p_one_sided_greater": r["p_one_sided_greater"],
+                }
+                for r in tables["fall_probability_tests"]
+            ],
             "current_ellipse_displayed_pct": [
                 r["displayed_integer_pct"]
                 for r in tables["ellipse_risk"]
@@ -1040,10 +1255,12 @@ def _figure4(data_root: Path, output_root: Path) -> dict:
     )
 
 
-def _s4(data_root: Path, output_root: Path) -> dict:
+def _s3(data_root: Path, output_root: Path) -> dict:
+    """Export Supplementary Figure 3: fall risk versus ψ at fixed α and versus α at fixed ψ."""
     alpha, psi, rates = landscape_data(data_root)
     if rates.shape != (20, 20, 3):
-        raise ValueError("S4 requires the original 20 × 20 × 3 landscape")
+        raise ValueError("Supplementary Figure 3 requires the original 20 × 20 × 3 landscape")
+    # Grid indices of the fixed α and ψ values in the original plotting script.
     ai, pi = [0, 2, 6, 15], [0, 9, 19]
     rows, summary = [], []
     plt = _plotting()
@@ -1096,19 +1313,22 @@ def _s4(data_root: Path, output_root: Path) -> dict:
             axes[row, c].legend(frameon=False, fontsize=7)
     axes[0, 0].set_ylabel("Fall probability (%)")
     axes[1, 0].set_ylabel("Fall probability (%)")
-    fig.suptitle("Supplementary Figure 4 — slices of the original cached landscape")
+    fig.suptitle("Supplementary Figure 3: slices of the original cached landscape")
     fig.tight_layout()
     outputs = [
-        _csv(output_root, "s4_plotted_points", rows),
-        _csv(output_root, "s4_endpoint_summary", summary),
+        _csv(output_root, "s3_plotted_points", rows),
+        _csv(output_root, "s3_endpoint_summary", summary),
     ]
-    outputs += _save(output_root, "s4", fig)
+    outputs += _save(output_root, "s3_fall_risk_slices", fig)
     return _record(
-        "s4",
+        "s3",
         "passed",
         outputs,
         [
-            "The submitted script's exact grid indices are preserved; actual parameter values are exported.",
+            (
+                "Slices use the grid indices of the original plotting script; the corresponding "
+                "parameter values are exported."
+            ),
             "Cached probabilities are reproduced without assuming unrecorded trial counts or seeds.",
         ],
         {"plotted_points": len(rows), "summary_rows": len(summary)},
@@ -1116,9 +1336,22 @@ def _s4(data_root: Path, output_root: Path) -> dict:
 
 
 def render_main(data_root: Path, output_root: Path, figures: list[str] | None = None) -> list[dict]:
-    """Render supported figures and explicit partials, reporting missing inputs."""
+    """Render Figures 1, 3 and 4 and the Supplementary Figure 3 landscape slices (``s3``).
+
+    Args:
+        data_root: Prepared publication data directory.
+        output_root: Directory that receives ``figures/`` and ``tables/``.
+        figures: Subset of ``figure1``, ``figure3``, ``figure4`` and ``s3``; all if None.
+
+    Returns:
+        One result record per figure. A figure with missing inputs is recorded as
+        ``blocked``; other errors propagate.
+
+    Raises:
+        ValueError: If ``figures`` names an unknown figure.
+    """
     data_root, output_root = Path(data_root), Path(output_root)
-    functions = {"figure1": _figure1, "figure3": _figure3, "figure4": _figure4, "s4": _s4}
+    functions = {"figure1": _figure1, "figure3": _figure3, "figure4": _figure4, "s3": _s3}
     selected = list(functions) if figures is None else list(figures)
     unknown = set(selected) - functions.keys()
     if unknown:

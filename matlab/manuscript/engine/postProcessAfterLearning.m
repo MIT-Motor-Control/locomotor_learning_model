@@ -1,6 +1,10 @@
 function [time_list, sla_list, sta_list, energy_list, steptime_fast, steptime_slow, stepLength_fast, stepLength_slow] = postProcessAfterLearning(pInputStore,stateVar0_Model, ...
     paramController,paramFixed,delta,SwingCostCoeff)
-% Replay learned controllers and assemble gait and energy time series.
+% Replay the evaluated controllers to assemble gait and energy time series.
+% Inputs:  pInputStore - 10 x N controller targets, one column per iteration
+%          stateVar0_Model - initial midstance state; paramController - feedback gains
+%          paramFixed - model settings; delta - unused; SwingCostCoeff - swing-cost multiplier
+% Outputs: as in postProcessHelper_JustThePlots
 
 numIterations = size(pInputStore,2);
 

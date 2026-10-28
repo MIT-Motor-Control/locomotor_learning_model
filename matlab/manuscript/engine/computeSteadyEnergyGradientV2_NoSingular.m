@@ -1,9 +1,15 @@
 function gEnergy = ...
     computeSteadyEnergyGradientV2_NoSingular(AdynamicsModel,AdynamicsEnergy, ...
     pInputNow,numLearningDimensions,numStateDimensions,includeInternalModelOrNot)
-% Differentiate steady-state energy with respect to controller parameters.
+% Differentiate the steady-state objective with respect to the controller parameters.
+% Inputs:  AdynamicsModel - state model [A B C]; AdynamicsEnergy - objective model [G H K]
+%          pInputNow - unused
+%          numLearningDimensions - number of controller parameters
+%          numStateDimensions - state size including the omitted leg angle
+%          includeInternalModelOrNot - 1 to include the state-mediated term, 0 for H only
+% Outputs: gEnergy - gradient, column vector
 
-% The fixed midstance coordinate is excluded from the fitted state.
+% The fitted state omits the midstance leg angle.
 numStateDimensions = numStateDimensions-1;
 
 Inow = eye(numStateDimensions);
@@ -12,7 +18,7 @@ Inow = eye(numStateDimensions);
 A = AdynamicsModel(1:numStateDimensions,1:numStateDimensions);
 B = AdynamicsModel(1:numStateDimensions,numStateDimensions+1:numStateDimensions+numLearningDimensions);
 
-% Energy model: E = G*x + H*p + K.
+% Objective model: E = G*x + H*p + K.
 G = AdynamicsEnergy(1,1:numStateDimensions);
 H = AdynamicsEnergy(1,numStateDimensions+1:numStateDimensions+numLearningDimensions);
 

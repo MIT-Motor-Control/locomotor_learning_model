@@ -1,5 +1,9 @@
 function export_reference_run(outputPath, numIterations)
-% Save a seeded baseline run for Python/MATLAB numerical comparisons.
+% Save a noise-free baseline run as the reference for scripts/validate_matlab_python_parity.py.
+% Inputs:  outputPath    - MAT file to write (default: tempdir/locomotor_learning_model_reference.mat)
+%          numIterations - learning iterations to simulate (default 10)
+% The file holds objectiveValue (objective of the initial controller),
+% controllerStore8D, pInput, stateVar0 and contextNow.
 
 if nargin < 1 || isempty(outputPath)
     outputPath = fullfile(tempdir, 'locomotor_learning_model_reference.mat');
@@ -23,6 +27,7 @@ paramFixed = loadLearnerParameters(paramFixed);
 paramFixed = loadProtocolParameters(paramFixed);
 paramFixed = loadStoredMemoryParameters_ControlVsSpeed(paramFixed);
 
+% Remove exploration and sensory noise so the run is deterministic.
 paramFixed.Learner.noiseSTDExploratory = 0;
 paramFixed.noiseEnergySensory = 0;
 paramFixed.numIterations = numIterations;

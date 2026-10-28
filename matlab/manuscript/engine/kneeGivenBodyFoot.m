@@ -1,5 +1,7 @@
 function [yKneeList,zKneeList] = kneeGivenBodyFoot(yBodyList,zBodyList,yFootList,zFootList)
-% Construct knee coordinates for gait visualization.
+% Construct swing-leg knee coordinates for gait visualization.
+% Inputs:  yBodyList, zBodyList - body positions; yFootList, zFootList - swing-foot positions
+% Outputs: yKneeList, zKneeList - knee positions
 
 yKneeList = zeros(size(yBodyList)); zKneeList = yKneeList;
 
@@ -11,6 +13,7 @@ end
 end
 
 function [yKnee,zKnee] = kneeGivenBodyFootScalar(yBody,zBody,yFoot,zFoot)
+% Place the knee by rotating the body-to-midpoint vector by acos(body-to-foot distance).
 
 yMid = (yBody+yFoot)/2;
 zMid = (zBody+zFoot)/2;

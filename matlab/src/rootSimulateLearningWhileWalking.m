@@ -3,6 +3,7 @@ clear; close all; clc;
 
 paramFixed = [];
 
+% Clock-based seed; use rng(seed,'twister') for a repeatable run.
 rng('shuffle','twister');
 
 paramFixed = loadBipedModelParameters(paramFixed);
@@ -32,6 +33,7 @@ contextLength = length(contextNow);
     simulateLearningStepByStep(paramFixed,pInputControllerAsymmetricNominal, ...
     stateVar0_Model,contextNow,paramControllerGains);
 
+% Restore the zero odd-step position targets of the 10-D layout.
 pInputControllerStore_8D = pInputControllerStore_OnesTried;
 pInputControllerStore_10D = [pInputControllerStore_8D(1:3,:);
     zeros(2,size(pInputControllerStore_8D,2));

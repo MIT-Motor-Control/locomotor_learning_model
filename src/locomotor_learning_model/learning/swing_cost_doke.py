@@ -1,3 +1,5 @@
+"""Swing-leg metabolic cost (Doke et al., 2005)."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -10,9 +12,21 @@ def swing_cost_doke(
     v_body: float,
     param_fixed,
 ) -> float:
-    """Approximate leg swing cost following Doke and Kuo 2005.
+    """Return the swing-leg cost of changing foot velocity (Doke et al., 2005).
 
-    The cost scales with the force rate needed to change swing-leg velocity.
+    The cost is ``Coeff * sqrt(r**2 + 0.01**2) ** alpha``, a smoothed power of
+    the force rate ``r = mFoot * (v_final - v_initial) / T**2``.
+
+    Args:
+        t_duration_of_change: Duration ``T`` of the velocity change.
+        v_initial: Foot velocity before the change (lab frame).
+        v_final: Foot velocity after the change (lab frame).
+        v_body: Body velocity; it cancels in the velocity change.
+        param_fixed: Parameters ``mFoot``, ``swingCost['Coeff']`` and
+            ``swingCost['alpha']``.
+
+    Returns:
+        Swing cost for the interval.
     """
 
     v_initial_relative = v_initial - v_body

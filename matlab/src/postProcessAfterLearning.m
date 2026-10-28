@@ -1,6 +1,11 @@
 function postProcessAfterLearning(pInputStore,stateVar0_Model, ...
     paramController,paramFixed,doAnimate)
-% Replay learned controllers and assemble gait and energy time series.
+% Replay the walked controllers, assemble gait and energy time series, and plot them.
+% Inputs:  pInputStore     - 10-D controllers, one column per learning iteration
+%          stateVar0_Model - initial midstance state
+%          paramController - feedback gains
+%          paramFixed      - model and protocol parameters
+%          doAnimate       - unused
 
 numIterations = size(pInputStore,2);
 

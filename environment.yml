@@ -6,7 +6,7 @@ dependencies:
   - python=3.12.13
   - pip=26.0.1
   - setuptools=82.0.1
-  # Pip pins avoid conflicting optional constraints in the all-Conda solve.
+  # Python packages are pinned through pip; an all-Conda solve conflicts on optional constraints.
   - pip:
       - -r requirements-lock.txt
       - pytest==9.1.1

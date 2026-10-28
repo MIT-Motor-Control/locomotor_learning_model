@@ -1,4 +1,4 @@
-"""High-level workflow helpers for the Python implementation."""
+"""Run, resume, save, load and replot simulations of the baseline model."""
 
 from __future__ import annotations
 
@@ -63,7 +63,37 @@ from .artifacts import (
 
 @dataclass
 class SimulationResults:
-    """Container for the full Python simulation output."""
+    """Results of one simulation.
+
+    Energies, times and states are dimensionless (body mass, leg length and gravity are 1).
+
+    Attributes:
+        param_fixed: Model, noise, learner and protocol parameters, with the memory as
+            updated by learning.
+        param_controller_gains: Feedback gains and the last replayed controller targets.
+        initial_controller_parameters: Initial 10-element controller vector.
+        initial_state: Initial 5-element midstance body state.
+        controller_history_8d: Controller executed at each iteration (learned controller
+            plus exploratory noise), shape (8, n).
+        controller_history_10d: Same history with the odd-step position targets
+            (0-based rows 3 and 4) set to zero, shape (10, n).
+        final_state: Body state at the end of the replay.
+        t_store: Time samples of each stance phase; the first and last are half stances.
+        state_store: Stance-leg angle, angular rate and foot position for each stance phase.
+        emet_total_store: Metabolic energy per step (step-to-step transition plus swing cost).
+        emet_per_time_store: Metabolic rate per step.
+        t_step_store: Midstance-to-midstance step durations.
+        ework_pushoff_store: Push-off work per step.
+        ework_heelstrike_store: Heel-strike work per step.
+        edot_store_iteration_average: Metabolic rate averaged over each learning iteration.
+        t_total_iteration_store: Duration of each learning iteration.
+        summary: Statistics, asymmetry series and smoothed metabolic rate from
+            ``post_process_helper_plots``.
+        metadata: Seed, iteration counts, software versions and configuration digest.
+        learning_diagnostics: Per-iteration sensed objective, metabolic power, end time,
+            fall penalty and minimum COM height (NaN unless the fall penalty or
+            ``collectFallDiagnostics`` is enabled), and nominal step length asymmetry.
+    """
 
     param_fixed: dict[str, Any]
     param_controller_gains: dict[str, Any]
@@ -87,7 +117,7 @@ class SimulationResults:
 
 
 def _expand_controller_history(controller_history_8d: np.ndarray) -> np.ndarray:
-    """Convert the 8D learning state back to the 10D controller representation."""
+    """Return the 10-row controller history with zero odd-step position targets inserted."""
     return np.vstack(
         [
             controller_history_8d[:3, :],
@@ -98,16 +128,19 @@ def _expand_controller_history(controller_history_8d: np.ndarray) -> np.ndarray:
 
 
 def _positive_integer(value: Any, name: str) -> int:
+    """Return ``value`` as an int, or raise ValueError if it is not a positive integer."""
     if isinstance(value, bool) or not isinstance(value, (int, np.integer)) or value < 1:
         raise ValueError(f"{name} must be a positive integer")
     return int(value)
 
 
 def _without_runtime(parameters: dict[str, Any]) -> dict[str, Any]:
+    """Return a deep copy of ``parameters`` without the random generator."""
     return deepcopy({key: value for key, value in parameters.items() if key != "_rng"})
 
 
 def _configuration(split_or_tied, speed_protocol, transition_time, split_speed_diff_ms):
+    """Return fixed parameters, gains, initial controller and initial state for a protocol."""
     param_fixed: dict[str, Any] = {}
     param_fixed = load_biped_model_parameters(param_fixed)
     param_fixed = load_sensory_noise_parameters(param_fixed)
@@ -133,6 +166,7 @@ def _configuration(split_or_tied, speed_protocol, transition_time, split_speed_d
 
 
 def _scientific_configuration(configuration):
+    """Return a copy of ``configuration`` without the iteration target, for hashing."""
     value = deepcopy(configuration)
     value["param_fixed"].pop("num_iterations", None)
     value["param_fixed"].pop("numIterations", None)
@@ -140,7 +174,12 @@ def _scientific_configuration(configuration):
 
 
 def _validate_checkpoint_parameters(saved):
-    """Check immutable settings separately from the memory that learning updates."""
+    """Raise ValueError if checkpoint parameters differ from its saved configuration.
+
+    The learned memory (``controlSlopeVsContext``), the iteration target and the
+    runtime keys ``num_steps`` and ``_last*`` are excluded from the comparison. Controller
+    gains, apart from the ``Odd`` and ``Even`` targets, must also match.
+    """
     initial = saved["configuration"]["param_fixed"]
     actual = deepcopy(saved["param_fixed"])
     expected_keys = set(initial) | {
@@ -173,6 +212,7 @@ def _validate_checkpoint_parameters(saved):
 
 
 def _read_checkpoint(path):
+    """Load a checkpoint and validate its fields, iteration counts, seed and RNG state."""
     saved = load_archive(path, "checkpoint")
     required = {
         "metadata",
@@ -250,13 +290,37 @@ def run_simulation(
     checkpoint_every: int | None = None,
     stop_after: int | None = None,
 ) -> SimulationResults:
-    """Run or resume the baseline Python model.
+    """Run or resume learning, then replay and summarize the executed controllers.
 
-    ``num_iterations`` is the total target, including completed iterations on resume.
-    ``stop_after`` stops at an absolute iteration boundary and requires a checkpoint
-    path. Checkpoints capture learning state before post-processing; the latter is
-    replayed from the initial body state after each call. Random draws use a private
-    MT19937 generator whose state is saved in the checkpoint.
+    Random draws use a private ``numpy.random.RandomState`` (MT19937) whose full state is
+    saved in each checkpoint. Checkpoints are written after a learning iteration and
+    before post-processing, which replays the controller history from the initial body
+    state on every call, including after a resume.
+
+    Args:
+        seed: Seed in [0, 2**32); drawn at random and recorded when None. On resume it
+            must be None or equal to the checkpoint seed.
+        num_iterations: Total learning iterations, including those completed before a
+            resume; defaults to the protocol length or the checkpoint target.
+        split_or_tied: ``"split"`` (default for new runs) or ``"tied"``.
+        speed_protocol: Protocol name; defaults to ``"classic split belt"`` or
+            ``"four speed changes"``.
+        transition_time: Duration of each belt-speed ramp in seconds (default 15 split, 3 tied).
+        split_speed_diff_ms: Split-belt speed difference in m/s (default 1.0).
+        make_plots: Create and open interactive summary figures.
+        output_dir: Directory for ``run.npz``, ``metadata.json`` and summary figures.
+        resume_from: Checkpoint to continue. Protocol arguments must be None or match it.
+        checkpoint_path: Checkpoint destination; a checkpoint is always written when
+            learning stops.
+        checkpoint_every: Also write a checkpoint every N completed iterations.
+        stop_after: Total iteration count at which to stop; requires ``checkpoint_path``.
+
+    Returns:
+        Results for all iterations completed so far.
+
+    Raises:
+        ValueError: If an argument is invalid, or a checkpoint is malformed, was written
+            with other NumPy or SciPy versions, or does not match the current configuration.
     """
     if split_or_tied is not None and split_or_tied not in ("split", "tied"):
         raise ValueError("split_or_tied must be 'split' or 'tied'")
@@ -317,7 +381,7 @@ def run_simulation(
         if seed is not None and int(seed) != saved["metadata"]["seed"]:
             raise ValueError("Cannot change seed when resuming a checkpoint")
         seed = saved["metadata"]["seed"]
-        # A checkpoint must agree with the current model configuration.
+        # The configuration rebuilt by this code version must match the checkpoint digest.
         current = _configuration(
             original["SplitOrTied"],
             original["speedProtocol"],
@@ -388,6 +452,11 @@ def run_simulation(
     }
 
     def write_checkpoint(state):
+        """Validate the learner ``state`` and save it with the configuration and RNG state.
+
+        The checkpoint goes to ``checkpoint_path``; its metadata is also written beside
+        it, with the suffix replaced by ``.metadata.json``.
+        """
         validate_learning_state(state, param_fixed)
         checkpoint_metadata = dict(
             metadata,
@@ -485,7 +554,18 @@ def run_simulation(
 
 
 def save_simulation_results(results: SimulationResults, output_dir: str | Path) -> Path:
-    """Save complete numerical results and concise metadata; no pickled objects."""
+    """Write ``run.npz`` (all result fields) and ``metadata.json`` to ``output_dir``.
+
+    ``metadata.json`` holds the run metadata, the scalar summary values, the condition
+    and the speed protocol.
+
+    Args:
+        results: Results to save.
+        output_dir: Destination directory, created if missing; existing files are replaced.
+
+    Returns:
+        Path of ``run.npz``.
+    """
     directory = Path(output_dir)
     payload = {item.name: getattr(results, item.name) for item in fields(results)}
     path = directory / "run.npz"
@@ -504,7 +584,18 @@ def save_simulation_results(results: SimulationResults, output_dir: str | Path) 
 
 
 def load_simulation_results(path: str | Path) -> SimulationResults:
-    """Load an existing result for analysis/replotting without training the learner."""
+    """Load a ``run.npz`` archive written by ``save_simulation_results``.
+
+    Args:
+        path: ``run.npz`` file.
+
+    Returns:
+        The saved results, without rerunning the simulation.
+
+    Raises:
+        ValueError: If the archive is invalid or its fields or controller histories
+            have unexpected shapes.
+    """
     payload = load_archive(path, "results")
     if set(payload) != {item.name for item in fields(SimulationResults)}:
         raise ValueError("Result archive fields are incomplete or unsupported")
@@ -521,7 +612,16 @@ def load_simulation_results(path: str | Path) -> SimulationResults:
 def plot_simulation_results(
     results: SimulationResults, output_dir: str | Path | None = None, show_plots: bool = False
 ) -> dict[str, Any]:
-    """Replot saved trajectories; performs no model simulation or learning."""
+    """Recreate the summary figures from saved results without simulating.
+
+    Args:
+        results: Saved simulation results.
+        output_dir: Directory for PNG figures; None saves nothing.
+        show_plots: Open interactive figure windows.
+
+    Returns:
+        The summary dictionary from ``post_process_helper_plots``.
+    """
     return post_process_helper_plots(
         results.final_state,
         results.t_store,

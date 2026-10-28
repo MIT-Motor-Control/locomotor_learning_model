@@ -1,4 +1,19 @@
 function result = run_manuscript_trial(output_file, options)
+% Run one seeded manuscript-engine trial and save it, or reload a matching saved trial.
+% Inputs:  output_file - MAT file for the completed trial
+%          options.seed - random seed
+%          options.speed_difference - d (m/s); the belts run at 1 - d/2 and 1 + d/2 m/s
+%          options.learning_rate, options.exploration_noise - learner settings
+%          options.energy_weight - lambdaEnergyVsSymmetry, the weight on the energy term
+%          options.split_minutes - split-belt duration (min)
+%          options.swing_cost - swing-cost multiplier
+%          options.max_iterations - iteration limit; Inf runs the full protocol
+%          options.transition_seconds - tied-to-split ramp duration (s)
+%          options.speed_divisor - divisor from experimental to model belt speeds
+% Outputs: result - outputs of run_sim (time, sla, sta, energy, speed, state, steptime_fast,
+%              steptime_slow, steplength_fast, steplength_slow, param, fall_flag, min_vert_pos)
+%              and metadata (options, MATLAB version, engine source text, final RNG state)
+% An existing output_file is reloaded only if its options and engine source text match.
 arguments
     output_file (1,1) string
     options.seed (1,1) double {mustBeInteger, mustBeNonnegative} = 0
@@ -36,6 +51,7 @@ if isfile(output_file)
     fprintf('Loaded completed trial: %s\n', output_file);
     return
 end
+% Initial learned controller targets, as in loadLearnableParametersInitial.
 controller = [0.328221262798818; 0.310751796902254; 0.153556843539029; ...
     0.328221491356562; 0.310751694570805; 0.153557221281688; ...
     -0.000000038953735; -0.000000038953735];
@@ -62,6 +78,7 @@ fprintf('Saved %d completed iterations: %s\n', size(result.param, 2), output_fil
 end
 
 function validate_result(result)
+% Check the saved-trial schema and that the required results are finite.
 if ~isfield(result, 'metadata') || result.metadata.schema_version ~= 1 || ~strcmp(result.metadata.kind, 'completed_trial')
     error('LocAd:InvalidResult', 'Unsupported saved-trial schema.');
 end
@@ -77,10 +94,12 @@ end
 end
 
 function restore_session(old_path, old_rng)
+% Restore the MATLAB path and random number generator state.
 path(old_path);
 rng(old_rng);
 end
 
 function delete_if_present(file)
+% Delete a file if it exists.
 if isfile(file); delete(file); end
 end

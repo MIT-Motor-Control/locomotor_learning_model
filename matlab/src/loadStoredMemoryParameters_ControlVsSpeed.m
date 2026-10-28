@@ -1,5 +1,7 @@
 function paramFixed = loadStoredMemoryParameters_ControlVsSpeed(paramFixed)
-% Initialize the context-dependent controller memory.
+% Add the initial controller memory to paramFixed.storedmemory.
+% The memory predicts the 8-D controller for a belt-speed context c as
+% nominalControl + controlSlopeVsContext*(c - nominalContext).
 
 switch paramFixed.swingCost.Coeff
     case 0.9

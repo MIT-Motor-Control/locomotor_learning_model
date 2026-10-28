@@ -1,8 +1,9 @@
-"""Format numerical publication CSVs as an editor source workbook.
+"""Format the numerical publication CSVs as a source-data workbook.
 
-Usage: python scripts/build_source_workbook.py REPRODUCTION_DIR OUTPUT.xlsx
-Requires only openpyxl and the Python standard library. Scientific calculations
-remain in the figure pipeline; this command preserves its recorded CSV values.
+Usage: python scripts/build_source_workbook.py REPRODUCTION_DIR OUTPUT.xlsx [--overwrite]
+Requires openpyxl. Values are copied from the CSVs recorded in report.json and are not
+recalculated; the workbook is verified with check_source_workbook.check before it is
+written to OUTPUT.
 """
 
 from __future__ import annotations
@@ -27,12 +28,12 @@ from openpyxl.worksheet.table import Table, TableStyleInfo
 
 NAVY, GRAY = "253D5B", "56616E"
 NUMBER = re.compile(r"[+-]?(?:\d+\.?\d*|\.\d+)(?:[Ee][+-]?\d+)?\Z")
-# Each CSV remains one flat table. Related small tables share a worksheet.
+# (sheet name, title, note, CSV names). Each CSV is one table; related tables share a sheet.
 SECTIONS = (
     (
         "Fig1 summary",
-        "Figure 1 group summaries",
-        "For 1C-D, energy change is percent and SLA change is percentage points. Figure 1E box statistics are in W/kg.",
+        "Figure 1C-E group summaries",
+        "For Figure 1C-D, energy change is percent and SLA change is percentage points. Figure 1E box statistics are in W/kg.",
         ("figure1_cd_summary", "figure1_e_box_summary"),
     ),
     (
@@ -43,8 +44,8 @@ SECTIONS = (
     ),
     (
         "Fig1 SLA",
-        "Figure 1D participant step-length asymmetry",
-        "The source script's fractional-stride short window is retained. Changes are percentage points.",
+        "Figure 1D participant step length asymmetry",
+        "The short window is the 100 strides ending at stride ceil(6/45 x split strides). Changes are percentage points.",
         ("figure1_sla_participants",),
     ),
     (
@@ -56,62 +57,73 @@ SECTIONS = (
     (
         "Fig1 timepoints",
         "Figure 1E metabolic time course",
-        "Three-minute means. Adjacent paired t-tests are two-sided and uncorrected, matching the source analysis.",
+        "Three-minute means. Adjacent paired t-tests are two-sided, without multiplicity correction.",
         ("figure1_energy_timeseries", "figure1_paired_tests"),
     ),
     (
-        "Optimization",
-        "Reported trajectory-optimization values",
-        "The five plotted constants are retained. The separate four-condition source check does not regenerate that series.",
+        "Energy minimization",
+        "Figures 1C-D and 2C energy-minimization predictions",
+        "Rounded trajectory-optimization values plotted in Figures 1C-D and 2C. The separate four-condition OpenSim source subset does not regenerate this series.",
         (
             "figure1_optimization",
-            "s3a_trajectory_optimization",
+            "figure2c_energy_minimization",
             "figure1_optimization_source_subset",
         ),
     ),
     (
-        "Fig3 counts",
+        "Fig2C model",
+        "Figure 2C inverse adaptation model energy relative to tied walking",
+        "Per-participant median over nonfalling trials, then condition mean. Shared cells are reused across participants.",
+        ("figure2c_model_summary", "figure2c_model_participants"),
+    ),
+    (
+        "Fig2C model trials",
+        "Figure 2C unique inverse adaptation model trials",
+        "Tied baseline: strides 31-70. Adapted: final 100 strides. Falling trials are excluded from participant medians.",
+        ("figure2c_model_trials",),
+    ),
+    (
+        "Fig2C experiment",
+        "Figure 2C experimental energy relative to tied walking",
+        "Percent change between final 180-second means. Correlations compare trends across the three conditions.",
+        (
+            "figure2c_experimental_summary",
+            "figure2c_experimental_participants",
+            "figure2c_direction_correlations",
+        ),
+    ),
+    (
+        "Fig3C counts",
         "Figure 3C fall probabilities",
         "50 trials per cell. Probability and percentage columns have distinct scales.",
         ("figure3_c_counts",),
     ),
     (
         "Fig3 trials",
-        "Figure 3C simulation trials",
-        "One row per simulation. A blank fall stride denotes a nonfalling trial.",
+        "Figure 3C-D simulation trials",
+        "One row per simulation. A blank fall stride denotes a nonfalling trial. Figure 3D plots the fall stride of each falling trial.",
         ("figure3_trials",),
     ),
     (
-        "S1 LOSO",
-        "S1 held-out prediction errors",
+        "Fig3D fits",
+        "Figure 3D strides until fall and exponential fits",
+        "Mean strides until fall per speed over falling trials, with the fitted a*exp(b*x) coefficients and curves for each learning rate.",
+        ("figure3_d_fit_inputs", "figure3_d_fit_coefficients", "figure3_d_fit_curves"),
+    ),
+    (
+        "SuppFig1 cross-validation",
+        "Supplementary Figure 1 held-out prediction errors",
         "Regenerated trial-average grid. The plotted p-value uses MATLAB signrank; SciPy exact is an alternative calculation.",
         ("s1_loso_persubject", "s1_loso_stats", "s1_loso_summary", "s1_loso_matlab_test"),
     ),
     (
-        "S1 sensitivity",
-        "S1 shared-grid sensitivity",
+        "S1 Text grid sensitivity",
+        "S1 Text Section 1 shared-grid sensitivity",
         "MATLAB rng(0), 200 subsamples per fold, thresholds 26/17/8. RMSE is in percentage points.",
         ("s1_grid_sensitivity_summary", "s1_grid_finite_counts", "s1_grid_sensitivity_persubject"),
     ),
-    (
-        "S3 model",
-        "S3B model energy relative to tied walking",
-        "Per-participant median over nonfalling trials, then condition mean. Shared cells are reused across participants.",
-        ("s3b_model_summary", "s3b_model_participants"),
-    ),
-    (
-        "S3 trials",
-        "S3B unique model trials",
-        "Tied baseline: strides 31-70. Adapted: final 100 strides. Falling trials are excluded from participant medians.",
-        ("s3b_model_trials",),
-    ),
-    (
-        "S3 experiment",
-        "S3C experimental energy relative to tied walking",
-        "Percent change between final 180-second means. Correlations compare trends across the three conditions.",
-        ("s3c_group_means", "s3c_experimental", "s3_direction_correlations"),
-    ),
 )
+# Tables required for each reproduction result (Figure 2: its 2C part) unless it is blocked.
 BASE_TABLES = {
     "figure1": {
         "figure1_cd_summary",
@@ -122,13 +134,31 @@ BASE_TABLES = {
         "figure1_paired_tests",
         "figure1_optimization",
     },
-    "figure3": {"figure3_c_counts", "figure3_trials"},
+    "figure2": {
+        "figure2c_energy_minimization",
+        "figure2c_experimental_participants",
+        "figure2c_experimental_summary",
+    },
+    "figure3": {
+        "figure3_c_counts",
+        "figure3_trials",
+        "figure3_d_fit_inputs",
+        "figure3_d_fit_coefficients",
+        "figure3_d_fit_curves",
+    },
     "s1": {"s1_loso_persubject", "s1_loso_stats", "s1_loso_summary", "s1_loso_matlab_test"},
-    "s3": {"s3a_trajectory_optimization", "s3c_experimental", "s3c_group_means"},
 }
 
 
+def _status(record: dict) -> str:
+    """Return the status of a result record, or of its Figure 2C part for ``figure2``."""
+    if record["id"] == "figure2":
+        return record.get("details", {}).get("panels", {}).get("2C", record["status"])
+    return record["status"]
+
+
 def typed(value: str):
+    """Convert a CSV field to None (blank), bool, float or the original string."""
     if value == "":
         return None
     if value in ("True", "False"):
@@ -145,10 +175,24 @@ def typed(value: str):
 
 
 def digest(payload: bytes) -> str:
+    """Return the SHA-256 hex digest of ``payload``."""
     return hashlib.sha256(payload).hexdigest()
 
 
 def load_sources(root: Path) -> tuple[dict, dict, dict]:
+    """Read the reproduction report and the CSV tables it records.
+
+    Args:
+        root: Reproduction output directory containing report.json and tables/.
+
+    Returns:
+        Tuple ``(records, sources, metadata)``: report results by id, parsed tables by
+        CSV stem, and the initial validation metadata.
+
+    Raises:
+        ValueError: If the report is invalid or lacks a required result, a required CSV is
+            missing, or a CSV is malformed, outside ``root`` or differs from its checksum.
+    """
     report_bytes = (root / "report.json").read_bytes()
     report = json.loads(report_bytes)
     if report.get("schema_version") != 1 or report.get("inputs", {}).get("errors"):
@@ -156,22 +200,22 @@ def load_sources(root: Path) -> tuple[dict, dict, dict]:
     records = {r["id"]: r for r in report["results"]}
     if not BASE_TABLES.keys() <= records.keys():
         raise ValueError(
-            "Reproduce figure1, figure3, s1 and s3 before building the source workbook"
+            "Reproduce figure1, figure2, figure3 and s1 before building the source workbook"
         )
     artifacts = {r["path"]: r["sha256"] for r in report["artifacts"]}
     wanted = {name for *_, names in SECTIONS for name in names}
     required = set().union(
-        *(names for figure, names in BASE_TABLES.items() if records[figure]["status"] != "blocked")
+        *(names for figure, names in BASE_TABLES.items() if _status(records[figure]) != "blocked")
     )
     if records["figure1"]["status"] == "passed":
         required.add("figure1_sanchez_participants")
-    if records["s3"]["status"] == "passed":
+    if _status(records["figure2"]) == "passed":
         required.update(
             {
-                "s3b_model_summary",
-                "s3b_model_participants",
-                "s3b_model_trials",
-                "s3_direction_correlations",
+                "figure2c_model_summary",
+                "figure2c_model_participants",
+                "figure2c_model_trials",
+                "figure2c_direction_correlations",
             }
         )
     if records["s1"].get("details", {}).get("grid_sensitivity_available"):
@@ -212,7 +256,7 @@ def load_sources(root: Path) -> tuple[dict, dict, dict]:
     if not sources:
         raise ValueError("No numerical source tables are available for the requested panels")
     metadata = {
-        "schema_version": 2,
+        "schema_version": 3,
         "sourceReportSha256": digest(report_bytes),
         "sourceReportCreatedAt": report["created_at"],
         "inputManifestSha256": report["inputs"]["manifest_sha256"],
@@ -223,6 +267,7 @@ def load_sources(root: Path) -> tuple[dict, dict, dict]:
 
 
 def header(name: str) -> str:
+    """Return the display header for a CSV column, with units where known."""
     special = {
         "delta_mps": "Speed difference (m/s)",
         "energy_change_pct": "Energy change (%)",
@@ -259,12 +304,14 @@ def header(name: str) -> str:
 
 
 def text(cell, value):
+    """Assign ``value`` to ``cell``, storing strings as text so none is read as a formula."""
     cell.value = value
     if isinstance(value, str):
-        cell.data_type = "s"  # CSV text is never executed as an Excel formula.
+        cell.data_type = "s"
 
 
 def heading(sheet, title: str, note: str):
+    """Write the sheet title and wrapped note, and set a landscape A3 page layout."""
     sheet.sheet_view.showGridLines = False
     text(sheet["A2"], title)
     sheet["A2"].font = Font(name="Arial", size=14, bold=True, color=NAVY)
@@ -281,6 +328,18 @@ def heading(sheet, title: str, note: str):
 
 
 def add_table(sheet, source: dict, row: int, index: int, metadata: dict) -> int:
+    """Write one formatted table and append its layout to ``metadata["tables"]``.
+
+    Args:
+        sheet: Destination worksheet.
+        source: Table with ``name``, ``headers``, ``rows`` and ``sha256`` entries.
+        row: Row of the source label; the header row is two rows below it.
+        index: Suffix of the Excel table name, unique within the workbook.
+        metadata: Validation metadata to update.
+
+    Returns:
+        Source-label row for the next table, three blank rows below this one.
+    """
     text(
         sheet.cell(row, 1),
         f"Source: tables/{source['name']}"
@@ -367,6 +426,24 @@ def add_table(sheet, source: dict, row: int, index: int, metadata: dict) -> int:
 
 
 def build(input_root: Path, output: Path, *, overwrite: bool = False) -> dict:
+    """Build, verify and save the workbook and its ``.validation.json`` sidecar.
+
+    Both files are written to a temporary directory beside ``output`` and moved into
+    place only after ``check`` passes.
+
+    Args:
+        input_root: Reproduction output directory.
+        output: Destination ``.xlsx`` path.
+        overwrite: Replace an existing workbook or sidecar.
+
+    Returns:
+        The ``check`` summary with the workbook path under ``"workbook"``.
+
+    Raises:
+        FileExistsError: If an output file exists and ``overwrite`` is false.
+        ValueError: If ``output`` is not .xlsx, an output path is a symlink, or an input
+            or the built workbook fails validation.
+    """
     input_root, output = Path(input_root).resolve(), Path(output).absolute()
     if output.suffix.lower() != ".xlsx":
         raise ValueError("Output must have an .xlsx extension")
@@ -384,51 +461,56 @@ def build(input_root: Path, output: Path, *, overwrite: bool = False) -> dict:
     heading(
         guide,
         "Numerical source data",
-        "PBIOLOGY-D-26-00535R2. CSVs remain the numerical sources; this workbook formats their recorded values.",
+        "Safety prioritization shapes locomotor adaptation and performance. CSVs remain the numerical sources; this workbook formats their recorded values.",
     )
     guide.sheet_properties.tabColor = NAVY
     guide_rows = [
         [
-            "1C-D",
+            "Figure 1C-D",
             records["figure1"]["status"],
-            "Participant measurements, Sanchez comparison when available, and five reported optimization values.",
+            "Participant measurements, Sanchez comparison when available, and five reported energy-minimization values.",
         ],
         [
-            "1E",
+            "Figure 1E",
             "available" if "figure1_energy_timeseries" in sources else "unavailable",
-            "Metabolic timepoints and adjacent paired tests. Sanchez data are not part of this panel.",
+            "Metabolic time points and adjacent paired tests. Sanchez data are not part of this panel.",
         ],
         [
-            "3C",
+            "Figure 2C energy minimization",
+            "reported values" if "figure2c_energy_minimization" in sources else "unavailable",
+            "Five plotted trajectory-optimization values. The separate source subset is not a full OpenSim regeneration.",
+        ],
+        [
+            "Figure 2C model",
+            "available" if "figure2c_model_trials" in sources else "unavailable",
+            "Regenerated trials at original fitted cells, participant medians and condition means.",
+        ],
+        [
+            "Figure 2C experiment",
+            "available" if "figure2c_experimental_participants" in sources else "unavailable",
+            "Participant energy changes relative to the tied baseline.",
+        ],
+        [
+            "Figure 3C",
             "available"
             if "figure3_c_counts" in sources and "figure3_trials" in sources
             else "unavailable",
             "Per-cell fall counts and individual simulation trials.",
         ],
         [
-            "S1",
+            "Figure 3D",
+            "available" if "figure3_d_fit_inputs" in sources else "unavailable",
+            "Strides until fall of each falling trial, per-speed means and fitted exponential curves.",
+        ],
+        [
+            "Supplementary Figure 1",
             records["s1"]["status"],
-            "Held-out errors and both labeled test methods. MATLAB signrank supplies the plotted p-value.",
+            "Held-out errors and both labeled test methods. MATLAB signrank gives the plotted p-value.",
         ],
         [
-            "S1 sensitivity",
-            "available" if "s1_grid_sensitivity_summary" in sources else "not supplied",
+            "S1 Text grid sensitivity",
+            "available" if "s1_grid_sensitivity_summary" in sources else "unavailable",
             "Shared-grid thresholds 26/17/8, finite-cell counts and participant folds.",
-        ],
-        [
-            "S3A",
-            "reported values" if "s3a_trajectory_optimization" in sources else "unavailable",
-            "Five plotted constants. The separate source subset is not a full OpenSim regeneration.",
-        ],
-        [
-            "S3B",
-            "available" if "s3b_model_trials" in sources else "unavailable",
-            "Regenerated trials at original fitted cells, participant medians and condition means.",
-        ],
-        [
-            "S3C",
-            "available" if "s3c_experimental" in sources else "unavailable",
-            "Participant energy changes relative to the tied baseline.",
         ],
     ]
     for row, values in enumerate([["Panel", "Coverage", "Contents and limits"], *guide_rows], 7):
@@ -442,7 +524,7 @@ def build(input_root: Path, output: Path, *, overwrite: bool = False) -> dict:
             if row == 7:
                 cell.fill = PatternFill("solid", fgColor=NAVY)
         guide.row_dimensions[row].height = 38 if row != 7 else 25
-    for letter, width in zip("ABC", (23, 23, 100)):
+    for letter, width in zip("ABC", (30, 23, 100)):
         guide.column_dimensions[letter].width = width
     notes = [
         f"Reproduction: {metadata['sourceReportCreatedAt']}",
@@ -479,7 +561,7 @@ def build(input_root: Path, output: Path, *, overwrite: bool = False) -> dict:
     }
     count = len(metadata["tables"])
     add_table(index, index_source, 8, count + 1, metadata)
-    metadata["tables"].pop()  # The index is metadata, not another scientific CSV.
+    metadata["tables"].pop()  # The index is verified through sourceIndexRows, not as a CSV.
     metadata["sourceIndexRows"] = index_source["rows"]
     metadata["sourceIndexFirstDataRow"] = 11
     text(
@@ -503,6 +585,7 @@ def build(input_root: Path, output: Path, *, overwrite: bool = False) -> dict:
 
 
 def main(argv=None) -> int:
+    """Build the workbook from command-line arguments; print the summary or exit with 1."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("reproduction_dir", type=Path)
     parser.add_argument("output", type=Path)

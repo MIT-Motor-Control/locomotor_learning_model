@@ -1,10 +1,15 @@
 function beltSpeedsImposed = makeTreadmillSpeed_Tied(paramFixed)
 % Build a tied-belt speed profile with linear transition ramps.
+% Not called by default; to use it, call it in loadProtocolParameters in place
+% of makeTreadmillSpeed_Split and set SplitOrTied to 'tied'. Units, ramps and
+% outputs are as in makeTreadmillSpeed_Split, but no plot is made.
+% Inputs:  paramFixed - uses speedProtocol
 
 L = 0.95; g = 9.81;
 timeScaling = sqrt(L/g);
 timePerPhaseInMin = 2;
 
+% Tied protocols use a 3-second transition regardless of the caller's value.
 paramFixed.transitionTime = 3;
 
 vNormal = -0.35;

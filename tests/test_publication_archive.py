@@ -13,6 +13,7 @@ from locomotor_learning_model.publication import archive as installer
 
 
 def write_dataset(root, files, kind=None):
+    """Write ``files`` and their manifest under ``root``; return the manifest."""
     root.mkdir(parents=True)
     manifest = {"schema_version": 1, "files": []}
     if kind:
@@ -27,6 +28,7 @@ def write_dataset(root, files, kind=None):
 
 
 def write_archive(path, files=None, extra=()):
+    """Write a publication ZIP with its manifest and extra members; return the manifest."""
     files = files or {"original/model.dat": b"model result"}
     manifest = {
         "schema_version": 1,
@@ -48,11 +50,12 @@ def write_archive(path, files=None, extra=()):
 
 @pytest.fixture
 def public_source(tmp_path, monkeypatch):
+    """Return an experimental source folder and stub out experimental-data validation."""
     source = tmp_path / "experimental"
     source.mkdir()
 
-    # Isolate archive installation from experimental-data parsing.
     def validate(actual_source, destination):
+        """Check the source folder and return the verified destination manifest."""
         assert actual_source == source
         return installer._verified_manifest(destination)
 
@@ -182,6 +185,7 @@ def test_cross_dataset_validation_failure_leaves_no_install(tmp_path, public_sou
     write_archive(archive)
 
     def mismatch(*_):
+        """Raise the error of a failed experimental-data comparison."""
         raise ValueError("Public experimental CSVs differ")
 
     monkeypatch.setattr(installer, "prepare_zenodo_data", mismatch)
@@ -211,6 +215,7 @@ def test_failed_upgrade_restores_original_dataset(tmp_path, public_source, monke
     rename = Path.rename
 
     def fail_install(path, target):
+        """Fail the rename of the staged installation; rename other paths."""
         if path.parent.name.startswith("publication-install-"):
             raise OSError("Simulated install failure")
         return rename(path, target)
@@ -233,6 +238,7 @@ def test_failed_rollback_keeps_original_backup_outside_temporary_cleanup(
     rename = Path.rename
 
     def fail_install_and_restore(path, target):
+        """Fail the renames of the staged installation and of the backup."""
         if path.parent.name.startswith("publication-install-") or path.name.startswith(
             "publication.backup-"
         ):

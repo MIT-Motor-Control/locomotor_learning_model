@@ -1,5 +1,5 @@
 function [ value, isterminal, direction ] = DetectMidstance(t,stateVar,paramFixed,paramController)
-% Stop integration when the body passes above the stance foot.
+% Stop integration at midstance, when the body passes over the stance foot.
 
 angleTheta = stateVar(1);
 

@@ -1,5 +1,8 @@
 function beltSpeedsImposed = makeTreadmillSpeed_Split(paramFixed)
-% Build a split-belt speed profile with linear transition ramps.
+% Build a split-belt speed profile with linear transition ramps and plot it in figure 2555.
+% Inputs:  paramFixed.speedProtocol - protocol name; paramFixed.transitionTime - ramp duration (s)
+% Outputs: beltSpeedsImposed - tList (model time), footSpeed1List and footSpeed2List
+%          (negative values move backward), footAcc1List and footAcc2List (constant per segment)
 
 L = 0.95; g = 9.81;
 timeScaling = sqrt(L/g);

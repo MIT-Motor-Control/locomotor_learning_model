@@ -1,5 +1,7 @@
 function [tSpan,EmetVO2List] = convertMetToVO2(params)
 % Apply a first-order metabolic transient with a 44-second time constant.
+% Inputs:  params.tList - model times; params.EmetRateList - metabolic rates at those times
+% Outputs: tSpan - output times; EmetVO2List - lagged rate, approximating indirect calorimetry
 if numel(params.tList) == 1
     tSpan = params.tList;
     EmetVO2List = params.EmetRateList;
@@ -8,6 +10,7 @@ end
 
 timeConstant = 44; % seconds
 g = 9.81; LegLength = 0.95;
+% Convert the time constant to model time units of sqrt(LegLength/g) seconds.
 timeScaling = sqrt(LegLength/g);
 timeConstant = timeConstant/timeScaling;
 params.k = 1/timeConstant;
@@ -21,6 +24,7 @@ options = odeset('reltol',1e-8,'abstol',1e-8);
 end
 
 function dEmetVO2dt = odeMetToVO2MET(t,EmetS,params)
+% Relax the measured rate toward the instantaneous rate.
 
 EmetNow = interp1(params.tList,params.EmetRateList,t,'linear','extrap');
 

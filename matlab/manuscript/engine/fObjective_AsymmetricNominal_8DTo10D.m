@@ -1,7 +1,8 @@
 function [f_objective,stateVar0,tEnd,f_energy,f_constraint,fall_info,yPosStore] = ...
     fObjective_AsymmetricNominal_8DTo10D(pInputControllerNominal,stateVar0_Model, ...
     paramController,paramFixed,tStart,SwingCostCoeff,iStride)
-% Insert the fixed odd-leg position coordinates before evaluating the objective.
+% Insert the zero odd-step position targets, then evaluate fObjective_AsymmetricNominal.
+% Inputs and outputs are as in fObjective_AsymmetricNominal, with 8 learned controller targets.
 
 temp = zeros(10,1);
 temp(1:3) = pInputControllerNominal(1:3);

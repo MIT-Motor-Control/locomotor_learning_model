@@ -12,8 +12,20 @@ authors:
 version: 0.3.0
 date-released: 2026-10-15
 repository-code: "https://github.com/MIT-Motor-Control/locomotor_learning_model"
-url: "https://doi.org/10.5281/zenodo.19547419"
+doi: 10.5281/zenodo.23402153
+url: "https://doi.org/10.5281/zenodo.23402153"
 license: MIT
+preferred-citation:
+  type: article
+  title: "Safety prioritization shapes locomotor adaptation and performance"
+  authors:
+    - family-names: Kang
+      given-names: Inseung
+    - family-names: Mitra
+      given-names: Kanishka
+    - family-names: Seethapathi
+      given-names: Nidhi
+  year: 2026
 keywords:
   - locomotor adaptation
   - motor learning

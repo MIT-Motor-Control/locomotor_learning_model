@@ -1,6 +1,14 @@
 function beltSpeedsImposed = makeTreadmillSpeed_Split(paramFixed)
 % Build a split-belt speed profile with linear transition ramps.
+% Inputs:  paramFixed - uses speedProtocol and transitionTime (seconds)
+% Outputs: beltSpeedsImposed - knot times tList, belt speeds footSpeed1List
+%          (belt 1, fast) and footSpeed2List, and belt accelerations
+%          footAcc1List and footAcc2List on the interval that starts at each
+%          knot. The profile is also plotted in figure 2555.
 
+% Speeds are in units of sqrt(g*L) and times in units of sqrt(L/g), with
+% L = 0.95 m; negative speeds move the belt backward. vNormal is 1.0 m/s and
+% delta is 0.1 m/s, so the split phase runs the belts at 1.5 and 0.5 m/s.
 L = 0.95; g = 9.81;
 timeScaling = sqrt(L/g);
 
@@ -68,6 +76,7 @@ switch paramFixed.speedProtocol
 
 end
 
+% Each speed change starts at a phase boundary and ramps over tDurationTransition.
 tStore_new = 0;
 footSpeed1Store_new = footSpeed1Store(1);
 footSpeed2Store_new = footSpeed2Store(1);

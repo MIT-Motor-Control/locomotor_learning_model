@@ -1,5 +1,6 @@
 function paramFixed = loadProtocolParameters(paramFixed)
-% Set the treadmill protocol and derive the learning-iteration budget.
+% Add the treadmill protocol and the learning-iteration budget to paramFixed.
+% Requires paramFixed.Learner.numStepsPerIteration (loadLearnerParameters).
 
 paramFixed.SplitOrTied = 'split';
 paramFixed.speedProtocol = 'classic split belt';
@@ -8,9 +9,10 @@ paramFixed.imposedFootSpeeds = makeTreadmillSpeed_Split(paramFixed);
 
 drawnow;
 
-% The supported protocol uses level ground.
+% Level ground; nonzero slopes have not been tested.
 paramFixed.angleSlope = 0;
 
+% Approximate step duration (nondimensional) used to convert protocol time to steps.
 nominalStepTime = 1.7;
 paramFixed.numStepsToLearn = paramFixed.imposedFootSpeeds.tList(end)/nominalStepTime;
 paramFixed.numStepsToLearn = round(paramFixed.numStepsToLearn/100)*100;

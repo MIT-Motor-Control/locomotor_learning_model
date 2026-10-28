@@ -2,7 +2,17 @@ function postProcessHelper_JustThePlots(stateVar0,tStore,stateStore, ...
     EmetStore,EmetPerTimeStore,tStepStore,paramController,paramFixed,doAnimate, ...
     EworkPushoffStore,EworkHeelstrikeStore, EdotStore_IterationAverage, ...
     tTotalIterationStore)
-% Compute gait asymmetries and the metabolic transient.
+% Compute step asymmetries and the VO2-filtered energy rate, and plot the results.
+% Split-belt runs show step length asymmetry and energy rate, tied-belt runs show
+% step frequency; both show the belt speeds.
+% Inputs:  tStore, stateStore - per-stance time and state trajectories
+%          EmetStore          - per-step energy; only its length is used
+%          paramFixed         - model and protocol parameters
+%          EdotStore_IterationAverage - energy rate of each learning iteration
+%          tTotalIterationStore       - duration of each learning iteration
+%          stateVar0, EmetPerTimeStore, tStepStore, paramController, doAnimate,
+%          EworkPushoffStore, EworkHeelstrikeStore - unused
+
 paramFixed.numSteps = length(EmetStore);
 
 tStanceList = zeros(paramFixed.numSteps,1);
@@ -13,12 +23,13 @@ for iStep = 1:paramFixed.numSteps
     stepLengthList(iStep) = abs(2*paramFixed.leglength*sin(theta_end));
 end
 
-% Odd stance intervals use the fast belt and end with contact on the slow belt.
+% Odd stance intervals are on belt 1 (fast) and end with heel strike on belt 2
+% (slow), so odd intervals give slow step lengths. Step length asymmetry
+% follows paper Eq. 3.
 tStance_fast = tStanceList(1:2:end);
 tStance_slow = tStanceList(2:2:end);
 
 stepTimeAsymmetryList = (tStance_slow-tStance_fast)./(tStance_slow+tStance_fast);
-% Assign step lengths by the belt contacted at the end of each interval.
 stepLength_slow = stepLengthList(1:2:end);
 stepLength_fast = stepLengthList(2:2:end);
 stepLengthAsymmetryList = (stepLength_fast-stepLength_slow)./(stepLength_fast+stepLength_slow);
@@ -31,6 +42,7 @@ skipPlot = 10;
 
 if strcmp(paramFixed.SplitOrTied,'split')
 
+    % The first interval starts at midstance, so its stance time is incomplete.
     stepTimeAsymmetryList(1) = NaN;
     strideCountList = 1:length(stepTimeAsymmetryList);
 

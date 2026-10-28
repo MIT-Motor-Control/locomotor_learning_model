@@ -1,4 +1,4 @@
-"""Convert stride-wise metabolic rate into an indirect-calorimetry-like signal."""
+"""First-order VO2 kinetics filter for the simulated metabolic rate."""
 
 from __future__ import annotations
 
@@ -7,7 +7,19 @@ from scipy.integrate import solve_ivp
 
 
 def convert_met_to_vo2(params: dict) -> tuple[np.ndarray, np.ndarray]:
-    """Apply first-order smoothing to stride-wise metabolic rate."""
+    """Return the metabolic rate filtered by first-order VO2 kinetics.
+
+    Integrates dE/dt = (Edot(t) - E) / tau with tau = 44 s (converted to model time with
+    L = 0.95 m) and Edot interpolated linearly. E starts at the mean of the first 30 rates,
+    or of all rates if there are fewer.
+
+    Args:
+        params: ``tList``, dimensionless sample times, and ``EmetRateList``, the
+            metabolic rate at those times.
+
+    Returns:
+        Sample times and the filtered metabolic rate at those times.
+    """
     time_constant = 44.0
     grav = 9.81
     leg_length = 0.95
@@ -23,6 +35,7 @@ def convert_met_to_vo2(params: dict) -> tuple[np.ndarray, np.ndarray]:
         return t_span.copy(), np.array([emet_vo2_initial])
 
     def ode_met_to_vo2(t: float, emet_vo2: np.ndarray) -> np.ndarray:
+        """Return dE/dt of the filter."""
         emet_now = np.interp(t, t_span, emet_rate_list)
         return np.array([gain * (emet_now - emet_vo2[0])])
 

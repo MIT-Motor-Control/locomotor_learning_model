@@ -16,6 +16,7 @@ from .zenodo import EXPERIMENTAL_PATHS, prepare_zenodo_data
 
 
 def _verified_manifest(root: Path) -> dict:
+    """Return the manifest of ``root`` after verifying every listed checksum."""
     integrity = verify_data(root)
     if integrity["errors"]:
         first = integrity["errors"][0]
@@ -26,6 +27,7 @@ def _verified_manifest(root: Path) -> dict:
 
 
 def _fingerprints(root: Path, manifest: dict) -> dict[str, str]:
+    """Map each listed path to its manifest SHA-256 and add the SHA-256 of ``manifest.json``."""
     return {
         **{item["path"]: item["sha256"] for item in manifest["files"]},
         "manifest.json": sha256(root / "manifest.json"),
@@ -33,7 +35,11 @@ def _fingerprints(root: Path, manifest: dict) -> dict[str, str]:
 
 
 def _entries(archive: zipfile.ZipFile) -> list[tuple[zipfile.ZipInfo, Path]]:
-    """Validate archive paths, file types and extraction-path collisions."""
+    """Return (entry, path below ``publication/``) pairs after validating every member.
+
+    Paths must be relative, portable and under ``publication/``; links, special files,
+    encrypted members and case- or Unicode-equivalent duplicates are rejected.
+    """
     result, seen = [], {}
     for entry in archive.infolist():
         name = entry.orig_filename
@@ -70,6 +76,7 @@ def _entries(archive: zipfile.ZipFile) -> list[tuple[zipfile.ZipInfo, Path]]:
 
 
 def _extract(archive_path: Path, destination: Path) -> None:
+    """Extract a validated archive into the new folder ``destination``."""
     try:
         with zipfile.ZipFile(archive_path) as archive:
             entries = _entries(archive)
@@ -89,7 +96,22 @@ def _extract(archive_path: Path, destination: Path) -> None:
 
 
 def install_publication_archive(archive: Path, destination: Path, source: Path) -> dict:
-    """Install a verified input ZIP, cross-checking its measurements against ``source``."""
+    """Install a ``publication/`` input ZIP after checking it against the public CSVs.
+
+    An existing experimental-only dataset is upgraded, an identical dataset is kept and any
+    other existing dataset is rejected.
+
+    Args:
+        archive: ZIP with all members under ``publication/``, including ``manifest.json``.
+        destination: Prepared-data folder to create or upgrade.
+        source: Public DATA folder whose measurement CSVs must agree with the archive.
+
+    Returns:
+        The manifest of the installed dataset.
+
+    Raises:
+        ValueError: If the archive fails verification or conflicts with ``destination``.
+    """
     archive, destination, source = Path(archive), Path(destination), Path(source)
     if destination.is_symlink():
         raise ValueError("The publication destination must not be a symbolic link.")

@@ -1,1 +1,1 @@
-"""Initialization helpers for the Python locomotor learning model."""
+"""Initial body state, initial controller and treadmill speed lookup."""

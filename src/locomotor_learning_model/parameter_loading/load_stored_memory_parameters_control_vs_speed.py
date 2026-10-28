@@ -1,11 +1,23 @@
-"""Initial stored controller memory."""
+"""Initial context-dependent controller memory."""
 from __future__ import annotations
 
 import numpy as np
 
 
 def load_stored_memory_parameters_control_vs_speed(param_fixed: dict) -> dict:
-    """Return dictionary with stored memory settings."""
+    """Add the initial controller memory as ``param_fixed["storedmemory"]``.
+
+    The memory predicts the 8-element learned controller for belt-speed context ``c`` as
+    ``nominalControl + controlSlopeVsContext @ (c - nominalContext)``; the learner
+    updates ``controlSlopeVsContext``.
+
+    Args:
+        param_fixed: Parameter dictionary to update in place; ``nominalControl`` is
+            defined for ``swingCost["Coeff"] == 0.9``.
+
+    Returns:
+        The updated ``param_fixed``.
+    """
     stored = {}
     if param_fixed.get('swingCost', {}).get('Coeff') == 0.9:
         stored['nominalControl'] = np.array([

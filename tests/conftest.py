@@ -1,3 +1,5 @@
+"""Shared pytest fixtures."""
+
 import pytest
 
 from locomotor_learning_model.parameter_loading.load_biped_model_parameters import (
@@ -22,6 +24,7 @@ from locomotor_learning_model.parameter_loading.load_stored_memory_parameters_co
 
 @pytest.fixture
 def model_parameters():
+    """Return the default fixed parameters and controller with the belt-speed schedule attached."""
     fixed = load_biped_model_parameters({})
     fixed = load_sensory_noise_parameters(fixed)
     controller = load_controller_gain_parameters(fixed)

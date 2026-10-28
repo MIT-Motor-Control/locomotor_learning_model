@@ -1,4 +1,8 @@
-"""Compare a deterministic MATLAB reference export against the Python port."""
+"""Compare the Python implementation with a deterministic MATLAB reference run.
+
+The reference is written by matlab/validation/export_reference_run.m. Both runs use the
+default parameters with exploratory and sensory energy noise set to zero.
+"""
 
 from __future__ import annotations
 
@@ -48,7 +52,7 @@ from locomotor_learning_model.parameter_loading.load_stored_memory_parameters_co
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Build the CLI parser."""
+    """Return the parser for the reference path and the absolute tolerance."""
     parser = argparse.ArgumentParser(
         description=(
             "Validate the Python implementation against a deterministic MATLAB reference "
@@ -70,7 +74,18 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Compare the current Python implementation against a MATLAB export."""
+    """Rerun the reference configuration in Python and compare it with the MATLAB export.
+
+    Compares, by maximum absolute difference, the initial objective value, 10D
+    controller, body state and belt speeds, and the controller tried at each learning
+    iteration (``controllerStore8D``).
+
+    Args:
+        argv: Command-line arguments; None reads ``sys.argv``.
+
+    Returns:
+        0 if every difference is finite and within the tolerance, otherwise 1.
+    """
     parser = build_parser()
     args = parser.parse_args(argv)
     if not np.isfinite(args.tolerance) or args.tolerance < 0:

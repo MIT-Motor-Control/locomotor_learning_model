@@ -1,3 +1,5 @@
+"""Publication command line: data verification, packaging, reproduction and preparation."""
+
 import json
 from pathlib import Path
 from zipfile import ZipFile
@@ -9,6 +11,7 @@ from locomotor_learning_model.publication.reporting import sha256, verify_data
 
 
 def prepared(tmp_path):
+    """Return a dataset folder with one CSV and a matching manifest."""
     root = tmp_path / "input"
     root.mkdir()
     source = root / "value.csv"
@@ -78,6 +81,7 @@ def test_failed_figure_has_log_and_nonzero_exit(tmp_path, monkeypatch):
     root = prepared(tmp_path)
 
     def fail(*_):
+        """Raise an input error from the renderer."""
         raise ValueError("test input invalid")
 
     monkeypatch.setattr(main_figures, "render_main", fail)
@@ -100,12 +104,13 @@ def test_reproduce_protects_unmanaged_output(tmp_path):
 def test_missing_model_inputs_are_blocked_not_execution_failures(tmp_path):
     root = prepared(tmp_path)
     output = tmp_path / "output"
-    command = ["reproduce", "--data", str(root), "--output", str(output), "--figures", "s1", "figure4", "s4"]
+    figures = ["figure2", "s1", "figure4", "s3", "s4"]
+    command = ["reproduce", "--data", str(root), "--output", str(output), "--figures", *figures]
     assert main(command) == 0
     report = json.loads((output / "report.json").read_text())
-    assert {item["id"]: item["status"] for item in report["results"]} == {
-        "s1": "blocked", "figure4": "blocked", "s4": "blocked"
-    }
+    assert {item["id"]: item["status"] for item in report["results"]} == dict.fromkeys(
+        figures, "blocked"
+    )
     assert not (output / "logs").exists()
     assert main(command + ["--overwrite", "--strict"]) == 2
 
@@ -128,12 +133,13 @@ def test_prepare_discovers_embedded_archive_from_relative_default_and_wrapper_so
     (dataset / "processed_csv").mkdir(parents=True)
     companion = dataset / "publication-data.zip"
     companion.write_bytes(b"embedded archive")
-    legacy = Path("data/publication-data.zip")
-    legacy.parent.mkdir(exist_ok=True)
-    legacy.write_bytes(b"older external archive")
+    external = Path("data/publication-data.zip")
+    external.parent.mkdir(exist_ok=True)
+    external.write_bytes(b"external archive in data/")
     calls = []
 
     def install(archive, destination, source):
+        """Record the installation arguments and return a one-file manifest."""
         calls.append((archive.resolve(), destination, source))
         return {"files": [{"path": "model input"}]}
 
@@ -143,13 +149,13 @@ def test_prepare_discovers_embedded_archive_from_relative_default_and_wrapper_so
     assert calls == [(companion.resolve(), Path("data/publication"), Path(source_option) if source_option else dataset)]
 
 
-@pytest.mark.parametrize("mode", ["wrapper", "legacy", "explicit"])
+@pytest.mark.parametrize("mode", ["wrapper", "data_folder", "explicit"])
 def test_prepare_preserves_external_archive_choices(tmp_path, monkeypatch, mode):
     from locomotor_learning_model.publication import archive as installer
 
     monkeypatch.chdir(tmp_path)
     (Path("download/DATA") / "processed_csv").mkdir(parents=True)
-    expected = {"wrapper": "download/publication-data.zip", "legacy": "data/publication-data.zip", "explicit": "chosen.zip"}[mode]
+    expected = {"wrapper": "download/publication-data.zip", "data_folder": "data/publication-data.zip", "explicit": "chosen.zip"}[mode]
     selected = Path(expected)
     selected.parent.mkdir(exist_ok=True)
     selected.write_bytes(b"selected archive")
@@ -158,6 +164,7 @@ def test_prepare_preserves_external_archive_choices(tmp_path, monkeypatch, mode)
     calls = []
 
     def install(archive, *_):
+        """Record the selected archive and return an empty manifest."""
         calls.append(archive.resolve())
         return {"files": []}
 
@@ -178,6 +185,7 @@ def test_prepare_without_companion_keeps_experimental_import(tmp_path, monkeypat
     calls = []
 
     def prepare(actual_source, destination):
+        """Record the import arguments and return an experimental-only manifest."""
         calls.append((actual_source, destination))
         return {"files": [], "dataset_kind": "zenodo_experimental"}
 

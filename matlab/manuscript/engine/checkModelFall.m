@@ -1,5 +1,9 @@
 function [fall_info, y_pos] = checkModelFall(tlist, statelist, leglength, iStride)
-% Detect a fall when the point mass passes below ground level.
+% Detect a fall when the point mass passes below ground level during a step.
+% Inputs:  tlist - sample times; statelist - states, leg angle in column 1
+%          leglength - leg length; iStride - current learning iteration
+% Outputs: fall_info - [1 iStride] if any sample is below ground, otherwise [0 0]
+%          y_pos - minimum height of the point mass
     fall_info = [0 0];
 
     x_positions = zeros(length(tlist), 1);

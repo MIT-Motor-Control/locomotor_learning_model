@@ -1,4 +1,4 @@
-"""Tied-belt treadmill speed protocol definitions."""
+"""Tied-belt treadmill speed protocols."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import numpy as np
 
 
 def _phase_arrays(durations: list[float], speeds: list[float]) -> tuple[np.ndarray, np.ndarray]:
-    """Construct cumulative phase times and corresponding speeds."""
+    """Return phase boundary times and speeds, repeating the first speed at time zero."""
     t_store = np.cumsum(np.array([0.0, *durations], dtype=float))
     speed_store = np.array([speeds[0], *speeds], dtype=float)
     return t_store, speed_store
@@ -18,7 +18,7 @@ def _with_transitions(
     foot_speed2_store: np.ndarray,
     transition_duration: float,
 ) -> dict[str, np.ndarray]:
-    """Insert finite-duration transitions between speed phases."""
+    """Return the schedule with a linear ramp after each interior phase boundary."""
     t_store_new = [float(t_store[0])]
     foot_speed1_new = [float(foot_speed1_store[0])]
     foot_speed2_new = [float(foot_speed2_store[0])]
@@ -52,7 +52,21 @@ def _with_transitions(
 
 
 def make_treadmill_speed_tied(param_fixed: dict) -> dict[str, np.ndarray]:
-    """Build a tied-belt treadmill protocol from the requested timing table."""
+    """Return the tied-belt speed schedule with linear ramps between phases.
+
+    Both belts follow 0.5, 0.75, 1, 1.25 or 1.5 times the normal speed -0.35 (units of
+    sqrt(g * L), L = 0.95 m). Phase durations in minutes are listed in ``protocol_specs``.
+
+    Args:
+        param_fixed: Parameters with ``speedProtocol`` and optionally ``transitionTime``
+            in seconds (default 3, written back).
+
+    Returns:
+        Schedule with the same keys as ``make_treadmill_speed_split``.
+
+    Raises:
+        ValueError: For an unknown protocol.
+    """
     leg_length = 0.95
     grav = 9.81
     time_scaling = np.sqrt(leg_length / grav)

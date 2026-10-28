@@ -1,5 +1,7 @@
 function g = gradientOfErrorFromMemoryCompute(slopeJControllerVsContext,pInputNow_ConsideredGood,paramFixed,contextGaitNow)
-% Differentiate the stored-policy prediction error with respect to its slopes.
+% Return the forward-difference gradient of errorFromMemoryCompute with respect to the slopes.
+% Inputs:  as for errorFromMemoryCompute
+% Outputs: g - gradient, same size as slopeJControllerVsContext
 
 f0 = errorFromMemoryCompute(slopeJControllerVsContext,pInputNow_ConsideredGood,paramFixed,contextGaitNow);
 

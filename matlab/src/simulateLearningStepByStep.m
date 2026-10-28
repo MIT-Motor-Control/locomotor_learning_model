@@ -1,15 +1,26 @@
 function pInputControllerStore_OnesTried = simulateLearningStepByStep(paramFixed, ...
     pInputControllerAsymmetricNominal,stateVar0_Model,contextNow, ...
     paramControllerGains)
-% Update the controller from noisy energy estimates and learned dynamics.
+% Simulate learning of the 8-D nominal controller over paramFixed.numIterations iterations.
+% Each iteration moves the controller along a model-based estimate of the
+% objective gradient and toward the context-dependent memory, adds exploration
+% noise, walks one iteration with it, refits the linear state and objective
+% models, and updates the memory.
+% Inputs:  paramFixed                        - model, learner and protocol parameters
+%          pInputControllerAsymmetricNominal - initial 10-D nominal controller
+%          stateVar0_Model                   - initial midstance state
+%          contextNow                        - initial belt speeds [belt 1; belt 2]
+%          paramControllerGains              - feedback gains
+% Outputs: pInputControllerStore_OnesTried   - 8-D controllers walked, one column per iteration
 
-disp(['Simulating Learning While Walking ... (' num2str(paramFixed.numIterations) ' strides)']);
+disp(['Simulating learning while walking (' num2str(paramFixed.numIterations) ' learning iterations)']);
 
 noiseSTD = paramFixed.Learner.noiseSTDExploratory;
 numIterations = paramFixed.numIterations;
 includeInternalModelOrNot = paramFixed.Learner.includeInternalModel;
 
-% Fix the two odd-leg position coordinates to define the spatial origin.
+% Learn 8 of the 10 parameters; the odd-step position targets stay at zero
+% and define the spatial origin.
 pInputControllerAsymmetricNominal = pInputControllerAsymmetricNominal([1:3 6:10]);
 numLearningDimensions = length(pInputControllerAsymmetricNominal);
 numStateDimensions = length(stateVar0_Model);
@@ -74,14 +85,14 @@ for iStride = 1:numIterations
 
     dirTowardMemory = (pInputMemoryNow-pInputNow_ConsideredGood);
 
-    % Memory attraction depends on alignment with the energy gradient.
+    % Step toward the memory, weighted by its alignment with the descent direction.
     temp = ...
         dot(dirTowardMemory,-gEnergyGradientNow)/norm(dirTowardMemory,2)/norm(gEnergyGradientNow,2);
     memoryToGradientDirectionCosineStore(iStride) = temp;
 
     powerMovetoMemory = paramFixed.Learner.powerToTheMoveToMemory;
 
-    % A zero-length direction gives an undefined direction cosine.
+    % The cosine is NaN when either vector is zero, e.g. before the first model fit.
     if isnan(temp)
         temp = 1*paramFixed.Learner.LearningRateTowardMemory;
     else
@@ -97,6 +108,8 @@ for iStride = 1:numIterations
     pInputNow_ConsideredGood = pInputNow_ConsideredGood + delta_pInputNow2_Gradient;
     pInputNow_ToTry = pInputNow_ConsideredGood + delta_pInputNow1_Noise;
 
+    % EdotNow is the weighted objective of fObjective_AsymmetricNominal; the
+    % learner's energy variables (Edot*, AdynamicsEnergy*, gEnergy*) refer to it.
     [EdotNow,stateVar0_ModelNext,tEnd] = ...
         fObjective_AsymmetricNominal_8DTo10D(pInputNow_ToTry,stateVar0_ModelNow, ...
         paramControllerGains,paramFixed,tStart);
@@ -110,6 +123,8 @@ for iStride = 1:numIterations
     pInputControllerStore_OnesConsideredGood = ...
         [pInputControllerStore_OnesConsideredGood pInputNow_ConsideredGood];
 
+    % The models are first fit at iteration numStridesToUse+1; until then they
+    % and the gradient estimate stay zero.
     if iStride>numStridesToUse
         [AdynamicsModelNow,errorOldDynamicsModel,errorNewDynamicsModel] = ...
             computeModelDynamicsModelRLS_NoSingular(AdynamicsModelNow,stateVarNowStore,...
@@ -159,6 +174,8 @@ for iStride = 1:numIterations
         gradientOfErrorFromMemoryCompute(paramFixed.storedmemory.controlSlopeVsContext, ...
         pInputNow_ConsideredGood,paramFixed,contextNow);
 
+    % Memory formation: update the slopes more when the controller moves away
+    % from the memory, and not at all when the cosine is undefined.
     n_memorytocurrentcontroller = -dirTowardMemory;
     n_memorytocurrentcontroller = n_memorytocurrentcontroller/norm(n_memorytocurrentcontroller,2);
 
@@ -169,7 +186,6 @@ for iStride = 1:numIterations
 
     temp = dot_MemoryToCurrent_vCurrent;
     powerForMemoryFormation = paramFixed.Learner.powerToTheMemoryFormation;
-    % A zero-length direction gives an undefined direction cosine.
     if isnan(temp)
         temp = 0;
     else
@@ -188,6 +204,7 @@ for iStride = 1:numIterations
     [vA,vB] = getTreadmillSpeed(tStart,paramFixed.imposedFootSpeeds);
     contextNow = [vA; vB];
 
+    % One context-noise draw is shared by both belts.
     contextNow = contextNow + paramFixed.noiseEnergySensory*randn;
 
 end

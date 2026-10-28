@@ -1,3 +1,5 @@
+"""Inverted-pendulum stance dynamics on a moving belt."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -9,17 +11,37 @@ def single_pendulum_ode(
     param_fixed,
     param_controller,
 ) -> np.ndarray:
-    """Evaluate simple inverted-pendulum stance dynamics."""
+    """Return the time derivative of the inverted-pendulum stance state.
+
+    ``theta`` is the stance-leg angle from vertical, positive with the body
+    ahead of the foot. Belt acceleration ``a`` adds the inertial term
+    ``-a cos(theta) / leglength`` to the angular acceleration unless
+    ``includeAccelerationTorque`` is false. Without a belt-speed schedule in
+    ``param_controller``, the foot moves at the nominal tied-belt speed -0.3276
+    (1.0 m/s) with zero acceleration.
+
+    Args:
+        t: Time (nondimensional).
+        state_var: Stance state ``[theta, theta_dot, y_foot]``.
+        param_fixed: Model parameters ``mbody``, ``leglength`` and ``gravg``.
+        param_controller: Belt-speed schedule ``tList_BeltSpeed``,
+            ``PushoffFootSpeedNowList`` and ``PushoffAccelerationNowList``.
+            ``PushoffFootSpeedNow`` and ``PushoffAccelerationNow`` are set to
+            their values at ``t``.
+
+    Returns:
+        ``[theta_dot, theta_ddot, y_foot_dot]``.
+    """
 
     angle_theta = state_var[0]
     dangle_theta = state_var[1]
 
-    if ('tList_BeltSpeed' not in param_controller or 
+    if ('tList_BeltSpeed' not in param_controller or
         'PushoffAccelerationNowList' not in param_controller):
         param_controller['PushoffAccelerationNow'] = 0.0
     else:
-        # Hold acceleration constant within each belt-schedule segment;
-        # linear interpolation would introduce torque during constant-speed phases.
+        # Acceleration is piecewise constant between schedule knots; linear
+        # interpolation would add torque during constant-speed phases.
         _t_knots = param_controller['tList_BeltSpeed']
         _acc_list = param_controller['PushoffAccelerationNowList']
         _idx = int(np.searchsorted(_t_knots, t, side='right')) - 1
@@ -41,11 +63,10 @@ def single_pendulum_ode(
         + torque_due_to_acceleration
     )
 
-    if ('tList_BeltSpeed' not in param_controller or 
+    if ('tList_BeltSpeed' not in param_controller or
         'PushoffFootSpeedNowList' not in param_controller):
         param_controller['PushoffFootSpeedNow'] = -0.3276
     else:
-        # Belt velocity varies linearly during each transition ramp.
         param_controller['PushoffFootSpeedNow'] = float(
             np.interp(
                 t,

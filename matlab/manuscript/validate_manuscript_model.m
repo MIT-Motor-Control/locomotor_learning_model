@@ -1,4 +1,6 @@
 function validate_manuscript_model(output_dir)
+% Check step budgets, seeded repeatability, saved-trial reuse, mismatch rejection and sweep restart.
+% Inputs:  output_dir - directory for validation trials (default: a new temporary folder)
 if nargin < 1; output_dir = tempname; end
 validate_protocol_step_budgets;
 if ~isfolder(output_dir); mkdir(output_dir); end
@@ -26,6 +28,7 @@ disp('Manuscript engine: seeded repeatability, saved-trial reuse, mismatch rejec
 end
 
 function validate_protocol_step_budgets()
+% Check that odd step requests are rounded up to complete step pairs before budgeting.
 old_path = path;
 restore_path = onCleanup(@() path(old_path));
 engine_dir = fullfile(fileparts(mfilename('fullpath')), 'engine');

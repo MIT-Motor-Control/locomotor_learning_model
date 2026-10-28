@@ -47,9 +47,11 @@ def test_run_pause_and_resume_inherit_state_without_changing_source(tmp_path, mo
 
 @pytest.fixture
 def simulation_calls(monkeypatch):
+    """Replace ``run_simulation`` with a stub; return the list of its keyword arguments."""
     calls = []
 
     def simulate(**kwargs):
+        """Record the keyword arguments and return a minimal completed result."""
         calls.append(kwargs)
         return SimpleNamespace(
             summary={"average_energy_rate": 0.1, "final_average_energy_rate": 0.1},
@@ -104,7 +106,7 @@ def test_run_preserves_model_defaults_and_supports_custom_output(simulation_call
     assert request["make_plots"] is True
 
 
-def test_legacy_flags_keep_their_original_defaults(simulation_calls):
+def test_options_without_command_save_nothing_by_default(simulation_calls):
     assert cli.main(["--seed", "7", "--iterations", "12"]) == 0
     request = simulation_calls[0]
     assert request["seed"] == 7

@@ -3,7 +3,18 @@ function [pInput0_out,tlistTillEndstance, statevarlistTillEndstance, ...
    Emet_total,Emet_perTime,tTotal,Ework_pushoff,Ework_heelstrike,fall_info, y_pos] = ...
     simulateOneStep_MidstanceToMidstance_WithEnergy(pInput0,iStep,tStart, ...
     paramController,paramFixed,SwingCostCoeff,iStride)
-% Simulate one midstance-to-midstance step and its mechanical energy costs.
+% Simulate one midstance-to-midstance step and its metabolic energy cost.
+% Inputs:  pInput0 - midstance state (ordering in run_sim)
+%          iStep - step index; odd steps push off from belt 1, even steps from belt 2
+%          tStart - start time; paramController - feedback gains and current targets
+%          paramFixed - model settings; SwingCostCoeff - swing-cost multiplier
+%          iStride - learning iteration, recorded on a fall
+% Outputs: pInput0_out - next midstance state
+%          tlistTillEndstance, statevarlistTillEndstance - midstance to push-off
+%          tlistTillMidstance, statevarlistMidstance - heel strike to the next midstance
+%          Emet_total - metabolic energy; Emet_perTime - metabolic power; tTotal - step duration
+%          Ework_pushoff, Ework_heelstrike - magnitudes of push-off and heel-strike work
+%          fall_info, y_pos - outputs of checkModelFall for the step
 
 if rem(iStep,2)==0
     paramController.tList_BeltSpeed = paramFixed.imposedFootSpeeds.tList;
@@ -46,7 +57,7 @@ delta_y_atMidstance = y_atMidstance_Slopeframe - ...
 delta_SUMy = SUMy0-paramController.SUMy_atMidstance_nominal_slopeframe;
 
 ydot_atMidstance_LabFrame = ydot_atMidstance+paramController.PushoffFootSpeedNow;
-% Nominal belt speed used for lab-frame velocity feedback.
+% Nominal belt speed for lab-frame velocity feedback: 1.0 m/s with speed_divisor = 2.
 vFootNominal = -0.5;
 paramController.ydot_atMidstance_nominal_labframe = ...
     paramController.ydot_atMidstance_nominal_beltframe+vFootNominal;
@@ -55,6 +66,7 @@ delta_ydot_atMidstance_labframe = ydot_atMidstance_LabFrame-paramController.ydot
 delta_ydot_atMidstance_beltframe = delta_ydot_atMidstance_beltframe + ...
     paramFixed.velocitySensoryNoise*randn;
 
+% Deviation of the belt speed from vFootNominal, less any velocity sensory noise.
 delta_vFoot_labFrame = ...
     (delta_ydot_atMidstance_labframe-delta_ydot_atMidstance_beltframe);
 paramController.theta_end_thisStep = paramController.theta_end_nominal+ ...
@@ -120,6 +132,7 @@ stepLength_nextStep = ...
 vector_leadingleg = ...
     [-sin(paramController.theta_end_thisStep+paramFixed.angleSlope) cos(paramController.theta_end_thisStep+paramFixed.angleSlope)];
 unit_vector_leadingleg = vector_leadingleg/norm(vector_leadingleg);
+% Heel strike removes the velocity component along the leading leg.
 v_afterHeelStrike_heelstrikeFootFrame = v_afterPushoff_heelstrikeFootFrame - (dot(unit_vector_leadingleg,v_afterPushoff_heelstrikeFootFrame)*unit_vector_leadingleg);
 
 deltaE_heelstrike = ...
@@ -155,6 +168,7 @@ yFootEnd_Step2 = yFoot0;
 
 pInput0_out = [stateVar0; SUMy0];
 
+% Step-to-step cost: positive and negative work divided by their muscle efficiencies.
 Ework_pushoff = abs(deltaE_pushoff);
 Ework_heelstrike = abs(deltaE_heelstrike);
 Emet_step2step = paramFixed.bPos*Ework_pushoff + paramFixed.bNeg*Ework_heelstrike;
