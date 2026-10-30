@@ -24,8 +24,8 @@ Repeated runs in one environment give identical tables, except the double-expone
 
 ## DATA archive
 
-`locomotor_learning_model-DATA.zip`: 13,269,924,017 bytes, SHA-256
+`locomotor_learning_model-DATA.zip`: 13,269,920,505 bytes, SHA-256
 
 ```text
-7fe389e9125e56338a5e99bd1448474ef20447930fc1aaaf3c3becb02679c945
+0c9bef014af484a419746141cd887eb0d1e66020cad4f593897cb7646eff26aa
 ```
